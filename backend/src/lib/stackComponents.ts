@@ -79,6 +79,14 @@ export async function listTierCandidates(category: TierStackCategory): Promise<T
   return await res.json() as TierCandidates;
 }
 
+/** stack-owns-model-choices: tell the Stack which model a level now uses; the Stack applies what that means (for voice, the speaking engine). A Stack too old to know the route answers 404 and the call is a no-op. */
+export async function chooseStackModel(category: TierStackCategory, tier: "reduced" | "standard" | "boost" | "max", model: string): Promise<{ applied: boolean; pending_restart: boolean }> {
+  const res = await call("/stack/v1/tiers/choice", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ category, tier, model }) });
+  if (res.status === 404) return { applied: false, pending_restart: false };
+  if (!res.ok) return failure(res);
+  return await res.json() as { applied: boolean; pending_restart: boolean };
+}
+
 /** AUDIT-DUP-ROUTES-01: the one answer a component route gives for a Stack component error (404 and 409 as they are, anything else 503);
  * an error that is not a StackComponentError is a bug and rethrows. Was copied byte for byte in routes/components.ts and routes/aiChoices.ts. */
 export function componentFailure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {

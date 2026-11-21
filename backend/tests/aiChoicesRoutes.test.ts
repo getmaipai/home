@@ -558,6 +558,7 @@ describe("choosing a chat model for Standard in Settings switches the running ch
   let loaded: string[] = [];
   let slotsInstalled: string[] = [];
 
+  let choices: Array<{ category: string; tier: string; model: string }> = [];
   function wire(installed: string[], running: string) {
     const pin = (id: string, extra: object = {}) => ({ id, role: "chat", license: "Apache-2.0", revision: "r", download: { url: `https://example.com/${id}.gguf`, sha256: "a".repeat(64), approx_bytes: 1000 }, ...extra });
     __setStackClientForTests({
@@ -573,13 +574,21 @@ describe("choosing a chat model for Standard in Settings switches the running ch
         const ids = url.searchParams.get("category") === "chat" ? [PICK, tierModel()] : ["z-image-turbo"];
         return Response.json({ category: url.searchParams.get("category"), profile: "p128", room_bytes: 90 * GIB, levels: ["standard", "boost", "max"].map((tier) => ({ tier, cap_bytes: 80 * GIB, recommended: ids[0], candidates: ids.map((id) => ({ id, label: id, family: "f", peak_bytes: 1e9, verified: true, fits: true, refusal: null })) })) });
       }
+      if (url.pathname === "/stack/v1/tiers/choice") { choices.push(JSON.parse(String(init?.body))); return Response.json({ ok: true, applied: false, pending_restart: false }); }
       if (url.pathname === "/stack/v1/components") return Response.json({ tier: "p128", free_disk_bytes: 800 * GIB, disk_margin_bytes: 5 * GIB, installed_bytes: 0, components: [] });
       if ((init?.method ?? "GET") === "POST" && url.pathname.endsWith("/install")) { slotsInstalled.push(decodeURIComponent(url.pathname.split("/")[4] ?? "")); return Response.json({ job: "job-part" }, { status: 202 }); }
       return Response.json({}, { status: 500 });
     }) as never);
   }
-  beforeEach(() => { pulled = []; loaded = []; slotsInstalled = []; });
+  beforeEach(() => { pulled = []; loaded = []; slotsInstalled = []; choices = []; });
   const slot = (category: string, tier: string) => (getHouseholdSettingValue(`engines.${category}.tier.${tier}`) as { model: string } | undefined)?.model;
+
+  test("a level pick is sent to the Stack, which applies what it means (stack-owns-model-choices)", async () => {
+    const { client } = await owner();
+    wire([tierModel(), PICK], tierModel());
+    expect((await client.post("/api/ai/level/voice/standard/install", { model: "z-image-turbo" })).status).toBe(200);
+    expect(choices).toEqual([{ category: "voice", tier: "standard", model: "z-image-turbo" }]);
+  });
 
   test("an installed chat model picked for Standard is loaded and saved", async () => {
     const { client } = await owner();

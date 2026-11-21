@@ -16,7 +16,7 @@ import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } fro
 import { rowHasModel, type DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
 import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from "@/lib/aiUnused";
-import { componentFailure, installStackComponent, listStackComponents, listTierCandidates, type TierStackCategory, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
+import { componentFailure, installStackComponent, listStackComponents, listTierCandidates, chooseStackModel, type TierStackCategory, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
@@ -518,6 +518,8 @@ aiChoicesRoutes.openapi(levelInstallRoute, async (c) => {
       ? (() => { const slot = readSlot(slotCategory, "reduced"); const saved = setHouseholdSettingValue(slotKey(slotCategory, "reduced"), { model, options: slot.options }); return saved.ok ? { ok: true as const } : { ok: false as const, status: saved.status, error: saved.error }; })()
       : writeSlotModel(slotCategory, tier, model);
     if (!write.ok) return c.json({ error: write.error, code: "setting" }, write.status) as never;
+    // The Stack applies what the pick means (a voice pick sets the speaking engine); Home names no model.
+    await chooseStackModel(TIER_STACK_CATEGORY[job]!, tier, model);
     dropModelCaches();
     return c.json({ ok: true as const, job: jobId }, 200);
   } catch (error) { return componentFailure(c, error) as never; }
