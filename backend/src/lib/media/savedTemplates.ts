@@ -3,6 +3,7 @@
 // blanks in the words only, references and styles are empty, no model ids exist in the record. Rated at save time (the stricter of the words' rating and the source's stamp);
 // listed only through `listTemplates`, which filters by the viewer's ceiling and the household setting. A person's lock on the source carries over; being unchecked never makes one.
 import { eq, or } from "drizzle-orm";
+import { isGuestRole } from "@/lib/audience";
 import { MediaTemplate, type MediaTemplate as MediaTemplateRecord } from "@maipai/spec/gen/ts/media-template.js";
 import { validateMediaTemplate } from "@maipai/spec/records/ts/validate.js";
 import { db } from "@/db";
@@ -43,7 +44,7 @@ export function visibleRows(actor: PersonRow, rows: Row[]): Row[] {
   const ceiling = pass.ceiling.made, unrated = pass.unrated.has("made");
   return rows.filter((row) => {
     const owner = row.ownerPersonId === actor.id;
-    if (!owner && (row.sharedWith !== "household" || actor.role === "guest")) return false;
+    if (!owner && (row.sharedWith !== "household" || isGuestRole(actor.role))) return false;
     if (!stampAllowed(stamps.get(row.id) ?? null, ceiling, unrated)) return false;
     if (row.lock === "on" && lockState({ ownerPersonId: row.ownerPersonId, madeAudience: row.audience as "all-ages" | "adult-only", lock: "on" }, actor) !== "open") return false;
     if (row.audience === "adult-only" && !adultStylesAllowed()) return false;   // the household check runs after the stamp filter, for saved rows too
@@ -52,12 +53,12 @@ export function visibleRows(actor: PersonRow, rows: Row[]): Row[] {
 }
 
 export function listSavedTemplates(actor: PersonRow, kind?: SavedKind): MediaTemplateRecord[] {
-  if (actor.role === "guest") return [];
+  if (isGuestRole(actor.role)) return [];
   const rows = db.select().from(savedTemplates).where(or(eq(savedTemplates.ownerPersonId, actor.id), eq(savedTemplates.sharedWith, "household"))).all().filter((row) => !kind || row.kind === kind);
   return visibleRows(actor, rows).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(recordOf).filter((record): record is MediaTemplateRecord => record !== null);
 }
 export function getSavedTemplate(actor: PersonRow, id: string): MediaTemplateRecord | null {
-  if (!id.startsWith("mtpl-") || actor.role === "guest") return null;
+  if (!id.startsWith("mtpl-") || isGuestRole(actor.role)) return null;
   const row = db.select().from(savedTemplates).where(eq(savedTemplates.id, id)).get();
   const seen = row ? visibleRows(actor, [row])[0] : undefined;
   return seen ? recordOf(seen) : null;

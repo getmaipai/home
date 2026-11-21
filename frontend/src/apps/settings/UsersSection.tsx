@@ -1,4 +1,5 @@
 import { i18n } from "@lingui/core";
+import { isGuestRole, isMinor } from "@/lib/audience";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -261,7 +262,7 @@ export function UsersSection({ person, onOpenPerson }: UsersSectionProps) {
 
       {roster ? (
         <SiteBlocksSection
-          roster={roster.filter((p) => (p.role === "child" || p.role === "teen") && p.id !== person.id)}
+          roster={roster.filter((p) => isMinor(p) && !isGuestRole(p.role) && p.id !== person.id)}
         />
       ) : null}
 

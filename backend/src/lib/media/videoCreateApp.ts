@@ -4,6 +4,7 @@
 // re-reads while a clip is made), "clips" = My clips (Library files made at home, own and shared, or the person's uploaded pictures, by `view`).
 // Only the two Create pages bind it and both have an adult floor, so appRouteAllowed refuses the rest.
 import { doneVideoJobsFor } from "@/lib/videos/jobs";
+import { audienceBand, isGuestRole } from "@/lib/audience";
 import { lockedVideoTile } from "@/lib/videos/lock";
 import { feedRowById, feedRowOf, feedRows, levelOfJob } from "@/lib/videos/feed";
 import { favoriteFileIds } from "@/lib/videos/favorites";
@@ -527,7 +528,7 @@ function templateRows(person: PersonRow, inspiration: boolean, limit = 100, filt
   const rows = listTemplates({ actor: person, kind: "video" }).filter((row) => row.id.startsWith(INSPIRATION_PREFIX) === inspiration).filter((row) =>
     filter === "private" ? mineOf(row) && !sharedOf(row) : filter === "shared" ? mineOf(row) && sharedOf(row) : filter === "household" ? !!row.owner_person_id && !mineOf(row) && sharedOf(row) : filter === "starter" ? !row.owner_person_id : true);
   return rows.slice(0, Math.min(Math.max(limit, 1), 100)).flatMap<Record<string, unknown>>((row) => {
-    if (!inspiration) return [{ id: row.id, title: row.title, subtitle: sharedOf(row) && !mineOf(row) ? "Shared with home" : row.summary, thumbnail: templateCoverUrl(row.id), can_share: mineOf(row) && !sharedOf(row) && person.role !== "child" && person.role !== "guest" }];
+    if (!inspiration) return [{ id: row.id, title: row.title, subtitle: sharedOf(row) && !mineOf(row) ? "Shared with home" : row.summary, thumbnail: templateCoverUrl(row.id), can_share: mineOf(row) && !sharedOf(row) && audienceBand(person) !== "child" && !isGuestRole(person.role) }];
     if (!packageAssetFile("video", `showcase/${row.id}.jpg`)) return [];
     const settings = videoTemplateSettings()[row.id];
     const look = videoLookFor(settings?.look)!, camera = videoRecipeFor(settings?.camera);

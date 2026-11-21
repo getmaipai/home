@@ -3,6 +3,7 @@ import { db, sqlite } from "@/db";
 import { attachments, mediaSubjects, mediaProductions, people } from "@/db/schema";
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { isGuestRole } from "@/lib/audience";
 import { attachmentFilePath } from "@/lib/attachments";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -79,7 +80,7 @@ export function updateMediaSubject(actor: PersonRow, id: string, patch: Partial<
 }
 /** ELEMENTS-HOME-05: the voice an element speaks in, stored on the subject and returned by `resolveCast`. Owner's own saved element only (a companion's or a member's voice is theirs). Null clears it. */
 export function setSubjectVoice(actor: PersonRow, id: string, voice: string | null): MediaSubject | null {
-  const existing = rowById(id); if (!existing || existing.personId || existing.synthId || existing.ownerPersonId !== actor.id || actor.role === "guest") return null;
+  const existing = rowById(id); if (!existing || existing.personId || existing.synthId || existing.ownerPersonId !== actor.id || isGuestRole(actor.role)) return null;
   db.update(mediaSubjects).set({ voice, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(mediaSubjects.id, id)).run();
   return getMediaSubject(actor, id);
 }

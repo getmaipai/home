@@ -84,7 +84,8 @@ export async function lookupLyricsFor(
   if (!bandAllows(person, item) || !wordsAllowFor(person, newLyrics.text)) return { ok: true, value: { lookup: "none" } };
   // RULES.md C9: stored content is rated when it arrives and the rating is stored. The item's band is computed at ingest from its words INCLUDING its lyrics (`bandOkAtIngest`), so the new lyrics
   // re-rate it here: lyrics that trip the floor make the item adult (unless an adult already marked it), and the stamp is rewritten from the stored row. A minor is never served them: the item is adult.
-  const band = item.verified_by_person_id ? item.band_ok : bandOkAtIngest({ explicit: item.advisory.explicit, title: item.title, description: item.description, lyrics: newLyrics.text, also: [item.subtitle, item.artist, item.album, item.series, item.author] }).band === "adult" ? "adult" : item.band_ok;
+  const tripped = bandOkAtIngest({ explicit: item.advisory.explicit, title: item.title, description: item.description, lyrics: newLyrics.text, also: [item.subtitle, item.artist, item.album, item.series, item.author] }).advisorySource === "classifier";
+  const band = item.verified_by_person_id || !tripped ? item.band_ok : "adult";
   db.update(mediaItems).set({ lyrics: JSON.stringify(newLyrics), bandOk: band }).where(eq(mediaItems.id, item.id)).run();
   stampMediaById(item.id);
   // MUSIC-GEN-20c: word timing for the new synced lyrics runs in the background; the answer below does not wait for it.

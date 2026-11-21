@@ -1,5 +1,6 @@
 // TEMPLATE-02: the actions behind "Save as a template", rename, delete and Share with home (the readers are in savedTemplates.ts). See that file's header for the rules.
 import { and, eq } from "drizzle-orm";
+import { audienceBand, isGuestRole } from "@/lib/audience";
 import { createHash } from "node:crypto";
 import type { MediaTemplate as MediaTemplateRecord } from "@maipai/spec/gen/ts/media-template.js";
 import { ContentRating, rankOf, type RatingLevel } from "@maipai/spec/ratings/ts/contentRating";
@@ -54,7 +55,7 @@ function blankWords(actor: PersonRow, words: string): { ok: true; words: string 
 
 /** Save a template from a finished clip or picture of the actor's own. Failing closed: if a check cannot run, nothing is saved. */
 export async function saveTemplate(actor: PersonRow, input: { source: SaveSource; title: string; words?: string; category?: string }): Promise<SaveResult> {
-  if (actor.role === "guest") return fail(403, "guest", "Saved templates aren't available to guest profiles.");
+  if (isGuestRole(actor.role)) return fail(403, "guest", "Saved templates aren't available to guest profiles.");
   const title = scrubTitle(actor, input.title.trim()).slice(0, 120);
   if (!title) return fail(400, "title", "Give the template a name.");
   const category = input.category && CATEGORIES.includes(input.category) ? input.category : "other";
@@ -117,7 +118,7 @@ const ownVisibleRow = (actor: PersonRow, id: string): Row | null => { const row 
 /** Rename (the name is rated with the words again, still no looser than the source's own mark). */
 export function renameSavedTemplate(actor: PersonRow, id: string, title: string): SaveResult {
   const row = ownVisibleRow(actor, id);
-  if (!row || actor.role === "guest") return fail(404, "gone", SAVED_NOT_FOUND_LINE);
+  if (!row || isGuestRole(actor.role)) return fail(404, "gone", SAVED_NOT_FOUND_LINE);
   const name = scrubTitle(actor, title.trim()).slice(0, 120);
   if (!name) return fail(400, "title", "Give the template a name.");
   const words = rateStoredItem({ kind: "template", title: name, text: row.prompt });
@@ -141,9 +142,9 @@ export function deleteSavedTemplate(actor: PersonRow, id: string): boolean {
 /** Share with home (`shared_with: "household"`) or stop sharing. A child cannot share and a locked template cannot be shared (the same two rules `createShare` holds for files). */
 export function shareSavedTemplate(actor: PersonRow, id: string, shared: boolean): SaveResult {
   const row = ownVisibleRow(actor, id);
-  if (!row || actor.role === "guest") return fail(404, "gone", SAVED_NOT_FOUND_LINE);
+  if (!row || isGuestRole(actor.role)) return fail(404, "gone", SAVED_NOT_FOUND_LINE);
   if (shared) {
-    if (actor.role === "child") return fail(403, "share_children_off", SAVED_CHILD_SHARE_LINE);
+    if (audienceBand(actor) === "child") return fail(403, "share_children_off", SAVED_CHILD_SHARE_LINE);
     if (row.lock === "on") return fail(403, "share_locked", SAVED_LOCKED_SHARE_LINE);
   }
   db.update(savedTemplates).set({ sharedWith: shared ? "household" : null, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(savedTemplates.id, id)).run();

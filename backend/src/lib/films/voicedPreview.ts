@@ -3,6 +3,7 @@
 // anyone else gets the same answer as a film that does not exist.
 import type { PersonRow } from "@/types";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
+import { isGuestRole } from "@/lib/audience";
 import { getFilmRun, updateFilmRun, type FilmRun } from "./store";
 import { makeRoughCut, type RoughCutOutcome } from "./roughCut";
 
@@ -16,7 +17,7 @@ export type VoicedStart = { ok: true; id: string; state: FilmRun["state"] } | { 
 
 /** Starts the voiced preview of this film for its owner. Returns at once; the card's note carries the result. */
 export function startVoicedPreview(person: PersonRow, run: FilmRun | null): VoicedStart {
-  if (!run || run.person_id !== person.id || person.role === "guest" || laneOfPerson(person) !== "adult") return { ok: false, status: 404, line: "That film isn't available any more.", code: "gone" };
+  if (!run || run.person_id !== person.id || isGuestRole(person.role) || laneOfPerson(person) !== "adult") return { ok: false, status: 404, line: "That film isn't available any more.", code: "gone" };
   if (!run.plan || !run.production_id) return { ok: false, status: 422, line: "The shot list is not ready yet. Wait for the plan, then make the voiced preview.", code: "not_ready" };
   // A film that is being planned or made keeps its own note (progress, verify lines); the voiced preview waits until it stops.
   if (run.state === "planning" || run.state === "running") return { ok: false, status: 422, line: "Wait for the film to finish being made, then make the voiced preview.", code: "not_ready" };

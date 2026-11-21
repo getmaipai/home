@@ -10,6 +10,7 @@ import type { PersonRow } from "@/types";
 import { readAttachment, storeFile } from "@/lib/attachments";
 import { checkImages } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
+import { isGuestRole } from "@/lib/audience";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import { EDIT_REMOTE_LINE, plainStackLine, stageFilesForStack } from "@/lib/videos/stackEdit";
 import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
@@ -211,7 +212,7 @@ export async function makeRoughCut(input: { actor: PersonRow; productionId: stri
   const { actor, productionId, voiced, signal } = input;
   // The silent animatic has always held every planned shot; only the voiced preview leaves out a shot the person skipped.
   const plan = voiced ? { ...input.plan, shots: input.plan.shots.filter((shot) => (shot as { kept?: boolean }).kept !== false) } as FilmPlan : input.plan;
-  if (actor.role === "guest" || laneOfPerson(actor) !== "adult") return { ok: false, line: "That film is not available to you." };
+  if (isGuestRole(actor.role) || laneOfPerson(actor) !== "adult") return { ok: false, line: "That film is not available to you." };
   const production = getMediaProduction(actor, productionId);
   if (!production || production.owner_person_id !== actor.id) return { ok: false, line: "That film is not available to you." };
   const stored = production.episodes.flatMap((episode) => episode.scenes.flatMap((scene) => scene.shots));

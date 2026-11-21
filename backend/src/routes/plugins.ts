@@ -4,6 +4,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, refuseWith } from "@/lib/openapi";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { roleHealth } from "@/lib/roleHealth";
+import { isGuestRole } from "@/lib/audience";
 import { VOICEOVER_TOOL_ID, CHANGE_VOICE_TOOL_ID, MAKE_INSPIRED_VOICE_TOOL_ID, MAKE_SPEECH_TOOL_ID } from "@/lib/voiceTools";
 import { mayUseClipVoices } from "@/lib/access";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
@@ -116,7 +117,7 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
   const uptimeOk = uptimeAllowed({ actor, band, surfaceClass: "written", spoken: false, bare: false });
   const resolved = await resolveTurnBudgetWithStack(undefined, band);
   // SCENE-01c: the same gate a real turn applies (toolGates.ts): a person who is not a guest, on a turn that has tool rounds.
-  const sceneOk = actor.role !== "guest" && resolved.rounds > 0;
+  const sceneOk = !isGuestRole(actor.role) && resolved.rounds > 0;
   const budget = withTurnToolGates(
     resolved,
     answerImagesAllowed({ actor, band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false }),
