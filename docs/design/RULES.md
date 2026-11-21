@@ -702,8 +702,10 @@ E3. **Install, uninstall and update of a part are calls to the Stack by id.** Ho
 E4. **Home makes no fit decision.** Whether a part can run on this computer, what is loaded, what waits and why are the Stack's answers.
     Home decides whose job goes first and passes that as a priority; it does not read memory or size a job's memory (the chat window of chat rule 4 is not
     this).
-E5. **The household's choice is stored once, by Home.** The order and the on or off state per category live in the household's settings
-    and are sent to the Stack. No household's own choice is written into a repo, a default or a migration.
+E5. **The household's model choice is stored once, by the Stack.** The order, the on or off state, and the per-tier and per-hardware-profile picks per
+    category live in the Stack's settings store. Home and Bot read and write them only through the Stack's choices API, and Home keeps no copy. Who may
+    use each level needs people and stays in Home. No household's own choice is written into a repo, a default or a migration.
+    Record: [stack-owns-model-choices](../plans/stack-owns-model-choices-2026-11-21.md). Owner-approved: 2026-11-21 (Jesse, in the question box).
 E6. **A minor gets the minor's list, and only that.** Home asks the Stack for the minor's list: neutral names, and adult-only parts left
     out (chat rules 0 and 8). The Stack runs a minor's job only on a part in that list. A part whose output can carry speech that is not
     checked is not in a minor's list until its check ships (VIDEO-LTX-06). This adds to the age and surface gates and replaces none of
