@@ -62,11 +62,11 @@ doctor() {
   local engine_current engine_target
   engine_current="${MAIPAI_ENGINE_CURRENT:-$STACK_STORE/llama-server/current}"
   if [ -L "$engine_current" ]; then engine_target="$(readlink -f "$engine_current")"; else engine_target="${MAIPAI_PINNED_ENGINE:-}"; fi
-  if [ -n "$engine_target" ] && [ -x "$engine_target/llama-server" ] && [ -f "$engine_target/.engine-ready" ] && "$engine_target/llama-server" --version 2>/dev/null | grep -q 'b10797'; then
-    say "PASS hop 4: pinned llama-server b10797 is present"
+  if [ -n "$engine_target" ] && [ -x "$engine_target/llama-server" ] && [ -f "$engine_target/.engine-ready" ] && "$engine_target/llama-server" --version 2>/dev/null | grep -Eq '(b|build )12589([^0-9]|$)'; then
+    say "PASS hop 4: pinned llama-server b12589 is present"
     say "Fix hop 4: no action needed."
   else
-    say "FAIL hop 4: pinned llama-server b10797 is missing"
+    say "FAIL hop 4: pinned llama-server b12589 is missing"
     say "Fix hop 4: sudo maipai-engine update"
   fi
 

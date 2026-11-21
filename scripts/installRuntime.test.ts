@@ -67,12 +67,29 @@ describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
       });
     };
     try {
-      writeFileSync(join(folder, "llama-server"), "#!/bin/sh\necho 'version b10797'\n", { mode: 0o755 });
+      writeFileSync(join(folder, "llama-server"), "#!/bin/sh\necho 'version b12589'\n", { mode: 0o755 });
       writeFileSync(join(folder, ".engine-ready"), "ready");
       const matched = runDoctor(`${expected}\n`);
       expect(matched.stdout.toString()).toContain("PASS hop 5: one restricted key matches the paired household");
       const duplicated = runDoctor(`${expected}\n${expected}\n`);
       expect(duplicated.stdout.toString()).toContain("FAIL hop 5: restricted authorized key is missing or duplicated");
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  });
+
+  test("box doctor hop 4 accepts the pinned build in both --version forms", () => {
+    const folder = mkdtempSync(join(tmpdir(), "maipai-engine-hop4-"));
+    const run = (printed: string) => {
+      writeFileSync(join(folder, "llama-server"), `#!/bin/sh\necho '${printed}'\n`, { mode: 0o755 });
+      writeFileSync(join(folder, ".engine-ready"), "ready");
+      return Bun.spawnSync(["bash", "-c", 'source "$ENGINE_HELPER"; id() { echo 1000; }; systemctl() { return 0; }; loginctl() { echo yes; }; ss() { :; }; nvidia-smi() { echo "GPU 0"; }; doctor'], {
+        env: { ...process.env, ENGINE_HELPER, MAIPAI_PINNED_ENGINE: folder },
+      }).stdout.toString();
+    };
+    try {
+      expect(run("version: 1.0.0-dev (build 12589, commit 6f5c9ad21)")).toContain("PASS hop 4");
+      expect(run("version b12589")).toContain("PASS hop 4");
+      expect(run("version: 1.0.0-dev (build 10797, commit 832fd6f17)")).toContain("FAIL hop 4");
+      expect(run("version: 1.0.0-dev (build 125890, commit abc)")).toContain("FAIL hop 4");
     } finally { rmSync(folder, { recursive: true, force: true }); }
   });
 

@@ -9540,7 +9540,7 @@ async function captureNextUpdatesReview(browser: Browser, sessionValue: string):
           stack: {
             checksEnabled: true,
             engines: [
-              { name: "llama-server", installed: "b10797", available: "b10820", availableKnown: true, lastChecked: "2026-10-06T10:00:00.000Z", notes: null },
+              { name: "llama-server", installed: "b12589", available: "b12600", availableKnown: true, lastChecked: "2026-10-06T10:00:00.000Z", notes: null },
               { name: "whisper", installed: "v1.8.0", available: "v1.8.2", availableKnown: true, lastChecked: "2026-10-06T10:00:00.000Z", notes: null },
             ],
             models: { lastChecked: "2026-10-06T10:00:00.000Z", entries: [

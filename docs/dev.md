@@ -3903,7 +3903,7 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       Q4_K_M's GGUF: Qwen's own official HF repo (not a third-party
       requant), pinned to one git revision so the sha256 can never drift
       out from under it (`d98cdcbd...`, 5,027,783,488 bytes). The
-      llama-server engine: ggml-org/llama.cpp build b10797, one pin per
+      llama-server engine: ggml-org/llama.cpp build b10797 (moved to b12589 on 2026-11-21 to match the Stack pin), one pin per
       platform/arch/GPU-vendor (`engineCatalog.ts`). The macOS arm64
       (Metal) pin was downloaded, extracted, and run for real this
       session - `verified: true`. The Windows CUDA x64 pin (plus its

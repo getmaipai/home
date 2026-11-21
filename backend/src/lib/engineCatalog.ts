@@ -7,7 +7,7 @@
 // downloading each asset once and hashing it, the same trust model
 // git-lfs/HF's own oid pinning uses), never a binary tracked in git.
 //
-// One build (b10797, 2026-09-04) pinned across every platform entry so a
+// One build (b12589) pinned across every platform entry so a
 // household's engine and every catalog model's sizing assumptions
 // (context, flash-attn/KV-cache flag names below) come from one known-
 // good llama-server, not whatever happened to be newest per platform.
@@ -44,30 +44,30 @@ export interface EngineBinaryPin {
 
 export const ENGINE_BINARIES: EngineBinaryPin[] = [
   {
-    id: "llama-server-b10797-macos-arm64",
+    id: "llama-server-b12589-macos-arm64",
     platform: "darwin",
     arch: "arm64",
     requiresNvidia: false,
-    label: "llama-server (macOS, Apple Silicon, Metal), build b10797",
+    label: "llama-server (macOS, Apple Silicon, Metal), build b12589",
     archive: {
       label: "llama-server (macOS arm64)",
-      url: "https://github.com/ggml-org/llama.cpp/releases/download/b10797/llama-b10797-bin-macos-arm64.tar.gz",
-      sha256: "474a788ec73d17a066360b1c50c9733c78a47d062616e91963c65a344548e889",
-      approxBytes: 11_108_860,
+      url: "https://github.com/ggml-org/llama.cpp/releases/download/b12589/llama-b12589-bin-macos-arm64.tar.gz",
+      sha256: "711006321bbac464624da19f2333b49e8e0d5e6aa75c867b5323d88818abff2f",
+      approxBytes: 16_569_293,
     },
     verified: true,
   },
   {
-    id: "llama-server-b10797-win-cuda-x64",
+    id: "llama-server-b12589-win-cuda-x64",
     platform: "win32",
     arch: "x64",
     requiresNvidia: true,
-    label: "llama-server (Windows, NVIDIA CUDA 12.4, x64), build b10797",
+    label: "llama-server (Windows, NVIDIA CUDA 12.4, x64), build b12589",
     archive: {
       label: "llama-server (Windows CUDA x64)",
-      url: "https://github.com/ggml-org/llama.cpp/releases/download/b10797/llama-b10797-bin-win-cuda-12.4-x64.zip",
-      sha256: "98d9195ea691f284c1eb8723e28e9ea0efc0adcacc7f082d5f8732491766b8c9",
-      approxBytes: 253_916_914,
+      url: "https://github.com/ggml-org/llama.cpp/releases/download/b12589/llama-b12589-bin-win-cuda-12.4-x64.zip",
+      sha256: "6f405b9fdcf26aa2d78b5f8ee76f4933aa6659d1de7dddb1ce04dacc187b691e",
+      approxBytes: 357_937_847,
     },
     // The CUDA build's GPU DLL (ggml-cuda.dll) links the CUDA runtime,
     // which llama.cpp ships as this separate asset rather than bundling -
@@ -76,7 +76,7 @@ export const ENGINE_BINARIES: EngineBinaryPin[] = [
     extraArchives: [
       {
         label: "CUDA 12.4 runtime (cudart)",
-        url: "https://github.com/ggml-org/llama.cpp/releases/download/b10797/cudart-llama-bin-win-cuda-12.4-x64.zip",
+        url: "https://github.com/ggml-org/llama.cpp/releases/download/b12589/cudart-llama-bin-win-cuda-12.4-x64.zip",
         sha256: "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
         approxBytes: 391_443_627,
       },
