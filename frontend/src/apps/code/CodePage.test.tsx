@@ -108,13 +108,14 @@ describe("the Code app page", () => {
     expect(document.querySelector('[data-slot="composer-input"], textarea.aui-composer-input')).toBeTruthy();
   });
 
-  test("the composer is the kit's compact density (one slim row with the level chip beside Add), not the large unified panel", async () => {
+  test("the composer is the kit's compact density (one slim row with Add, the field and Send; the mode and level sit in the footer below), not the large unified panel", async () => {
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
     const shell = document.querySelector('[data-slot="aui_composer-shell"]')!;
     expect(shell.getAttribute("data-density")).toBe("compact");
     expect(shell.hasAttribute("data-unified")).toBe(false);
-    expect(shell.querySelector('.aui-composer-action-wrapper [data-slot="composer-quality"]')).toBeTruthy();
+    expect(shell.querySelector('[data-slot="composer-quality"]')).toBeNull();
+    expect(document.querySelector('[data-slot="aui_composer-footer"] [data-slot="composer-quality"]')).toBeTruthy();
   });
   test("adding a file goes through the composer's attachment adapter to the session's upload route", async () => {
     open("/apps/code/csess-abc123");
