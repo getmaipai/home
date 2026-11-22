@@ -29512,15 +29512,15 @@ msgid "Storage & hardware"
 msgstr "Almacenamiento y hardware"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:26
-msgid "Storage and backups"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1980
 #, needs-review
 msgid "area.Storage and backups"
 msgstr "Almacenamiento y copias de seguridad"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiModelsPage.tsx:26
+msgid "Storage and backups"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/DiskHardwareBody.tsx:32

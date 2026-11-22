@@ -26027,13 +26027,13 @@ msgid "Storage & hardware"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:26
-msgid "Storage and backups"
+#: src/lib/settingCopy.generated.ts:1980
+msgid "area.Storage and backups"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1980
-msgid "area.Storage and backups"
+#: src/apps/settings/AiModelsPage.tsx:26
+msgid "Storage and backups"
 msgstr ""
 
 #. js-lingui-explicit-id
