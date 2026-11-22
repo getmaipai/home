@@ -145,7 +145,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
           </div>
           {voices.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={flowErrorText(voices.error)} /> : null}
           {choices?.notice ? <p className="text-sm text-muted-foreground">{choices.notice}</p> : null}
-          {choices && choices.options.length === 1 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "This voice engine has one built-in voice. To give this synth another voice, choose Create / Clone and add one from a short recording.", message: "This voice engine has one built-in voice. To give this synth another voice, choose Create / Clone and add one from a short recording." })}</p> : null}
+          {choices && choices.options.length === 1 ? <p className="text-body text-muted-foreground">{i18n._({ id: "This voice engine has one built-in voice. To give this synth another voice, choose Create / Clone and add one from a short recording.", message: "This voice engine has one built-in voice. To give this synth another voice, choose Create / Clone and add one from a short recording." })}</p> : null}
           {preview.error ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={preview.error} /> : null}
           {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
         </DialogSection>
