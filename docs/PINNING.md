@@ -85,6 +85,14 @@ and waits its turn behind any other repo's gate on this machine; `bash
 ../.github/standards/bin/gate-lock.sh status` shows who holds it and who
 is queued. Never hand-roll a wait for another gate: run `check.sh`.
 
+## The Stack's admin page needs its ui tag pinned too
+
+The Stack builds its admin page (`admin-ui/`) only when the `@maipai/ui` tag named in `admin-ui/package.json` sits in `commons-tags`. The
+installer (`fetch_stack_commons`, then `fetch_stack_admin_ui`, in both `install.sh` and `maipai-engine update`) reads that name from the fetched
+Stack, checks the archive against the same `commons_archive_sha256` table and places it, so `bash scripts/pin.sh stack <sha>` also adds a digest
+for every Commons tag the Stack's `backend/` and `admin-ui/` name that the table lacks. A tag that cannot be placed, verified or built never
+blocks the Stack: the installer says in one sentence that the admin page was skipped, builds without it, and `/admin/` answers 503 until the next run.
+
 ## Bumping `STACK_TAG` also copies the disk plan table
 
 `shared/diskPlan.json` is a verbatim copy of the Stack's `docs/disk-plan.json` (every install's size per component and tier, from the

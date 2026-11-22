@@ -23,6 +23,27 @@ run_cmd() { local command="$1"; shift; bash -o pipefail -c "$command" -- "$@"; }
 print_cmd() { printf '  %s\n' "$*"; }
 changed=()
 add_changed() { local item="$1" current; for current in "${changed[@]:-}"; do [[ "$current" == "$item" ]] && return; done; changed+=("$item"); }
+# Adds "<tag>) printf ...digest" to commons_archive_sha256 in one script unless it is already there.
+add_commons_digest() {
+  local file="$1" tag="$2" digest="$3"
+  rg -Fq "${tag})" "$file" && return 0
+  PIN_FILE="$file" PIN_TAG="$tag" PIN_DIGEST="$digest" python3 - <<'PY'
+import os, re
+path, tag, digest = os.environ["PIN_FILE"], os.environ["PIN_TAG"], os.environ["PIN_DIGEST"]
+text = open(path).read()
+pattern = re.compile(r'(commons_archive_sha256\(\) \{.*?)(?m:^(\s*)\*\))', re.S)
+updated, count = pattern.subn(lambda m: f'{m.group(1)}{m.group(2)}{tag}) printf \'%s\\n\' "{digest}" ;;\n{m.group(2)}*)', text, count=1)
+if count != 1: raise SystemExit(f"could not add {tag} digest to {path}")
+open(path, "w").write(updated)
+PY
+}
+# The Commons tags a Stack commit names (backend/ and admin-ui/ package.json, file:../../commons-tags/<pkg>-<tag>/<pkg>), one per line.
+stack_commons_tags() {
+  local sha="$1" manifest
+  for manifest in backend/package.json admin-ui/package.json; do
+    git -C "$stack_dir" show "$sha:$manifest" 2>/dev/null | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\1-\([^/"]*\)/\1".*#\2#p' || true
+  done | sort -u
+}
 case "$kind" in
   commons)
     [[ "$value" =~ ^(core|spec|ui)-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "malformed Commons pin '$value'; use <core|spec|ui>-vX.Y.Z."
@@ -59,19 +80,7 @@ if count != 1: raise SystemExit(f"could not replace @maipai/{pkg} pin in {path}"
 open(path, "w").write(updated)
 PY
       done
-      for file in scripts/install.sh scripts/engine-computer/maipai-engine; do
-        if ! rg -Fq "${tag})" "$file"; then
-          PIN_FILE="$file" PIN_TAG="$tag" PIN_DIGEST="$digest" python3 - <<'PY'
-import os, re
-path, tag, digest = os.environ["PIN_FILE"], os.environ["PIN_TAG"], os.environ["PIN_DIGEST"]
-text = open(path).read()
-pattern = re.compile(r'(commons_archive_sha256\(\) \{.*?)(?m:^(\s*)\*\))', re.S)
-updated, count = pattern.subn(lambda m: f'{m.group(1)}{m.group(2)}{tag}) printf \'%s\\n\' "{digest}" ;;\n{m.group(2)}*)', text, count=1)
-if count != 1: raise SystemExit(f"could not add {tag} digest to {path}")
-open(path, "w").write(updated)
-PY
-        fi
-      done
+      for file in scripts/install.sh scripts/engine-computer/maipai-engine; do add_commons_digest "$file" "$tag" "$digest"; done
       var="$(printf '%s' "$pkg" | tr '[:lower:]' '[:upper:]')_TAG"
       rg -q "^[[:space:]]*${var}=\"" scripts/check.sh || die "could not find ${var} in scripts/check.sh; inspect it before retrying."
       sed -E "s/^([[:space:]]*${var}=)\"[^\"]*\"/\1\"${tag}\"/" scripts/check.sh > scripts/check.sh.tmp && cat scripts/check.sh.tmp > scripts/check.sh && rm scripts/check.sh.tmp
@@ -91,14 +100,31 @@ PY
     disk_plan="$(git -C "$stack_dir" show "$full_sha:docs/disk-plan.json" 2>/dev/null)" || die "Stack commit $value has no docs/disk-plan.json; choose a complete Stack commit."
     for file in scripts/install.sh scripts/engine-computer/maipai-engine; do rg -q '^STACK_TAG=' "$file" || die "could not find STACK_TAG in $file; inspect it before retrying."; add_changed "$file"; done
     add_changed shared/diskPlan.json
+    # Every Commons tag the Stack names (backend and the admin page) needs a pinned digest here, or the installer would refuse it or leave the page out.
+    new_tags=()
+    while IFS= read -r ctag; do
+      [[ -n "$ctag" ]] || continue
+      for file in scripts/install.sh scripts/engine-computer/maipai-engine; do
+        rg -Fq "${ctag})" "$file" || { [[ " ${new_tags[*]:-} " == *" $ctag "* ]] || new_tags+=("$ctag"); }
+      done
+    done < <(stack_commons_tags "$full_sha")
     disk_docs=(docs/user/install-upgrade-uninstall.md docs/site-fumadocs/content/docs/user/start-here/install-upgrade-uninstall.mdx)
     for file in "${disk_docs[@]}"; do [[ -f "$file" ]] && add_changed "$file"; done
     if ((dry_run)); then
       printf 'Would change:\n'; printf '  %s\n' "${changed[@]}"
       print_cmd "replace STACK_TAG with $full_sha in both scripts"; print_cmd "git -C $stack_dir show $full_sha:docs/disk-plan.json > shared/diskPlan.json"
+      for ctag in "${new_tags[@]:-}"; do [[ -n "$ctag" ]] && print_cmd "$sha_cmd https://github.com/getmaipai/commons/archive/refs/tags/${ctag}.tar.gz (add its digest to both scripts)"; done
     else
       for file in scripts/install.sh scripts/engine-computer/maipai-engine; do sed -E "s/^STACK_TAG=?\"?[0-9a-fA-F]+\"?$/STACK_TAG=\"$full_sha\"/" "$file" > "$file.tmp" && chmod --reference="$file" "$file.tmp" 2>/dev/null || chmod "$(stat -f %Lp "$file" 2>/dev/null || stat -c %a "$file")" "$file.tmp"; mv "$file.tmp" "$file"; done
       printf '%s\n' "$disk_plan" > shared/diskPlan.json
+      for ctag in "${new_tags[@]:-}"; do
+        [[ -n "$ctag" ]] || continue
+        digest_url="https://github.com/getmaipai/commons/archive/refs/tags/${ctag}.tar.gz"
+        digest="$(run_cmd "$sha_cmd" "$digest_url")" || die "digest command failed for $digest_url; check the network, then retry."
+        [[ "$digest" =~ ^[0-9a-fA-F]{64}$ ]] || die "digest command returned an invalid SHA-256 for $digest_url; fix the override and retry."
+        [[ "$digest" != e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ]] || die "digest is the SHA-256 of an empty file; the download of $digest_url failed; check the URL and the network, then retry."
+        for file in scripts/install.sh scripts/engine-computer/maipai-engine; do add_commons_digest "$file" "$ctag" "$digest"; done
+      done
       # The install guides quote the Recommended plan with everything ticked ("about N GB"); backend/tests/diskPlanTable.test.ts holds them to the table, so a pin that moves the table moves the number.
       bun -e 'const fs = require("fs"); const t = JSON.parse(fs.readFileSync("shared/diskPlan.json", "utf8")).tiers?.p128?.everything?.required_free_bytes; if (typeof t !== "number") process.exit(0); const n = Math.ceil((t + 2 * 1024 ** 3) / 1024 ** 3); for (const f of process.argv.slice(1)) if (fs.existsSync(f)) fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(/about \d+ GB\./, `about ${n} GB.`));' "${disk_docs[@]}" || die "could not update the plan total in the install guides; edit the 'about N GB' line by hand."
     fi

@@ -122,6 +122,29 @@ describe.serial("pin.sh", () => {
     expect(gitRepo("log", "-1", "--format=%s")).toBe(`Pin Stack ${sha.slice(0, 7)}`);
   }, 60_000);
 
+  test("stack also pins the Commons tag its admin page names, once, with one command", () => {
+    // The Stack's admin-ui/package.json names @maipai/ui; the installer places it only if a digest is pinned (the page was left out before this).
+    mkdirSync(join(fixture.stack, "backend"), { recursive: true });
+    mkdirSync(join(fixture.stack, "admin-ui"), { recursive: true });
+    writeFileSync(join(fixture.stack, "backend/package.json"), '{\n  "dependencies": {\n    "@maipai/ui": "file:../../commons-tags/ui-ui-v1.0.0/ui",\n    "@maipai/spec": "file:../../commons-tags/spec-spec-v7.7.7/spec"\n  }\n}\n');
+    writeFileSync(join(fixture.stack, "admin-ui/package.json"), '{\n  "dependencies": {\n    "@maipai/ui": "file:../../commons-tags/ui-ui-v8.8.8/ui"\n  }\n}\n');
+    git(fixture.stack, "add", "backend/package.json", "admin-ui/package.json"); git(fixture.stack, "commit", "-m", "stack names ui and spec");
+    const sha = git(fixture.stack, "rev-parse", "HEAD");
+    const dry = run("stack", sha, "--dry-run");
+    expect(dry.status).toBe(0);
+    expect(dry.stdout).toContain("ui-v8.8.8.tar.gz");
+    expect(dry.stdout).toContain("spec-v7.7.7.tar.gz");
+    expect(dry.stdout).not.toContain("ui-v1.0.0.tar.gz"); // already pinned
+    const out = run("stack", sha);
+    if (out.status !== 0) console.error(out.stderr);
+    expect(out.status).toBe(0);
+    for (const path of ["scripts/install.sh", "scripts/engine-computer/maipai-engine"]) {
+      for (const tag of ["ui-v8.8.8", "spec-v7.7.7"]) expect(read(path)).toContain(`${tag}) printf '%s\\n' "${fixedSha}" ;;`);
+      expect(read(path).match(/ui-v1\.0\.0\)/g)).toHaveLength(1);
+    }
+    expect(gitRepo("log", "-1", "--format=%s")).toBe(`Pin Stack ${sha.slice(0, 7)}`);
+  }, 60_000);
+
   test("bot release updates asset sizes and digests while preserving key order and indentation", () => {
     const release = { assets: [
       { name: "bot-darwin.tar.gz", size: 900, digest: `sha256:${"a".repeat(64)}` },

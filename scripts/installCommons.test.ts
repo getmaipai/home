@@ -110,6 +110,164 @@ describe("fetch_stack_commons", () => {
     }
   });
 
+  // The Stack's admin page: admin-ui/package.json names @maipai/ui like backend/ names core and spec, and the Stack's
+  // build-binary.sh builds the page only when that folder exists. Without the installer placing it, /admin answers 503.
+  const ADMIN_UI_JSON = JSON.stringify({ name: "@maipai/stack-admin-ui", dependencies: { "@maipai/ui": "file:../../commons-tags/ui-ui-v0.5.726/ui", react: "^19" } }, null, 2);
+  function uiFixture(root: string): string {
+    const pkgDir = join(root, "archive", "ui", "commons-ui-v0.5.726", "ui");
+    mkdirSync(pkgDir, { recursive: true });
+    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "@maipai/ui", version: "0.0.1", dependencies: { "@maipai/spec": "file:../spec" } }));
+    const archive = join(root, "ui-v0.5.726.tar.gz");
+    expect(Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive", "ui"), "commons-ui-v0.5.726"]).exitCode).toBe(0);
+    return Bun.spawnSync(["shasum", "-a", "256", archive]).stdout.toString().split(/\s+/)[0]!;
+  }
+  function runFetchWithUi(script: string, root: string, digests: Record<string, string>, workspace: string, uiDigest: string, uiCurlFails = false) {
+    return Bun.spawnSync(["bash", "-c", `source "${script}"; curl() { case "$2" in *core-v0.1.0*) cp "$ROOT/core-v0.1.0.tar.gz" "$4";; *spec-v0.1.136*) cp "$ROOT/spec-v0.1.136.tar.gz" "$4";; *ui-v0.5.726*) [ "$UI_FAILS" = 1 ] && return 22; cp "$ROOT/ui-v0.5.726.tar.gz" "$4";; *) return 22;; esac; }; commons_archive_sha256() { case "$1" in core-v0.1.0) echo "$CORE_SHA";; spec-v0.1.136) echo "$SPEC_SHA";; ui-v0.5.726) [ -n "$UI_SHA" ] && echo "$UI_SHA";; *) return 1;; esac; }; fetch_stack_commons "$WORKSPACE" no`], {
+      env: { ...process.env, ROOT: root, CORE_SHA: digests["core-v0.1.0"]!, SPEC_SHA: digests["spec-v0.1.136"]!, UI_SHA: uiDigest, UI_FAILS: uiCurlFails ? "1" : "0", WORKSPACE: workspace, TMPDIR: root },
+    });
+  }
+  function adminWorkspace(root: string): string {
+    const workspace = join(root, "workspace");
+    mkdirSync(join(workspace, "stack", "backend"), { recursive: true });
+    mkdirSync(join(workspace, "stack", "admin-ui"), { recursive: true });
+    writeFileSync(join(workspace, "stack", "backend", "package.json"), STACK_PACKAGE_JSON);
+    writeFileSync(join(workspace, "stack", "admin-ui", "package.json"), ADMIN_UI_JSON);
+    return workspace;
+  }
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: places the ui tag the admin page names, verified, with its spec sibling linked", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-adminui-"));
+    try {
+      const { digests } = commonsFixture(root);
+      const uiDigest = uiFixture(root);
+      const workspace = adminWorkspace(root);
+      const result = runFetchWithUi(script, root, digests, workspace, uiDigest);
+      expect(result.exitCode, result.stdout.toString() + result.stderr.toString()).toBe(0);
+      // The path build-binary.sh tests: admin-ui/<file: path>/package.json.
+      const resolved = join(workspace, "stack", "admin-ui", "../../commons-tags/ui-ui-v0.5.726/ui");
+      expect(readFileSync(join(resolved, "package.json"), "utf8")).toContain('"name":"@maipai/ui"');
+      // ui names spec as file:../spec; the link points at the spec folder the backend already got.
+      expect(readFileSync(join(workspace, "commons-tags", "ui-ui-v0.5.726", "spec", "package.json"), "utf8")).toContain('"name":"@maipai/spec"');
+      expect(result.stdout.toString()).not.toContain("skipped");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ["no pinned digest", "", false, "commons_archive_sha256"],
+    ["a wrong digest", "0".repeat(64), false, "SHA-256 mismatch"],
+    ["a failed download", "x", true, "Could not download"],
+  ] as const)("%s for the ui tag skips the admin page with one plain sentence and still places core and spec (%s)", (_label, uiDigestRaw, curlFails, reason) => {
+    for (const script of [INSTALL_SH, ENGINE_HELPER]) {
+      const root = mkdtempSync(join(tmpdir(), "maipai-stack-adminui-skip-"));
+      try {
+        const { digests } = commonsFixture(root);
+        const real = uiFixture(root);
+        const workspace = adminWorkspace(root);
+        const result = runFetchWithUi(script, root, digests, workspace, uiDigestRaw === "x" ? real : uiDigestRaw, curlFails);
+        const said = result.stdout.toString();
+        expect(result.exitCode, said + result.stderr.toString()).toBe(0);
+        expect(said).toContain(reason);
+        expect(said.split("\n").filter((l) => l.includes("admin page was skipped"))).toHaveLength(1);
+        // Nothing half-placed: build-binary.sh must see no ui folder, so it ships the binary without the page.
+        expect(existsSync(join(workspace, "commons-tags", "ui-ui-v0.5.726"))).toBe(false);
+        expect(existsSync(join(workspace, "commons-tags", "core-core-v0.1.0", "core", "package.json"))).toBe(true);
+        expect(existsSync(join(workspace, "commons-tags", "spec-spec-v0.1.136", "spec", "package.json"))).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: a Stack with no admin-ui folder is unchanged", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-noadminui-"));
+    try {
+      const { digests } = commonsFixture(root);
+      const workspace = join(root, "workspace");
+      mkdirSync(join(workspace, "stack", "backend"), { recursive: true });
+      writeFileSync(join(workspace, "stack", "backend", "package.json"), STACK_PACKAGE_JSON);
+      const result = runFetch(script, root, digests, workspace);
+      expect(result.exitCode).toBe(0);
+      expect(readdirSync(join(workspace, "commons-tags")).sort()).toEqual(["core-core-v0.1.0", "spec-spec-v0.1.136"]);
+      expect(result.stdout.toString()).not.toContain("admin page");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: skip_stack_admin_ui moves the ui package aside so a retried build ships without the page", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-adminui-aside-"));
+    try {
+      const workspace = adminWorkspace(root);
+      mkdirSync(join(workspace, "commons-tags", "ui-ui-v0.5.726", "ui"), { recursive: true });
+      writeFileSync(join(workspace, "commons-tags", "ui-ui-v0.5.726", "ui", "package.json"), "{}");
+      const run = () => Bun.spawnSync(["bash", "-c", `source "${script}"; skip_stack_admin_ui "$WORKSPACE/stack"`], { env: { ...process.env, WORKSPACE: workspace } });
+      const first = run();
+      expect(first.exitCode).toBe(0);
+      expect(first.stdout.toString()).toContain("admin page was skipped");
+      expect(existsSync(join(workspace, "stack", "admin-ui", "../../commons-tags/ui-ui-v0.5.726/ui/package.json"))).toBe(false);
+      // Nothing left to move aside: the caller treats that as a real build failure.
+      expect(run().exitCode).not.toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("build_stack_binary retries once without the admin page when its build fails, and fails when nothing can be skipped", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-adminui-retry-"));
+    try {
+      const workspace = adminWorkspace(root);
+      const source = join(workspace, "stack");
+      mkdirSync(join(source, "scripts"), { recursive: true });
+      mkdirSync(join(workspace, "commons-tags", "ui-ui-v0.5.726", "ui"), { recursive: true });
+      writeFileSync(join(workspace, "commons-tags", "ui-ui-v0.5.726", "ui", "package.json"), "{}");
+      // A stand-in for build-binary.sh: the page build fails while its ui package is in place, as a broken install of it would.
+      writeFileSync(join(source, "scripts", "build-binary.sh"), [
+        "#!/usr/bin/env bash", "set -euo pipefail",
+        'echo run >> "$RUNS"',
+        'if [ -f "$SRC/admin-ui/../../commons-tags/ui-ui-v0.5.726/ui/package.json" ]; then echo "page build failed"; exit 1; fi',
+        'mkdir -p "$OUT_DIR"; : > "$OUT_DIR/maipai-stack-linux-x64"',
+      ].join("\n"), { mode: 0o755 });
+      const bun = join(root, "bun");
+      writeFileSync(bun, "#!/usr/bin/env bash\n", { mode: 0o755 });
+      const runs = join(root, "runs");
+      const env = { ...process.env, RUNS: runs, SRC: source };
+      const ok = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; build_stack_binary "${source}" "${join(root, "out")}" "${bun}" no`], { env });
+      expect(ok.exitCode, ok.stdout.toString() + ok.stderr.toString()).toBe(0);
+      expect(readFileSync(runs, "utf8").trim().split("\n")).toHaveLength(2);
+      expect(ok.stdout.toString()).toContain("admin page was skipped");
+      expect(existsSync(join(root, "out", "maipai-stack-linux-x64"))).toBe(true);
+      // The ui package is already aside, so a build that still fails is a real failure and is not retried.
+      writeFileSync(join(source, "scripts", "build-binary.sh"), "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
+      const hard = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; build_stack_binary "${source}" "${join(root, "out3")}" "${bun}" no`], { env });
+      expect(hard.exitCode).not.toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([["install.sh", "publish_engine_stack_binary"], ["maipai-engine update", "publish_stack_binary"]] as const)("%s: publishing carries the admin page beside the binary and drops a stale one when the build has none", (name, fn) => {
+    const script = name === "install.sh" ? INSTALL_SH : ENGINE_HELPER;
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-adminui-publish-"));
+    try {
+      const built = join(root, "built");
+      const out = join(root, "out");
+      for (const d of ["migrations", "backend-src", "ort-wasm", "admin-ui"]) mkdirSync(join(built, d), { recursive: true });
+      writeFileSync(join(built, "maipai-stack-linux-x64"), "binary");
+      writeFileSync(join(built, "admin-ui", "index.html"), "<html></html>");
+      const publish = () => Bun.spawnSync(["bash", "-c", `source "${script}"; ${fn} "${built}" "${out}" maipai-stack-linux-x64`]);
+      expect(publish().exitCode).toBe(0);
+      expect(readFileSync(join(out, "admin-ui", "index.html"), "utf8")).toBe("<html></html>");
+      rmSync(join(built, "admin-ui"), { recursive: true });
+      expect(publish().exitCode).toBe(0);
+      expect(existsSync(join(out, "admin-ui"))).toBe(false);
+      expect(readFileSync(join(out, "maipai-stack-linux-x64"), "utf8")).toBe("binary");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: a package.json that is not there says to fetch the Stack first", (_name, script) => {
     const result = Bun.spawnSync(["bash", "-c", `source "${script}"; fetch_stack_commons /nonexistent/maipai-work no`]);
     expect(result.exitCode).not.toBe(0);
@@ -118,7 +276,7 @@ describe("fetch_stack_commons", () => {
 
   test("the two scripts carry the same pins and the same helpers (a drift between them fails here)", () => {
     const show = (script: string) =>
-      Bun.spawnSync(["bash", "-c", `source "${script}"; for t in core-v0.1.0 spec-v0.1.136 other; do commons_archive_sha256 $t || echo none; done; declare -f commons_archive_sha256 stack_commons_deps fetch_one_stack_commons fetch_stack_commons`]).stdout.toString();
+      Bun.spawnSync(["bash", "-c", `source "${script}"; for t in core-v0.1.0 spec-v0.1.136 other; do commons_archive_sha256 $t || echo none; done; declare -f commons_archive_sha256 stack_commons_deps fetch_one_stack_commons fetch_stack_commons fetch_stack_admin_ui skip_stack_admin_ui link_commons_siblings`]).stdout.toString();
     const install = show(INSTALL_SH);
     const engine = show(ENGINE_HELPER);
     expect(install).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
@@ -146,6 +304,27 @@ describe("fetch_stack_commons", () => {
         expect(dir).toBe(`${pkg}-${ctag}`);
         expect(Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; commons_archive_sha256 "${ctag}"`]).exitCode, `no pinned digest for ${ctag}`).toBe(0);
         expect(shown.stdout.toString()).toContain(`"file:../../commons-tags/${dir}/${pkg}"`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.skipIf(!existsSync(join(STACK_DIR, ".git")))("every Commons tag the Stack's admin-ui at STACK_TAG names has a pinned digest in both scripts", () => {
+    const tag = /^STACK_TAG="?([0-9a-f]{40})"?$/m.exec(readFileSync(INSTALL_SH, "utf8"))?.[1];
+    const shown = Bun.spawnSync(["git", "-C", STACK_DIR, "show", `${tag}:admin-ui/package.json`]);
+    if (shown.exitCode !== 0) return; // not fetched here, or a Stack from before the admin page
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-ui-pins-"));
+    try {
+      writeFileSync(join(root, "package.json"), shown.stdout.toString());
+      for (const script of [INSTALL_SH, ENGINE_HELPER]) {
+        const out = Bun.spawnSync(["bash", "-c", `source "${script}"; stack_commons_deps "$MANIFEST"`], { env: { ...process.env, MANIFEST: join(root, "package.json") } });
+        expect(out.exitCode, out.stdout.toString()).toBe(0);
+        const rows = out.stdout.toString().trim().split("\n").map((line) => line.split(" "));
+        expect(rows.map((r) => r[0])).toContain("ui");
+        for (const [, , ctag] of rows) {
+          expect(Bun.spawnSync(["bash", "-c", `source "${script}"; commons_archive_sha256 "${ctag}"`]).exitCode, `the Stack's admin-ui pins ${ctag} but ${script} has no digest: run bash scripts/pin.sh stack <sha>`).toBe(0);
+        }
       }
     } finally {
       rmSync(root, { recursive: true, force: true });

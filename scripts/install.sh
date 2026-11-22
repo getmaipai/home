@@ -980,8 +980,9 @@ reexec_with_source_installer() {
 # One Commons package can name another as file:../<name> (core and ui name spec). A checkout of
 # Commons has the packages side by side, but here each tag sits in its own folder, so the sibling
 # is missing and bun install fails on it. Point each such name at the folder Home already staged.
+# The third argument, when given, is the rows to link; the second is then only where siblings are looked up.
 link_commons_siblings() {
-  local work="$1" deps="$2" pkg cdir tag name sibling_dir
+  local work="$1" deps="$2" only="${3:-$2}" pkg cdir tag name sibling_dir
   while read -r pkg cdir tag; do
     [ -n "$pkg" ] || continue
     for name in $(grep -oE '"file:\.\./[a-z0-9-]+"' "${work}/commons-tags/${cdir}/${pkg}/package.json" | sed -E 's/^"file:\.\.\/(.*)"$/\1/'); do
@@ -993,7 +994,7 @@ link_commons_siblings() {
       ln -sfn "../${sibling_dir}/${name}" "${work}/commons-tags/${cdir}/${name}" \
         || die "Could not link ${name} next to ${pkg} in ${work}/commons-tags/${cdir}. Check that the folder is writable, then run the installer again."
     done
-  done <<< "$deps"
+  done <<< "$only"
 }
 
 build_app() {
@@ -1965,11 +1966,12 @@ fetch_one_stack_commons() {
 # Every Commons package the fetched Stack names, laid beside it: <workspace>/stack is the Stack,
 # <workspace>/commons-tags/<package>-<tag>/<package> is each package, so ../../commons-tags/... from
 # <workspace>/stack/backend resolves (core and spec at STACK_TAG). Reads the names from the Stack's
-# own backend/package.json, so call it after fetch_stack_source.
+# own backend/package.json, so call it after the Stack is unpacked. The Stack's admin page
+# (admin-ui/package.json, its @maipai/ui) is placed last by fetch_stack_admin_ui, which never fails.
 fetch_stack_commons() {
   local work="$1" dry_run="$2"
   if [ "$dry_run" = "yes" ]; then
-    log "[dry-run] would fetch each getmaipai/commons tag named in ${work}/stack/backend/package.json (known: core-v0.1.0 sha256 $(commons_archive_sha256 core-v0.1.0), spec-v0.1.136 sha256 $(commons_archive_sha256 spec-v0.1.136)) into ${work}/commons-tags/<package>-<tag>/<package>"
+    log "[dry-run] would fetch each getmaipai/commons tag named in ${work}/stack/backend/package.json (known: core-v0.1.0 sha256 $(commons_archive_sha256 core-v0.1.0), spec-v0.1.136 sha256 $(commons_archive_sha256 spec-v0.1.136)) into ${work}/commons-tags/<package>-<tag>/<package>, then the ui tag named in ${work}/stack/admin-ui/package.json the same way (skipped, with a note, if it cannot be placed)"
     return 0
   fi
   local manifest="${work}/stack/backend/package.json" deps pkg dir tag
@@ -1981,6 +1983,54 @@ fetch_stack_commons() {
   while read -r pkg dir tag; do
     fetch_one_stack_commons "$work" "$pkg" "$dir" "$tag" || return 1
   done <<< "$deps"
+  fetch_stack_admin_ui "$work" "$deps"
+}
+
+# The Stack's admin page builds from admin-ui/, whose package.json names @maipai/ui as
+# file:../../commons-tags/ui-<tag>/ui, the same layout as backend/. Place that tag (digest-checked
+# like every other) so the Stack's build-binary.sh finds it and builds the page into the binary
+# folder. Never fatal: the page is optional (build-binary.sh ships the binary without it and /admin
+# answers 503), so any failure here removes what it half-placed, says so in one sentence and returns 0.
+fetch_stack_admin_ui() {
+  local work="$1" backend_deps="$2" manifest="${work}/stack/admin-ui/package.json" ui_deps="" row pkg dir tag placed="" why
+  [ -f "$manifest" ] || return 0
+  grep -q 'file:\.\./\.\./commons-tags/' "$manifest" || return 0
+  if ! ui_deps=$(stack_commons_deps "$manifest" "The Stack's admin-ui/package.json"); then
+    log "${ui_deps}"
+    log "The Stack's admin page was skipped because its package list could not be read; the Stack itself is installed without it."
+    return 0
+  fi
+  while read -r pkg dir tag; do
+    [ -n "$pkg" ] || continue
+    [ -f "${work}/commons-tags/${dir}/${pkg}/package.json" ] && continue
+    if ! fetch_one_stack_commons "$work" "$pkg" "$dir" "$tag"; then
+      rm -rf "${work}/commons-tags/${dir}"
+      for row in $placed; do rm -rf "${work}/commons-tags/${row}"; done
+      log "The Stack's admin page was skipped because Commons ${tag} could not be placed (see the line above); the Stack itself is installed without it, and running this installer again tries the page again."
+      return 0
+    fi
+    placed="${placed} ${dir}"
+  done <<< "$ui_deps"
+  if ! why=$( (link_commons_siblings "$work" "$(printf '%s\n%s\n' "$backend_deps" "$ui_deps")" "$ui_deps") 2>&1 ); then
+    log "${why}"
+    log "The Stack's admin page was skipped because its Commons packages could not be linked; the Stack itself is installed without it."
+    return 0
+  fi
+}
+
+# When the Stack build fails with the admin page's @maipai/ui in place, move that package aside so
+# build-binary.sh builds without the page, and say so in one sentence. Fails (builds nothing aside)
+# when there is no such package, so a real build failure is still a failure.
+skip_stack_admin_ui() {
+  local source_dir="$1" ui_dep ui_path
+  [ -f "${source_dir}/admin-ui/package.json" ] || return 1
+  ui_dep=$(sed -n 's#.*"@maipai/ui"[[:space:]]*:[[:space:]]*"file:\([^"]*\)".*#\1#p' "${source_dir}/admin-ui/package.json")
+  [ -n "$ui_dep" ] || return 1
+  ui_path="${source_dir}/admin-ui/${ui_dep}"
+  [ -f "${ui_path}/package.json" ] || return 1
+  rm -rf "${ui_path}.skipped"
+  mv "$ui_path" "${ui_path}.skipped" || return 1
+  log "The Stack's admin page was skipped because it did not build here; the Stack itself is built without it."
 }
 
 # Builds via the Stack's own scripts/build-binary.sh (one definition:
@@ -2000,6 +2050,9 @@ build_stack_binary() {
     log "[dry-run] would run ${source_dir}/scripts/build-binary.sh (OUT_DIR=${out_dir}, SKIP_VERIFY=1) with $(dirname "$bun_bin") first on PATH"
     return
   fi
+  PATH="$(dirname "$bun_bin"):$PATH" OUT_DIR="$out_dir" SKIP_VERIFY=1 bash "${source_dir}/scripts/build-binary.sh" && return 0
+  # A page that will not build must not take the Stack with it: move its package aside and build once more without the page.
+  skip_stack_admin_ui "$source_dir" || return 1
   PATH="$(dirname "$bun_bin"):$PATH" OUT_DIR="$out_dir" SKIP_VERIFY=1 bash "${source_dir}/scripts/build-binary.sh" || return 1
 }
 
@@ -2014,6 +2067,9 @@ publish_engine_stack_binary() {
     rm -rf "${out_dir:?}/${artifact}" || return 1
     cp -a "${built_dir}/${artifact}" "$out_dir/" || return 1
   done
+  # The admin page is optional (a build without it is a working Stack); a page left from an older build must not outlive this one.
+  rm -rf "${out_dir:?}/admin-ui" || return 1
+  if [ -d "${built_dir}/admin-ui" ]; then cp -a "${built_dir}/admin-ui" "$out_dir/" || return 1; fi
 }
 
 # install-service's own argv, one token per line - the single source

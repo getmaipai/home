@@ -37844,3 +37844,13 @@ error returns null and writes no stamp), `stamps.ts` (store, `allowedIds`, `stor
 fingerprint or an older `STORED_RATER_VERSION`; the old stamp holds until the new one is written. Library, media app,
 news and shelf lists add the stamp check beside the existing `band_ok` and floor checks for a viewer below the adult
 ceiling; an unstamped item is Unrated and waits for the sweep. A person's own uploaded files are never hidden by a stamp.
+
+### Installer places the Stack's admin page (2026-11-21)
+
+The Stack at `STACK_TAG` builds `admin-ui/` (Vite, `@maipai/ui`) into its binary folder only when the ui tag its `admin-ui/package.json` names is
+in `commons-tags`; the installer placed only `backend/`'s tags, so `/admin/` answered 503. `fetch_stack_commons` now also reads `admin-ui/package.json`
+(`fetch_stack_admin_ui`), verifies the tag against the pinned archive digest, links ui's `spec` sibling, and `publish_engine_stack_binary` and
+`publish_stack_binary` copy `admin-ui/` beside the binary (a stale one is removed when the build has none). It is optional by design: a missing digest,
+a failed download or a page that will not build (`skip_stack_admin_ui`, one retry without it) logs one sentence and the Stack installs anyway.
+`pin.sh stack <sha>` adds any missing digest. Proven in a scratch root: Stack at the pinned commit fetched, ui placed, built, `admin-ui/index.html`
+published, the binary answered `/healthz` and `/admin/` 200 on a scratch port. It reaches the live hub when the next release carrying this installer ships.
