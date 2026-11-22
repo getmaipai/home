@@ -59,7 +59,7 @@ describe("event mapping", () => {
   test("the config points at the gateway with the key and tier, turns permissions on and off, and always denies web fetches", () => {
     const c = JSON.parse(openCodeConfig({ gatewayUrl: "http://192.0.2.1:3000/code/v1", key: "k", tier: "boost", allowEdit: true, allowBash: false }));
     expect(c.provider.maipai.options).toMatchObject({ baseURL: "http://192.0.2.1:3000/code/v1", apiKey: "k", headers: { "x-maipai-coding-tier": "boost" } });
-    expect(c.permission).toEqual({ edit: "allow", bash: "deny", webfetch: "deny" }); expect(c.autoupdate).toBe(false); expect(c.share).toBe("disabled");
+    expect(c.permission).toEqual({ edit: "allow", bash: "ask", webfetch: "deny" }); expect(c.autoupdate).toBe(false); expect(c.share).toBe("disabled");
   });
 });
 
@@ -67,7 +67,18 @@ describe("the OpenCode config", () => {
   test("no separate title request, and the permissions are unchanged", () => {
     const cfg = JSON.parse(openCodeConfig({ gatewayUrl: "http://192.0.2.1:3100/code/v1", key: "k", tier: "standard", allowEdit: false, allowBash: false }));
     expect(cfg.agent.title.disable).toBe(true);
-    expect(cfg.permission).toEqual({ edit: "deny", bash: "deny", webfetch: "deny" });
+    expect(cfg.permission).toEqual({ edit: "ask", bash: "ask", webfetch: "deny" });
+  });
+  test("a tool that is not granted stays visible as \"ask\" (a denied tool is hidden from the model, which then prints the script instead of writing it); plan mode alone denies", () => {
+    const base = { gatewayUrl: "http://192.0.2.1:3100/code/v1", key: "k", tier: "standard" as const, allowEdit: false, allowBash: false };
+    expect(JSON.parse(openCodeConfig(base)).permission).toMatchObject({ edit: "ask", bash: "ask" });
+    expect(JSON.parse(openCodeConfig({ ...base, readOnly: true })).permission).toEqual({ edit: "deny", bash: "deny", webfetch: "deny" });
+    expect(JSON.parse(openCodeConfig({ ...base, readOnly: true, allowEdit: true })).permission.edit).toBe("allow");
+  });
+  test("the agent is told it works in a sandbox at /workspace and must write files, not print them", () => {
+    const cfg = JSON.parse(openCodeConfig({ gatewayUrl: "http://192.0.2.1:3100/code/v1", key: "k", tier: "standard", allowEdit: false, allowBash: false }));
+    expect(cfg.agent.build.prompt).toContain("/workspace");
+    expect(cfg.agent.build.prompt).toMatch(/never paste/i);
   });
 });
 
@@ -129,12 +140,12 @@ describe("a turn through the driver", () => {
     wire(sbx);
     const a = owner(); const s = createCodingSession(a, input({ mode: "ask" }));
     const t = submitTurn(a, s.id, "add left-pad"); await settled();
-    expect(JSON.parse(sbx.execs[0]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "deny", bash: "deny", webfetch: "deny" }); // nothing was asked up front
+    expect(JSON.parse(sbx.execs[0]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "ask", bash: "ask", webfetch: "deny" }); // nothing was asked up front
     const held = pendingRequestsFor(a.id, s.id); expect(held).toHaveLength(1); expect(held[0]!.effect).toBe("command");
     answerHostRequest(a, s.id, held[0]!.request_id, "allow"); await turnFinished(t.turn_id);
     expect(sbx.execs).toHaveLength(2);
     expect(sbx.execs[1]!.argv).toContain("--continue"); expect(sbx.execs[1]!.argv.at(-1)).toBe("You now have the permission you asked for. Continue the task.");
-    expect(JSON.parse(sbx.execs[1]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "deny", bash: "allow", webfetch: "deny" }); // only what was allowed
+    expect(JSON.parse(sbx.execs[1]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "ask", bash: "allow", webfetch: "deny" }); // only what was allowed
     expect(listCodingEvents(a.id, s.id).map((e) => e.kind)).toEqual(["approval", "command"]);
     // a deny ends it with one round
     round = 0; const s2 = createCodingSession(a, input({ mode: "ask", title: "Two" })); const t2 = submitTurn(a, s2.id, "again"); await settled();

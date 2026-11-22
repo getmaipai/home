@@ -29,15 +29,26 @@ export interface OpenCodeDeps {
   sessionKey: (input: { personId: string; sessionId: string; tier: Tier }) => Promise<string | null>;
 }
 
-export function openCodeConfig(input: { gatewayUrl: string; key: string; tier: Tier; allowEdit: boolean; allowBash: boolean }): string {
+/** What the agent is told it is in (verified against OpenCode 1.19.6: `agent.build.prompt` replaces the stock prompt, which says nothing about this sandbox). */
+export const SANDBOX_PROMPT = [
+  "You are the coding agent of MaiPai Home. You work inside a private sandbox: your project folder is /workspace, and nothing outside it exists for you. There is no internet.",
+  "You have tools to read and search files, and (outside plan mode) to edit and write files and to run commands. Use the tools you are given to do the task; never paste a whole file or script into your answer in place of writing it.",
+  "Some actions wait for the person's approval. If a tool call is refused, do not apologise or print the content instead: the person is asked, and you carry on when they allow it. In plan mode you only read and propose a plan.",
+  "Keep answers short and plain. Say what you changed and where.",
+].join("\n");
+
+export function openCodeConfig(input: { gatewayUrl: string; key: string; tier: Tier; allowEdit: boolean; allowBash: boolean; readOnly?: boolean }): string {
+  // "deny" hides a tool from the model altogether (the model then says it has no such tool and prints the script); "ask" keeps it visible and `opencode run` refuses the call
+  // with "rejected permission", which is how a per-action ask starts. Only plan mode (read-only) uses "deny".
+  const rule = (allowed: boolean) => (allowed ? "allow" : input.readOnly ? "deny" : "ask");
   return JSON.stringify({
     $schema: "https://opencode.ai/config.json",
     autoupdate: false, share: "disabled", small_model: `maipai/${GATEWAY_MODEL}`,
     model: `maipai/${GATEWAY_MODEL}`,
     provider: { maipai: { npm: "@ai-sdk/openai-compatible", name: "MaiPai", options: { baseURL: input.gatewayUrl, apiKey: input.key, headers: { "x-maipai-coding-tier": input.tier } }, models: { [GATEWAY_MODEL]: { name: "Coding" } } } },
     // No separate title request: on one model slot it would run a whole extra completion ahead of the answer; the app titles sessions itself. No model-list fetch either (no network in the sandbox).
-    agent: { title: { disable: true } },
-    permission: { edit: input.allowEdit ? "allow" : "deny", bash: input.allowBash ? "allow" : "deny", webfetch: "deny" },
+    agent: { title: { disable: true }, build: { prompt: SANDBOX_PROMPT } },
+    permission: { edit: rule(input.allowEdit), bash: rule(input.allowBash), webfetch: "deny" },
   });
 }
 
@@ -100,7 +111,7 @@ export function createOpenCodeAgent(deps: OpenCodeDeps): CodingAgent {
       for (let round = 0; round < MAX_ROUNDS; round++) {
         const blocked: BlockedAction[] = [];
         const argv = ["opencode", "run", "--format", "json", "--model", `maipai/${GATEWAY_MODEL}`, ...(hadEarlier || round > 0 ? ["--continue"] : []), round === 0 ? input.message : CONTINUE_MESSAGE];
-        const env = { OPENCODE_CONFIG_CONTENT: openCodeConfig({ gatewayUrl: gateway, key, tier: input.tier, allowEdit: granted.edit, allowBash: granted.bash }) };
+        const env = { OPENCODE_CONFIG_CONTENT: openCodeConfig({ gatewayUrl: gateway, key, tier: input.tier, allowEdit: granted.edit, allowBash: granted.bash, readOnly: row.mode === "plan" }) };
         let buffer = ""; let exit: number | null = null; let stderrTail = "";
         const feed = (line: string) => {
           if (!line.trim()) return;
