@@ -6,7 +6,7 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ComposerTrailingWithThinkingMode } from "@/apps/chat/chatThreadSlots";
 import { ChatAgeBandContext, ThinkingModeCapabilityContext, ThinkingModeContext } from "@/apps/chat/chatThreadContexts";
-import { MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, MAX_READY_LINE, MAX_BACK_LINE, composerNoticeFor, __setSelfTestPollMsForTests, consumeMaxPick, dropMaxPick, maxProgressLine, useMaxChatNotice, useMaxSendHold } from "@/apps/chat/maxChat";
+import { MAX_ON_SEND_LINE, ensureMaxLeaseForSend, MAX_SELF_TEST_LINE, MAX_RUNNING_LONG_LINE, MAX_READY_LINE, MAX_BACK_LINE, composerNoticeFor, __setSelfTestPollMsForTests, consumeMaxPick, dropMaxPick, maxProgressLine, useMaxChatNotice, useMaxSendHold } from "@/apps/chat/maxChat";
 import { MAX_DIALOG_BODY, MAX_DIALOG_TITLE, MODE_CHOICES } from "@/apps/chat/composerModeLines";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -70,6 +70,7 @@ const openMenu = async (view: ReturnType<typeof renderWithQueryClient>) => { fir
 const choose = async (view: ReturnType<typeof renderWithQueryClient>, word: string) => { const menu = await openMenu(view); fireEvent.click(within(menu).getByRole("menuitemradio", { name: new RegExp(`^${word}`) })); };
 const pickMax = async (view: ReturnType<typeof renderWithQueryClient>) => { await choose(view, "Max"); fireEvent.click(await view.findByRole("button", { name: "Use Max" })); };
 const held = () => screen_hold();
+const sendMax = () => ensureMaxLeaseForSend(qcRef);
 function screen_hold() { return document.querySelector("[data-testid=send-hold]")?.textContent; }
 
 describe("one answer-style control", () => {
@@ -105,7 +106,7 @@ describe("one answer-style control", () => {
     }
   });
 
-  test("an adult with the grant picks Max, confirms in the dialog, and Send waits until the lease is ready", async () => {
+  test("an adult with the grant picks Max and confirms: nothing switches until the message is sent (TIER-LEASE-04)", async () => {
     let finish!: () => void;
     takeAnswer = () => new Promise((resolve) => { finish = () => { current = lease({ state: "held", held_by_you: true }); resolve(Response.json(current)); }; });
     const view = renderWithQueryClient(<Harness band="adult" />);
@@ -116,11 +117,15 @@ describe("one answer-style control", () => {
     expect(calls).not.toContain("POST /api/ai/chat-lease");
     expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Instant");
     fireEvent.click(view.getByRole("button", { name: "Use Max" }));
-    expect(await view.findByText("Switching to Max. About a minute.")).toBeTruthy();
-    expect(held()).toBe("held");
+    expect(await view.findByText(MAX_ON_SEND_LINE)).toBeTruthy();
     expect((await trigger(view)).getAttribute("aria-label")).toBe("Answer style: Max");
+    expect(held()).toBe("open");
+    expect(calls).not.toContain("POST /api/ai/chat-lease");
+    const sending = sendMax();
+    expect(await view.findByText("Switching to Max. About a minute.")).toBeTruthy();
     finish();
-    await waitFor(() => expect(held()).toBe("open"));
+    expect(await sending).toBeNull();
+    expect(calls.filter((call) => call === "POST /api/ai/chat-lease").length).toBe(1);
     expect(await view.findByText(MAX_READY_LINE)).toBeTruthy();
     expect(view.queryByText(/Switching to Max/)).toBeNull();
   });
@@ -175,11 +180,15 @@ describe("one answer-style control", () => {
     expect(calls.filter((call) => call === "POST /api/ai/chat-lease").length).toBe(posts);
   });
 
-  test("leaving Max unused hands the lease back at once", async () => {
+  test("leaving Max before sending asks nothing of the lease; leaving it once taken hands it back at once", async () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
     await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
     await pickMax(view);
-    await waitFor(() => expect(held()).toBe("open"));
+    await choose(view, "Instant");
+    expect(await view.findByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy();
+    expect(calls).not.toContain("DELETE /api/ai/chat-lease");
+    await pickMax(view);
+    expect(await sendMax()).toBeNull();
     await choose(view, "Instant");
     await waitFor(() => expect(calls).toContain("DELETE /api/ai/chat-lease"));
     expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy();
@@ -189,7 +198,7 @@ describe("one answer-style control", () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
     await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
     await pickMax(view);
-    await waitFor(() => expect(held()).toBe("open"));
+    expect(await sendMax()).toBeNull();
     dropMaxPick(qcRef);
     await waitFor(() => expect(calls).toContain("DELETE /api/ai/chat-lease"));
     await waitFor(() => expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy());
@@ -251,6 +260,7 @@ describe("one answer-style control", () => {
     const view = renderWithQueryClient(<Harness band="adult" admin />);
     await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
     await pickMax(view);
+    expect(await sendMax()).toBe(MAX_SELF_TEST_LINE);
     expect(await view.findByText(MAX_SELF_TEST_LINE)).toBeTruthy();
     takeAnswer = async () => { current = lease({ state: "held", held_by_you: true }); return Response.json(current); };
     fireEvent.click(view.getByRole("button", { name: "Run self-test" }));
@@ -265,6 +275,7 @@ describe("one answer-style control", () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
     await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
     await pickMax(view);
+    await sendMax();
     expect(await view.findByText(/Ask an admin/)).toBeTruthy();
     expect(view.queryByRole("button", { name: "Run self-test" })).toBeNull();
   });
@@ -274,6 +285,7 @@ describe("one answer-style control", () => {
     const view = renderWithQueryClient(<Harness band="adult" />);
     await waitFor(() => expect(calls).toContain("GET /api/ai/chat-lease"));
     await pickMax(view);
+    expect(await sendMax()).toContain("A Max job is running");
     expect(await view.findByText(/A Max job is running/)).toBeTruthy();
     expect(view.getByRole("combobox", { name: "Answer style: Instant" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Dismiss" }));

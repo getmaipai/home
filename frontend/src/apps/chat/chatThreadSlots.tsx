@@ -11,7 +11,7 @@ import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
 import { ChatActorContext, rememberMessage } from "@/apps/chat/chatMemoryActions";
 import { RetryWithCurrentCompanionSetterContext } from "@/apps/chat/chatThreadContexts";
-import { useContext, useEffect, useState, useSyncExternalStore, type PropsWithChildren } from "react";
+import { useContext, useEffect, useRef, useState, useSyncExternalStore, type PropsWithChildren } from "react";
 import { ASK_MODE, pickedComposerMode, subscribeComposerMode } from "@/apps/chat/chatComposerHint";
 import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
@@ -114,6 +114,19 @@ function chatNoticeLevel(apps: StatusAppsResponse | undefined): "amber" | "red" 
  * The kit draws the muted frame; this fills it with the band's line from the
  * health row and, for an owner or admin, the Repairs link. Nothing while chat
  * is ready. */
+/** TIER-LEASE-04: calls `onEngage` when the composer's text or attachments change (a key pressed, a file added); the caller throttles. */
+export function ComposerEngage({ onEngage }: { onEngage: () => void }) {
+  const text = useAuiState((s) => s.composer.text);
+  const attachments = useAuiState((s) => s.composer.attachments.length);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    onEngage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, attachments]);
+  return null;
+}
+
 export function ChatComposerNotice() {
   const notice = useContext(ChatComposerNoticeContext);
   const apps = useStatusApps().data;
@@ -139,6 +152,8 @@ export function ChatComposerNotice() {
         </>
       ) : null}
       {notice.actionLabel && notice.onAction ? <><span> </span><KitButton variant="quiet-link" size="xs" onClick={notice.onAction}>{notice.actionLabel}</KitButton></> : null}
+      {notice.onEngage ? <ComposerEngage onEngage={notice.onEngage} /> : null}
+      {notice.actions?.map((action) => <span key={action.label}><span> </span><KitButton variant="quiet-link" size="xs" onClick={action.onAction}>{action.label}</KitButton></span>)}
     </span>
   );
 }

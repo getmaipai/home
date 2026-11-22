@@ -104,6 +104,8 @@ export interface ChatModelAdapterDeps {
   getThinking?(): boolean | undefined;
   /** Whether the person armed Max for this message (read before `onTurnSent` disarms it). The hub still checks the Max lease. */
   getMax?(): boolean;
+  /** TIER-LEASE-04: runs once before a Max message is sent; takes the lease. A string means Max could not start: the message is not sent and the line is already on the notice. */
+  prepareMax?(): Promise<string | null>;
   /** The first stream of a send opened: Max is one message only, so the page disarms it here. */
   onTurnSent?(): void;
   // Retired ChatPage's one-message "Think longer" action.
@@ -464,6 +466,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
         const selectedModel = deps.getModel?.();
         abortSignal.throwIfAborted();
+        if (deps.getMax?.() === true && deps.prepareMax) {
+          const refusal = await deps.prepareMax();
+          if (refusal) throw new Error(refusal);
+          abortSignal.throwIfAborted();
+        }
         while (!sawTerminalEvent) {
           const bare = deps.isBareMode?.() ?? false;
           // Bare completion ignores `thinking` entirely

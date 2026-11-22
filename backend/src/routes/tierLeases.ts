@@ -10,6 +10,8 @@ import { isLeaseKey, type LeaseKey } from "@/lib/tierLease/policy";
 import { CodingSessionError, getSessionRow, setSessionTier } from "@/lib/codingSessions";
 import { pauseSession, pauseMaxMs, resumeSession } from "@/lib/codingTurns";
 import type { Tier } from "@/lib/tiers";
+import { bandOfPerson } from "@/lib/ageBand";
+import { holderNotice, pausedNotice, releasedNotice, waiterNotice, type TierLeaseNotice } from "@/lib/tierLeaseCopy";
 import type { PersonRow } from "@/types";
 
 export const tierLeasesRoutes = apiRouter();
@@ -20,6 +22,12 @@ const NOT_HOLDER = { error: "This is not yours to change. Only the person using 
 const BAD_KEY = { error: "That is not a lease this home knows.", code: "not_found" } as const;
 const NOT_SESSION = { error: "That session was not found. It may have been deleted.", code: "not_found" } as const;
 
+const noticeShape = z.object({
+  code: z.enum(["holder_idle", "holder_waiting", "paused", "released", "waiter", "waiter_pinned"]),
+  text: z.string(), more: z.string(),
+  actions: z.array(z.enum(["keep", "lower", "pause", "resume", "standard_now"])),
+});
+const forBand = (n: TierLeaseNotice, person: Pick<PersonRow, "id" | "role" | "controls">) => ({ code: n.code, text: bandOfPerson(person) === "child" ? n.child : n.adult, more: n.more, actions: n.actions });
 const viewShape = z.object({
   key: z.enum(["chat", "coding"]),
   state: z.enum(["off", "starting", "held", "releasing"]),
@@ -32,13 +40,23 @@ const viewShape = z.object({
   /** Why the lease is held or would go, from the one policy; only for the holder. */
   decision: z.string().nullable(),
   pause_max_minutes: z.number().int(),
+  /** TIER-LEASE-04: the words of the notice line for this person (their age band's form), one short sentence each; null when the line has nothing to say now. */
+  notice: noticeShape.nullable(),
+  /** The line to show if the lease is released while this person is idle, and for a paused session, so the page needs no words of its own. */
+  released_notice: noticeShape,
+  paused_notice: noticeShape,
 });
-const view = (key: LeaseKey, person: Pick<PersonRow, "id">) => {
+const view = (key: LeaseKey, person: Pick<PersonRow, "id" | "role" | "controls">) => {
   const lease = getChatLease(); const snap = lease.snapshot();
   const here = snap.key === key && snap.state !== "off";
   const mine = here && snap.holderId === person.id;
   const d = mine && snap.state === "held" ? lease.decision() : null;
+  const waiters = snap.waiters;
+  const notice = here && snap.state === "held"
+    ? (mine ? forBand(holderNotice({ key, waiters }), person) : waiters.count > 0 ? forBand(waiterNotice({ blocker: snap.key }), person) : null)
+    : null;
   return {
+    notice, released_notice: forBand(releasedNotice(waiters), person), paused_notice: forBand(pausedNotice(waiters), person),
     key, state: here ? snap.state : "off" as const, held_by_you: mine, pinned: mine && snap.pinned,
     releases_in_seconds: mine ? snap.releasesInSeconds : null,
     waiters: snap.waiters, holder_jobs: snap.holderJobs,

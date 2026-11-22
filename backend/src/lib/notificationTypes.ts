@@ -460,6 +460,9 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   // The Telegram toggles are the spec's `notifications.coding.*.telegram` keys.
   { id: "coding.needs_you", level: "time_sensitive", audience: "person", template: "A coding session is waiting for your answer.", configurable: true, defaultChannels: ["in_app"], toast: true },
   { id: "coding.session_done", level: "passive", audience: "person", template: "A coding session finished its work.", configurable: true, defaultChannels: ["in_app"], toast: true },
+  // TIER-LEASE-04 (docs/design/tier-lease-2026-11-22.md sections 5 and 6, S6): the one away-notification of the shared tier lease: the holder was released for a waiting job while on
+  // another page. Kinds only, no person, title or id (rule 6a); the notice line (backend/src/lib/tierLeaseCopy.ts) says the same words when they are back on the page.
+  { id: "tier_lease.released", level: "passive", audience: "person", template: "Max was released so a waiting job could run. It switches back when you type.", configurable: true, defaultChannels: ["in_app"], toast: true },
   { id: "coding.workspace_expiring", level: "time_sensitive", audience: "person", template: "A deleted coding session will be removed soon. Restore it from Trash to keep it.", configurable: true, defaultChannels: ["in_app"], toast: true },
   // The design record's own "a failed step fails honestly... offers
   // retry" - the notification side of that: the person is told it didn't

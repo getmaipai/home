@@ -21,6 +21,7 @@ import { Stack } from "./layout";
 import { codeErrorLine, pollDelay } from "./codeShared";
 import { CodeThread } from "./CodeThread";
 import { useCodeReadiness } from "./useCodeReadiness";
+import { useTierLease } from "@/shell/tierLease/useTierLease";
 import { ChatComposerNoticeContext } from "@/apps/chat/chatThreadContexts";
 
 const TerminalIcon = getIcon("terminal");
@@ -43,6 +44,8 @@ export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions
   const [now, setNow] = useState(() => Date.now());
   const context = useQuery({ queryKey: ["code-context", id], queryFn: () => codeApi.context(id), retry: false, refetchInterval: (q) => q.state.data && view.data && isBusy(view.data.session.state) ? 4000 : 20000 });
   const readiness = useCodeReadiness();
+  // TIER-LEASE-04: the shared lease line (what waits for Max, Keep going, Use a lower tier, Pause and Resume); the hook holds all of the lease logic.
+  const lease = useTierLease("coding", { sessionId: id, paused: view.data?.session.state === "paused", showIdle: false, onChanged: () => { void queryClient.invalidateQueries({ queryKey: ["code-session", id] }); } });
   const ready = useQuery({ queryKey: ["code-ready"], queryFn: codeApi.ready, retry: false, enabled: false });
   const list = (messages.data ?? []).filter((m) => !m.parts.every((p) => p.type === "usage"));
   const session = view.data?.session;
@@ -112,11 +115,11 @@ export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions
           </div>} />
         <p className="truncate px-4 pb-1 text-body text-muted-foreground" data-slot="code-subtitle">{subtitle}</p>
         <div className="flex min-h-0 flex-1 flex-col pb-(--phone-nav-offset)" data-slot="code-thread">
-          <ChatComposerNoticeContext.Provider value={readiness.notice}>
+          <ChatComposerNoticeContext.Provider value={readiness.notice ?? lease.notice}>
           <CodeThread messages={list} tiers={tiers.data?.tiers ?? ["standard"]} tree={tree.data?.entries ?? []} onTier={(next) => void changeTier(next)}
             onSend={(message) => run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }))}
             onStop={() => void run(() => codeApi.stop(id), i18n._({ id: "Could not stop. Try again.", message: "Could not stop. Try again." }))}
-            state={{ session, context: context.data, statusLine, busy: busyNow, problem, notices: notices.map((n) => n.text), held: useStandard,
+            state={{ session, context: context.data, statusLine, busy: busyNow, problem, notices: notices.map((n) => n.text), onEngage: lease.touch, held: useStandard,
               stage: busyNow ? { label: stageOf(session.state, waiting?.line, list), elapsed: elapsedWords(now - Date.parse([...list].reverse().find((m) => m.role === "user")?.created_at ?? new Date(now).toISOString())) } : null,
               queued: queued.map((qid, index) => ({ id: qid, text: i18n._({ id: "Message {n} is waiting", message: "Message {n} is waiting", values: { n: index + 1 } }) })),
               onRetry: () => void run(() => codeApi.retry(id), i18n._({ id: "Could not retry. Try again.", message: "Could not retry. Try again." })),

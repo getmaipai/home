@@ -23,7 +23,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { codeApi, type CodeContext, type CodeMessage, type CodeSession, type CodeTier, type TreeEntry } from "./codeApi";
 import { approvalWords, outputLines, stopWords, tierWord } from "./codeTranscript";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
-import { ChatComposerNotice } from "@/apps/chat/chatThreadSlots";
+import { ChatComposerNotice, ComposerEngage } from "@/apps/chat/chatThreadSlots";
 import { ChatComposerNoticeContext } from "@/apps/chat/chatThreadContexts";
 import { ContextRing } from "./ContextRing";
 import { CodeComposerContexts } from "./codeShared";
@@ -45,6 +45,8 @@ export interface CodeThreadState {
   onRetry: () => void;
   problem: string;
   notices: readonly string[];
+  /** TIER-LEASE-04: the composer was used (the shared lease hook renews the lease; throttled there). */
+  onEngage?: () => void;
   onAnswer: (requestId: string, answer: "allow" | "deny") => void;
   onCancelQueued: (id: string) => void;
   onMode: (mode: CodeSession["mode"]) => void;
@@ -117,11 +119,11 @@ const Queue = () => {
   </>;
 };
 /** The composer line: Chat's notice while Code cannot run a message (CODE-FIX-02), else the session's own status line. */
-const Notice = () => { const s = useState_(); const readiness = useContext(ChatComposerNoticeContext); return readiness ? <ChatComposerNotice /> : <span data-slot="code-status">{s.statusLine}</span>; };
+const Notice = () => { const s = useState_(); const readiness = useContext(ChatComposerNoticeContext); return readiness ? <ChatComposerNotice /> : <span data-slot="code-status">{s.statusLine}{s.onEngage ? <ComposerEngage onEngage={s.onEngage} /> : null}</span>; };
 const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex shrink-0 items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
 // The density is Chat's, read from its one definition (THREAD_SLOTS), so a change there moves both. The mode and level controls stay inside the pill, as in Chat.
-const THREAD_COMPONENTS = { composerDensity: THREAD_SLOTS.composerDensity, ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerExtraEnd: ExtraEnd, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
+const THREAD_COMPONENTS = { composerDensity: THREAD_SLOTS.composerDensity, ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, composerNoticeLayout: "wrap" as const, ComposerExtraEnd: ExtraEnd, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 
 /** The composer's mode pill and level chip, one definition for the session view and the New session page so they cannot drift. */
 export function codeComposerModes({ mode, onMode, tier, tiers, onTier }: { mode: CodeSession["mode"]; onMode: (mode: CodeSession["mode"]) => void; tier: CodeTier; tiers: readonly CodeTier[]; onTier: (tier: CodeTier) => void }): ThreadComposerModes {

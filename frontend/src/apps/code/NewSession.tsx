@@ -16,6 +16,7 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { ChatComposerNotice } from "@/apps/chat/chatThreadSlots";
+import { useTierLease } from "@/shell/tierLease/useTierLease";
 import { ChatComposerNoticeContext } from "@/apps/chat/chatThreadContexts";
 import { useCodeReadiness } from "./useCodeReadiness";
 import { Stack } from "./layout";
@@ -63,6 +64,7 @@ export function NewSession() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const readiness = useCodeReadiness();
+  const lease = useTierLease("coding", { showIdle: false });
   const tiers = useQuery({ queryKey: CODE_TIERS_KEY, queryFn: codeApi.tiers, retry: false });
   const [tier, setTier] = useState<CodeTier | null>(null);
   const [mode, setMode] = useState<CodeSession["mode"]>("ask");
@@ -125,11 +127,11 @@ export function NewSession() {
   // Each click of New session is a new navigation key: the Thread remounts empty and takes focus again.
   return <>
     <AssistantRuntimeProvider runtime={runtime} key={location.key}>
-      <ChatComposerNoticeContext.Provider value={readiness.notice}>
+      <ChatComposerNoticeContext.Provider value={readiness.notice ?? lease.notice}>
       <ProblemContext.Provider value={problem}>
         <CodeComposerContexts draftId="code-new">
         <ChatShortcutReference onNew={() => navigate("/apps/code")} newLabel={i18n._({ id: "New session", message: "New session" })} description={i18n._({ id: "Shortcuts for coding and navigation.", message: "Shortcuts for coding and navigation." })} />
-        <Thread tourId="code.new" composerTourId="code.new-composer" components={{ composerDensity: THREAD_SLOTS.composerDensity, WelcomeContent: welcome, BelowComposerContent: choices, ComposerQueue: Problem, ComposerNotice: ChatComposerNotice, composerNoticeReserve: true, composerPlaceholder: i18n._({ id: "Describe the task, for example: fix the failing test in the thermostat code.", message: "Describe the task, for example: fix the failing test in the thermostat code." }), composerModes }} />
+        <Thread tourId="code.new" composerTourId="code.new-composer" components={{ composerDensity: THREAD_SLOTS.composerDensity, WelcomeContent: welcome, BelowComposerContent: choices, ComposerQueue: Problem, ComposerNotice: ChatComposerNotice, composerNoticeReserve: true, composerNoticeLayout: "wrap" as const, composerPlaceholder: i18n._({ id: "Describe the task, for example: fix the failing test in the thermostat code.", message: "Describe the task, for example: fix the failing test in the thermostat code." }), composerModes }} />
         </CodeComposerContexts>
       </ProblemContext.Provider>
       </ChatComposerNoticeContext.Provider>

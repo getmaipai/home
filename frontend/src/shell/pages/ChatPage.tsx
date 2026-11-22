@@ -96,7 +96,8 @@ import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
 import { selectedSpeakerFromCache } from "@/apps/chat/selectedSpeaker";
-import { composerNoticeFor, consumeMaxPick, dropMaxPick, isMaxPicked, useMaxChatNotice } from "@/apps/chat/maxChat";
+import { useTierLease } from "@/shell/tierLease/useTierLease";
+import { composerNoticeFor, consumeMaxPick, dropMaxPick, ensureMaxLeaseForSend, isMaxPicked, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
@@ -543,6 +544,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
           getMax: () => isMaxPicked(maxQueryClient),
+          prepareMax: () => ensureMaxLeaseForSend(maxQueryClient),
           onTurnSent: () => consumeMaxPick(maxQueryClient),
           getAgeBand: () => person.age_band,
           getTryCompanionId: () => tryCompanionIdRef.current,
@@ -1197,9 +1199,11 @@ export function ChatPage({ person }: { person: Roster }) {
     if (previousIncognitoRef.current !== undefined) setIncognitoRef.current(previousIncognitoRef.current);
   }, []);
   const maxChatNotice = useMaxChatNotice(isOwnerOrAdminRole(person.role));
+  // TIER-LEASE-04: the shared lease line (who holds Max, what waits, Keep going and the other choices); adults only, as Max chat itself.
+  const tierLeaseNotice = useTierLease("chat", { enabled: person.age_band === "adult" }).notice;
   const composerNotice = tryActive
     ? { text: tryCompanionName ? `Trying ${tryCompanionName}, a draft. Nothing is saved.` : "Trying a draft. Nothing is saved.", repairsLink: null, actionLabel: "Stop trying", onAction: () => navigate("/chat") }
-    : composerNoticeFor(maxChatNotice, baseComposerNotice);
+    : composerNoticeFor(maxChatNotice, tierLeaseNotice ?? baseComposerNotice);
   const routeLocation = useLocation();
   const projectRoute = useMatch("/chat/projects/:id");
   const projectFolderId = projectRoute?.params.id ? decodeURIComponent(projectRoute.params.id) : undefined;

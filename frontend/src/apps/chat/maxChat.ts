@@ -2,7 +2,7 @@
 // server's (GET, POST and DELETE /api/ai/chat-lease); this file holds the one-person flow around it: a confirm line, the starting
 // state, a missing self-test with the action that runs it, and the end. Its words reach the person through the composer's existing
 // notice line (ChatComposerNoticeContext), so there is no new status UI.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { chatLeaseApi, type ChatLeaseView } from "@/lib/chatLeaseApi";
@@ -15,6 +15,8 @@ export const MAX_SELF_TEST_LINE = "Max needs a quick test first.";
 export const MAX_RUNNING_LONG_LINE = "Taking longer than usual. Still working.";
 export const MAX_READY_LINE = "Max is ready.";
 export const MAX_BACK_LINE = "Back to Instant.";
+/** TIER-LEASE-04: Max is armed but nothing switches until the message is sent. */
+export const MAX_ON_SEND_LINE = "Max starts when you send.";
 const DEFAULT_MAX_LOAD_S = 60;
 const DEFAULT_SELF_TEST_S = 35;
 /** The same rule as the Home side (chatTransitions.ts waitPhrase): rounded to 5 seconds, "a minute" past 50. */
@@ -51,11 +53,22 @@ export function dropMaxPick(qc: QueryClient): void {
   if (getFlow(qc).phase === "confirm") setFlow(qc, IDLE);
   if (wasPicked && qc.getQueryData<ChatLeaseView>(LEASE_KEY)?.held_by_you) void chatLeaseApi.release().then((next) => qc.setQueryData(LEASE_KEY, next)).catch(() => undefined);
 }
-/** Send waits while Max is picked and the lease is not yet ready (the composer notice says why). */
+/** TIER-LEASE-04: the lease is taken when the message is sent (docs/design/tier-lease-2026-11-22.md section 2), so Send is held only while the self-test runs. */
 export function useMaxSendHold(): boolean {
   const picked = useQuery<boolean>({ queryKey: PICK_KEY, queryFn: () => false, initialData: false, staleTime: Infinity, enabled: false }).data;
-  const lease = useQuery<ChatLeaseView | undefined>({ queryKey: LEASE_KEY, queryFn: () => undefined, enabled: false }).data;
-  return picked && !(lease?.state === "held" && lease.held_by_you);
+  const flow = useQuery<Flow>({ queryKey: FLOW_KEY, queryFn: () => IDLE, initialData: IDLE, staleTime: Infinity, enabled: false }).data;
+  return picked && flow.phase === "self_test_running";
+}
+
+/** TIER-LEASE-04: called by the send path just before a Max message goes out. Takes the lease now (a no-op when this person already holds it) and returns null,
+ * or the one line to show when Max cannot start (the notice line carries it and its action); the message is then not sent. */
+export async function ensureMaxLeaseForSend(qc: QueryClient): Promise<string | null> {
+  if (!getPicked(qc)) return null;
+  const held = qc.getQueryData<ChatLeaseView>(LEASE_KEY);
+  if (held?.held_by_you && held.state === "held") return null;
+  await take(qc);
+  const flow = getFlow(qc);
+  return flow.phase === "self_test_needed" || flow.phase === "error" ? flow.line : null;
 }
 
 const setFlow = (qc: QueryClient, flow: Flow) => qc.setQueryData<Flow>(FLOW_KEY, flow);
@@ -129,15 +142,18 @@ export function useMaxChat(enabled: boolean): MaxChat {
   const lease = enabled && leaseQuery.data?.can_use ? leaseQuery.data : null;
   const busy = flow.phase === "starting" || flow.phase === "self_test_running";
   // The lease lapsed (or never came) while Max stayed armed: Max is off and the control says so by going back to Instant.
+  // TIER-LEASE-04: Max is armed before the lease exists (the take is at send), so only a lease that was held and then ended counts as lapsed.
+  const hadLease = useRef(false);
   useEffect(() => {
-    if (picked && flow.phase === "idle" && leaseQuery.data && leaseQuery.data.state === "off") setPicked(qc, false);
+    if (!picked) { hadLease.current = false; return; }
+    if (leaseQuery.data?.held_by_you && leaseQuery.data.state === "held") hadLease.current = true;
+    else if (hadLease.current && flow.phase === "idle" && leaseQuery.data?.state === "off") { hadLease.current = false; setPicked(qc, false); }
   }, [picked, flow.phase, leaseQuery.data, qc]);
   const ask = useCallback(() => { if (!busy) setFlow(qc, { phase: "confirm" }); }, [qc, busy]);
+  // TIER-LEASE-04: "Use Max" only arms it; nothing switches before Send (the take is `ensureMaxLeaseForSend`).
   const confirm = useCallback(() => {
-    const held = qc.getQueryData<ChatLeaseView>(LEASE_KEY);
     setPicked(qc, true);
-    if (held?.held_by_you && held.state === "held") { setFlow(qc, IDLE); return; }
-    void take(qc);
+    setFlow(qc, IDLE);
   }, [qc]);
   const cancel = useCallback(() => {
     if (getFlow(qc).phase !== "confirm") return;
@@ -186,6 +202,7 @@ export function useMaxChatNotice(isAdmin: boolean): ChatComposerNoticeValue | nu
     default:
       if (lease?.held_by_you && lease.state === "releasing") return { text: MAX_BACK_LINE, repairsLink: null };
       if (picked && lease?.held_by_you && lease.state === "held") return { text: MAX_READY_LINE, repairsLink: null };
+      if (picked) return { text: MAX_ON_SEND_LINE, repairsLink: null };
       return null;
   }
 }

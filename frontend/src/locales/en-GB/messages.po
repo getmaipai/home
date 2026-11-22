@@ -661,7 +661,7 @@ msgid "{kind}, Videos, {base}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:111
+#: src/apps/code/NewSession.tsx:113
 msgid "{kind}: {account}"
 msgstr ""
 
@@ -1366,7 +1366,7 @@ msgid "{title}: which one"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:808
+#: src/apps/chat/chatThreadSlots.tsx:823
 msgid "{tokens} tokens"
 msgstr ""
 
@@ -1848,7 +1848,7 @@ msgid "setting.home.access_token.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:907
+#: src/shell/pages/ChatPage.tsx:909
 msgid "A new chat always uses one of your companions. Choose a companion to switch."
 msgstr ""
 
@@ -2146,12 +2146,12 @@ msgid "Add a robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:49
+#: src/apps/code/NewSession.tsx:50
 msgid "Add a small feature"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:49
+#: src/apps/code/NewSession.tsx:50
 msgid "Add a small feature: "
 msgstr ""
 
@@ -3161,7 +3161,7 @@ msgid "Animate Character"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:499
+#: src/apps/chat/chatThreadSlots.tsx:514
 msgid "Animate this picture"
 msgstr ""
 
@@ -3554,7 +3554,7 @@ msgid "Ask anything"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:130
+#: src/apps/code/CodeThread.tsx:132
 msgid "Ask before changes"
 msgstr ""
 
@@ -3620,7 +3620,7 @@ msgid "Asked the robot to reach the hub over the tailnet for 10 minutes."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1661
+#: src/shell/pages/ChatPage.tsx:1665
 msgid "Asking the bare model…"
 msgstr ""
 
@@ -3719,7 +3719,7 @@ msgid "setting.coding.engine.option_label.auto"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:131
+#: src/apps/code/CodeThread.tsx:133
 msgid "Auto edit"
 msgstr ""
 
@@ -3862,7 +3862,7 @@ msgid "Back to robots"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:69
+#: src/apps/code/SessionView.tsx:72
 msgid "Back to sessions"
 msgstr ""
 
@@ -3984,13 +3984,13 @@ msgid "Bands could not be loaded. Open this page again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1834
+#: src/shell/pages/ChatPage.tsx:1838
 msgid "Bare mode is on"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:852
-#: src/shell/pages/ChatPage.tsx:1659
+#: src/apps/chat/chatThreadSlots.tsx:867
+#: src/shell/pages/ChatPage.tsx:1663
 msgid "Bare model"
 msgstr ""
 
@@ -4604,7 +4604,7 @@ msgid "Can use it now"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:278
+#: src/apps/chat/chatThreadSlots.tsx:293
 #: src/apps/code/SessionTabs.tsx:31
 #: src/apps/people/ProfileForm.tsx:195
 #: src/apps/people/ProfileForm.tsx:200
@@ -4631,8 +4631,8 @@ msgstr ""
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
 #: src/shell/pages/ActivityPage.tsx:156
-#: src/shell/pages/ChatPage.tsx:1712
-#: src/shell/pages/ChatPage.tsx:1728
+#: src/shell/pages/ChatPage.tsx:1716
+#: src/shell/pages/ChatPage.tsx:1732
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:184
 #: src/shell/pages/FilesPage.tsx:436
@@ -4900,7 +4900,7 @@ msgid "Changed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:85
+#: src/apps/code/CodeThread.tsx:87
 msgid "Changed {path}"
 msgstr ""
 
@@ -4916,8 +4916,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:43
-#: src/apps/code/SessionView.tsx:91
-#: src/apps/code/SessionView.tsx:107
+#: src/apps/code/SessionView.tsx:94
+#: src/apps/code/SessionView.tsx:110
 msgid "Changes"
 msgstr ""
 
@@ -4988,7 +4988,7 @@ msgstr ""
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
 #: src/shell/pageHeaderTitle.tsx:95
-#: src/shell/pages/ChatPage.tsx:1782
+#: src/shell/pages/ChatPage.tsx:1786
 #: src/shell/pages/CompanionsPage.tsx:165
 #: src/shell/pages/CompanionsPage.tsx:170
 #: src/shell/pages/personAccessCopy.ts:7
@@ -5171,11 +5171,11 @@ msgid "setting.access.tier.max.option.chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1144
-#: src/shell/pages/ChatPage.tsx:1530
-#: src/shell/pages/ChatPage.tsx:1530
-#: src/shell/pages/ChatPage.tsx:1938
-#: src/shell/pages/ChatPage.tsx:1938
+#: src/shell/pages/ChatPage.tsx:1146
+#: src/shell/pages/ChatPage.tsx:1534
+#: src/shell/pages/ChatPage.tsx:1534
+#: src/shell/pages/ChatPage.tsx:1942
+#: src/shell/pages/ChatPage.tsx:1942
 msgid "Chat settings"
 msgstr ""
 
@@ -6184,13 +6184,13 @@ msgid "Clone settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:97
+#: src/apps/code/SessionView.tsx:100
 #: src/apps/settings/EngineLinkCredentialSection.tsx:288
 #: src/apps/settings/StackChanInstallDialog.tsx:153
 #: src/apps/setup/AwayFromHome.tsx:175
 #: src/shell/AmbientCompanionPane.tsx:271
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1754
+#: src/shell/pages/ChatPage.tsx:1758
 #: src/shell/pages/status/StatusBoard.tsx:114
 #: src/shell/pages/status/StatusBoard.tsx:133
 msgid "Close"
@@ -6502,7 +6502,7 @@ msgid "Companions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1966
+#: src/shell/pages/ChatPage.tsx:1970
 msgid "Compare with the bare model"
 msgstr ""
 
@@ -6776,9 +6776,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:328
-#: src/shell/pages/ChatPage.tsx:1534
-#: src/shell/pages/ChatPage.tsx:1935
-#: src/shell/pages/ChatPage.tsx:1938
+#: src/shell/pages/ChatPage.tsx:1538
+#: src/shell/pages/ChatPage.tsx:1939
+#: src/shell/pages/ChatPage.tsx:1942
 msgid "Conversations"
 msgstr ""
 
@@ -6808,7 +6808,7 @@ msgid "Copy"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1753
+#: src/shell/pages/ChatPage.tsx:1757
 #: src/shell/pages/TurnErrorDetails.tsx:94
 msgid "Copy details"
 msgstr ""
@@ -6925,7 +6925,7 @@ msgid "Could not change access. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:124
+#: src/apps/code/SessionView.tsx:127
 msgid "Could not change that. Try again."
 msgstr ""
 
@@ -7005,7 +7005,7 @@ msgid "Could not continue this side chat. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1560
+#: src/shell/pages/ChatPage.tsx:1564
 #: src/shell/pages/MicTestPage.tsx:50
 msgid "Could not copy. Select the text instead."
 msgstr ""
@@ -7028,7 +7028,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:96
 #: src/apps/chat/chatProjects.tsx:154
-#: src/shell/pages/ChatPage.tsx:1263
+#: src/shell/pages/ChatPage.tsx:1267
 #: src/shell/pages/ProjectsPage.tsx:127
 msgid "Could not delete that project. Try again."
 msgstr ""
@@ -7049,7 +7049,7 @@ msgid "Could not delete the voice sample."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:960
+#: src/shell/pages/ChatPage.tsx:962
 msgid "Could not delete this chat. Try again."
 msgstr ""
 
@@ -7523,7 +7523,7 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:91
+#: src/apps/code/SessionView.tsx:94
 msgid "Could not open the pull request. Try again."
 msgstr ""
 
@@ -7533,7 +7533,7 @@ msgid "Could not open this app. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:69
+#: src/apps/code/SessionView.tsx:72
 msgid "Could not open this session. Try again."
 msgstr ""
 
@@ -7559,7 +7559,7 @@ msgid "Could not post the note."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:91
+#: src/apps/code/SessionView.tsx:94
 msgid "Could not push. Try again."
 msgstr ""
 
@@ -7617,7 +7617,7 @@ msgid "Could not remove those people. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:952
+#: src/shell/pages/ChatPage.tsx:954
 msgid "Could not rename this chat. Try again."
 msgstr ""
 
@@ -7652,7 +7652,7 @@ msgid "Could not restore this chat. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:122
+#: src/apps/code/SessionView.tsx:125
 msgid "Could not retry. Try again."
 msgstr ""
 
@@ -7755,9 +7755,9 @@ msgid "Could not save the voice matching setting. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:329
-#: src/shell/pages/ChatPage.tsx:369
-#: src/shell/pages/ChatPage.tsx:520
+#: src/shell/pages/ChatPage.tsx:330
+#: src/shell/pages/ChatPage.tsx:370
+#: src/shell/pages/ChatPage.tsx:521
 msgid "Could not save this chat's settings. Try again."
 msgstr ""
 
@@ -7835,12 +7835,12 @@ msgid "Could not send that to {name}. Check that it is switched on, then try aga
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:117
+#: src/apps/code/SessionView.tsx:120
 msgid "Could not send that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:125
+#: src/apps/code/SessionView.tsx:128
 msgid "Could not send your answer. Try again."
 msgstr ""
 
@@ -7885,7 +7885,7 @@ msgid "Could not start the camera"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:92
+#: src/apps/code/NewSession.tsx:94
 msgid "Could not start the session. Try again."
 msgstr ""
 
@@ -7910,8 +7910,8 @@ msgid "Could not stop that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:105
-#: src/apps/code/SessionView.tsx:118
+#: src/apps/code/SessionView.tsx:108
+#: src/apps/code/SessionView.tsx:121
 msgid "Could not stop. Try again."
 msgstr ""
 
@@ -7926,12 +7926,12 @@ msgid "Could not test the connection."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:106
+#: src/apps/code/SessionView.tsx:109
 msgid "Could not unarchive this session. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:91
+#: src/apps/code/SessionView.tsx:94
 msgid "Could not undo that. Try again."
 msgstr ""
 
@@ -7942,8 +7942,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:107
-#: src/shell/pages/ChatPage.tsx:1244
-#: src/shell/pages/ChatPage.tsx:1254
+#: src/shell/pages/ChatPage.tsx:1248
+#: src/shell/pages/ChatPage.tsx:1258
 #: src/shell/pages/ProjectsPage.tsx:192
 msgid "Could not update that project. Try again."
 msgstr ""
@@ -8585,7 +8585,7 @@ msgid "Delete all samples"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1714
+#: src/shell/pages/ChatPage.tsx:1718
 msgid "Delete chat and {media}"
 msgstr ""
 
@@ -8624,7 +8624,7 @@ msgid "Delete this alarm?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1708
+#: src/shell/pages/ChatPage.tsx:1712
 msgid "Delete this chat?"
 msgstr ""
 
@@ -8704,7 +8704,7 @@ msgid "Describe it, pick a sound, press Make. Your songs, bands and albums stay 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1726
+#: src/shell/pages/ChatPage.tsx:1730
 msgid "Describe the changes to this {kind}"
 msgstr ""
 
@@ -8745,12 +8745,12 @@ msgid "Describe the sound you want, like a door creaking or rain on a tin roof."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:132
+#: src/apps/code/NewSession.tsx:134
 msgid "Describe the task, for example: fix the failing test in the thermostat code."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1724
+#: src/shell/pages/ChatPage.tsx:1728
 msgid "Describe what you want changed. The original stays."
 msgstr ""
 
@@ -8796,7 +8796,7 @@ msgid "setting.generation.picture_detailed.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:339
+#: src/apps/chat/chatThreadSlots.tsx:354
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
 #: src/shell/InstallStrip.tsx:122
@@ -8805,7 +8805,7 @@ msgid "Details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1560
+#: src/shell/pages/ChatPage.tsx:1564
 msgid "Details copied."
 msgstr ""
 
@@ -8953,7 +8953,7 @@ msgid "Disk space"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:186
+#: src/apps/chat/chatThreadSlots.tsx:201
 #: src/apps/notifications/NotificationsPage.tsx:216
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
@@ -9013,7 +9013,7 @@ msgid "setting.tools.timer.mode.option_label.do"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1954
+#: src/shell/pages/ChatPage.tsx:1958
 #: src/shell/pages/FilesPage.tsx:166
 msgid "Document"
 msgstr ""
@@ -9808,7 +9808,7 @@ msgid "setting.synths.real_people.option.all"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1835
+#: src/shell/pages/ChatPage.tsx:1839
 msgid "Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards."
 msgstr ""
 
@@ -10007,7 +10007,7 @@ msgid "setting.topics.teen.risk.option_label.informative"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:48
+#: src/apps/code/NewSession.tsx:49
 msgid "Explain this code"
 msgstr ""
 
@@ -10238,12 +10238,12 @@ msgid "api.error.file_unavailable_to_share"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:92
+#: src/apps/code/SessionView.tsx:95
 msgid "Files"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:161
+#: src/apps/code/CodeThread.tsx:163
 msgid "Files I added:"
 msgstr ""
 
@@ -10351,7 +10351,7 @@ msgid "setting.radio.directory.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:47
+#: src/apps/code/NewSession.tsx:48
 msgid "Find the failing test, work out why it fails, and fix it."
 msgstr ""
 
@@ -10443,7 +10443,7 @@ msgid "Fix"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:47
+#: src/apps/code/NewSession.tsx:48
 msgid "Fix a failing test"
 msgstr ""
 
@@ -10670,7 +10670,7 @@ msgid "For example: 96"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1726
+#: src/shell/pages/ChatPage.tsx:1730
 msgid "For example: make it night time, add a red hat"
 msgstr ""
 
@@ -11291,12 +11291,12 @@ msgid "setting.coding.person.git_hosts.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:111
+#: src/apps/code/NewSession.tsx:113
 msgid "Gitea"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:111
+#: src/apps/code/NewSession.tsx:113
 msgid "GitHub"
 msgstr ""
 
@@ -11464,7 +11464,7 @@ msgid "setting.music.library_sort.option.creator"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1650
+#: src/shell/pages/ChatPage.tsx:1654
 msgid "Guard:"
 msgstr ""
 
@@ -13352,7 +13352,7 @@ msgid "Included skills"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:992
+#: src/apps/chat/chatModelAdapter.ts:999
 msgid "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
 msgstr ""
 
@@ -13786,7 +13786,7 @@ msgid "Keep"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1713
+#: src/shell/pages/ChatPage.tsx:1717
 msgid "Keep {media}"
 msgstr ""
 
@@ -13836,6 +13836,11 @@ msgid "setting.storage.library.generated.mode.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/tierLease/useTierLease.ts:31
+msgid "Keep going"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:97
 msgid "Keep in my Library"
 msgstr ""
@@ -13872,7 +13877,7 @@ msgid "Keep network"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:97
+#: src/apps/code/SessionView.tsx:100
 msgid "Keep open"
 msgstr ""
 
@@ -14763,8 +14768,8 @@ msgid "setting.coding.api.away.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:134
-#: src/apps/code/SessionView.tsx:110
+#: src/apps/code/CodeThread.tsx:136
+#: src/apps/code/SessionView.tsx:113
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
 msgstr ""
@@ -15874,7 +15879,7 @@ msgid "setting.talent.life.enabled.does_teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:114
+#: src/apps/code/NewSession.tsx:116
 msgid "main"
 msgstr ""
 
@@ -16045,7 +16050,7 @@ msgid "Make a talking character"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:458
+#: src/apps/chat/chatThreadSlots.tsx:473
 msgid "Make a variation"
 msgstr ""
 
@@ -16133,7 +16138,7 @@ msgid "Make Inspired voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1729
+#: src/shell/pages/ChatPage.tsx:1733
 msgid "Make it"
 msgstr ""
 
@@ -16510,7 +16515,7 @@ msgid "setting.access.tier.max.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:111
+#: src/apps/code/SessionView.tsx:114
 msgid "Max from the next message"
 msgstr ""
 
@@ -16648,7 +16653,7 @@ msgid "Memory used by the whole system."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:121
+#: src/apps/code/SessionView.tsx:124
 msgid "Message {n} is waiting"
 msgstr ""
 
@@ -16663,7 +16668,7 @@ msgid "setting.chat.paused_message.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:128
+#: src/apps/code/CodeThread.tsx:130
 msgid "Message the agent. Type @ to point at a file."
 msgstr ""
 
@@ -16696,7 +16701,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/pages/ChatPage.tsx:1741
+#: src/shell/pages/ChatPage.tsx:1745
 msgid "Microphone help"
 msgstr ""
 
@@ -16883,7 +16888,7 @@ msgid "area.Model per job"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1652
+#: src/shell/pages/ChatPage.tsx:1656
 msgid "Model:"
 msgstr ""
 
@@ -17558,7 +17563,7 @@ msgid "New alarm"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1521
+#: src/shell/pages/ChatPage.tsx:1525
 msgid "New chat"
 msgstr ""
 
@@ -17620,8 +17625,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/CodePage.tsx:57
-#: src/apps/code/CodeThread.tsx:171
-#: src/apps/code/NewSession.tsx:131
+#: src/apps/code/CodeThread.tsx:173
+#: src/apps/code/NewSession.tsx:133
 #: src/apps/code/SessionList.tsx:51
 #: src/apps/code/SessionList.tsx:63
 msgid "New session"
@@ -18118,7 +18123,7 @@ msgid "No replies timed yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:111
+#: src/apps/code/NewSession.tsx:113
 msgid "No repository"
 msgstr ""
 
@@ -18755,7 +18760,7 @@ msgid "Nothing was idle, so nothing changed."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:103
+#: src/apps/code/CodeThread.tsx:105
 msgid "Nothing yet. Tell the agent what to do."
 msgstr ""
 
@@ -19370,7 +19375,7 @@ msgid "One moment. Back soon."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:986
+#: src/apps/chat/chatModelAdapter.ts:993
 #: src/lib/hubReachability.ts:12
 msgid "One moment. Home will be back in about a minute."
 msgstr ""
@@ -19855,12 +19860,12 @@ msgid "Other running timers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1967
+#: src/shell/pages/ChatPage.tsx:1971
 msgid "Our reply beside the same model with no routing, packages, persona or guards"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1638
+#: src/shell/pages/ChatPage.tsx:1642
 msgid "Ours"
 msgstr ""
 
@@ -19897,7 +19902,7 @@ msgid "Owner"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:113
+#: src/apps/code/NewSession.tsx:115
 msgid "owner/name"
 msgstr ""
 
@@ -20049,7 +20054,7 @@ msgid "Password"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1936
+#: src/shell/pages/ChatPage.tsx:1940
 msgid "Past conversations"
 msgstr ""
 
@@ -20076,6 +20081,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:276
 #: src/shell/pages/MusicStudioView.tsx:147
+#: src/shell/tierLease/useTierLease.ts:33
 msgid "Pause"
 msgstr ""
 
@@ -20169,7 +20175,7 @@ msgid "Person"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1653
+#: src/shell/pages/ChatPage.tsx:1657
 msgid "Persona in effect:"
 msgstr ""
 
@@ -20827,14 +20833,14 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:132
+#: src/apps/code/CodeThread.tsx:134
 #: src/apps/code/SessionTabs.tsx:79
-#: src/apps/code/SessionView.tsx:94
+#: src/apps/code/SessionView.tsx:97
 msgid "Plan"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:87
+#: src/apps/code/CodeThread.tsx:89
 msgid "Plan updated: {done} of {total} steps done."
 msgstr ""
 
@@ -21854,7 +21860,7 @@ msgid "Remix and edit"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1723
+#: src/shell/pages/ChatPage.tsx:1727
 msgid "Remix this {kind}"
 msgstr ""
 
@@ -22241,12 +22247,12 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:135
-#: src/apps/code/NewSession.tsx:110
+#: src/apps/code/NewSession.tsx:112
 msgid "Repository"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:113
+#: src/apps/code/NewSession.tsx:115
 msgid "Repository name, for example owner/name"
 msgstr ""
 
@@ -22428,6 +22434,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:68
+#: src/shell/tierLease/useTierLease.ts:34
 msgid "Resume"
 msgstr ""
 
@@ -22476,7 +22483,7 @@ msgstr ""
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/TimersTab.tsx:148
-#: src/apps/code/CodeThread.tsx:114
+#: src/apps/code/CodeThread.tsx:116
 #: src/apps/code/SessionRow.tsx:79
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
@@ -22499,7 +22506,7 @@ msgid "failure.advice.engine_computer.next_step"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:535
+#: src/apps/chat/chatThreadSlots.tsx:550
 msgid "Retry with current companion"
 msgstr ""
 
@@ -22925,7 +22932,7 @@ msgid "Route taken"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1646
+#: src/shell/pages/ChatPage.tsx:1650
 msgid "Route:"
 msgstr ""
 
@@ -22946,7 +22953,7 @@ msgid "Rows per page:"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1649
+#: src/shell/pages/ChatPage.tsx:1653
 msgid "Rules fired:"
 msgstr ""
 
@@ -22982,7 +22989,7 @@ msgid "Run the test"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1644
+#: src/shell/pages/ChatPage.tsx:1648
 msgid "Rung:"
 msgstr ""
 
@@ -23563,8 +23570,8 @@ msgid "Search articles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1531
-#: src/shell/pages/ChatPage.tsx:1938
+#: src/shell/pages/ChatPage.tsx:1535
+#: src/shell/pages/ChatPage.tsx:1942
 msgid "Search chats"
 msgstr ""
 
@@ -23994,7 +24001,7 @@ msgid "Service, e.g. turn_off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:97
+#: src/apps/code/SessionView.tsx:100
 msgid "Session details"
 msgstr ""
 
@@ -24453,8 +24460,8 @@ msgid "Shortcuts for chat and navigation."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:171
-#: src/apps/code/NewSession.tsx:131
+#: src/apps/code/CodeThread.tsx:173
+#: src/apps/code/NewSession.tsx:133
 msgid "Shortcuts for coding and navigation."
 msgstr ""
 
@@ -24511,7 +24518,7 @@ msgid "Show archived ({count})"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1821
+#: src/shell/pages/ChatPage.tsx:1825
 msgid "Show conversations"
 msgstr ""
 
@@ -25877,7 +25884,7 @@ msgid "Starting {title}…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:114
+#: src/apps/code/NewSession.tsx:116
 msgid "Starting branch"
 msgstr ""
 
@@ -25927,7 +25934,7 @@ msgid "failure.composer.starting.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:599
+#: src/apps/chat/chatThreadSlots.tsx:614
 msgid "Starting your AI…"
 msgstr ""
 
@@ -26028,7 +26035,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:66
-#: src/apps/code/SessionView.tsx:105
+#: src/apps/code/SessionView.tsx:108
 #: src/apps/settings/AddVoiceBox.tsx:69
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/apps/settings/VoiceBrowserSection.tsx:99
@@ -26399,7 +26406,7 @@ msgid "Switch the chat engine only"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:82
+#: src/apps/code/SessionView.tsx:85
 msgid "Switched to {tier}"
 msgstr ""
 
@@ -26748,7 +26755,7 @@ msgid "Tempo in beats per minute"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:93
+#: src/apps/code/SessionView.tsx:96
 msgid "Terminal"
 msgstr ""
 
@@ -26902,12 +26909,12 @@ msgid "that device"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:995
+#: src/apps/chat/chatModelAdapter.ts:1002
 msgid "That did not send. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:205
+#: src/apps/chat/chatThreadSlots.tsx:220
 #: src/apps/chat/chatToolUis.tsx:324
 #: src/apps/chat/chatToolUis.tsx:341
 #: src/apps/clock/AlarmsTab.tsx:71
@@ -27117,12 +27124,12 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:126
+#: src/apps/code/SessionView.tsx:129
 msgid "That message is not waiting any more."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:88
+#: src/apps/code/SessionView.tsx:91
 msgid "That message is not waiting for Max any more."
 msgstr ""
 
@@ -27228,7 +27235,7 @@ msgid "that session"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:69
+#: src/apps/code/SessionView.tsx:72
 msgid "That session was not found. It may have been deleted."
 msgstr ""
 
@@ -27350,7 +27357,7 @@ msgid "The agent is asking first"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:114
+#: src/apps/code/CodeThread.tsx:116
 #: src/apps/code/codeTranscript.ts:63
 msgid "The agent stopped"
 msgstr ""
@@ -27476,7 +27483,7 @@ msgid "The backup from {backupDate} will replace everything in MaiPai Home the n
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1664
+#: src/shell/pages/ChatPage.tsx:1668
 msgid "The bare reply was refused by the same safety pass a real turn uses."
 msgstr ""
 
@@ -27636,7 +27643,7 @@ msgid "setting.music.dj.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1955
+#: src/shell/pages/ChatPage.tsx:1959
 msgid "The document from this reply"
 msgstr ""
 
@@ -28640,7 +28647,7 @@ msgid "Things made"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:254
+#: src/apps/chat/chatThreadSlots.tsx:269
 #: src/apps/code/codeTranscript.ts:122
 #: src/apps/settings/RobotBody.tsx:21
 msgid "Thinking"
@@ -28662,7 +28669,7 @@ msgid "setting.coding.thinking_budget.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1651
+#: src/shell/pages/ChatPage.tsx:1655
 msgid "Thinking:"
 msgstr ""
 
@@ -28732,12 +28739,12 @@ msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1709
+#: src/shell/pages/ChatPage.tsx:1713
 msgid "This chat made {media}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:614
+#: src/apps/chat/chatThreadSlots.tsx:629
 msgid "This chat won't be saved to your history."
 msgstr ""
 
@@ -29356,7 +29363,7 @@ msgid "Tour targets not found"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1643
+#: src/shell/pages/ChatPage.tsx:1647
 msgid "Trace"
 msgstr ""
 
@@ -29667,7 +29674,7 @@ msgid "Turn this feature off?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:390
+#: src/apps/chat/chatThreadSlots.tsx:405
 #: src/shell/Routes.tsx:221
 msgid "Turn trace"
 msgstr ""
@@ -29853,7 +29860,7 @@ msgid "Type it again"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:82
+#: src/apps/code/NewSession.tsx:84
 msgid "Type the repository as owner/name, for example willow/thermostat, then send again."
 msgstr ""
 
@@ -29874,7 +29881,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionRow.tsx:90
-#: src/apps/code/SessionView.tsx:106
+#: src/apps/code/SessionView.tsx:109
 msgid "Unarchive"
 msgstr ""
 
@@ -30260,6 +30267,11 @@ msgid "setting.robot.greetings.mode.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/tierLease/useTierLease.ts:32
+msgid "Use a lower tier"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/SignInPage.tsx:176
 #: src/shell/sessionLockContext.tsx:140
 msgid "Use a password instead"
@@ -30309,7 +30321,7 @@ msgid "setting.coding.engine.option.llama-server"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatThreadSlots.tsx:279
+#: src/apps/chat/chatThreadSlots.tsx:294
 msgid "Use Max"
 msgstr ""
 
@@ -30324,8 +30336,13 @@ msgid "setting.coding.engine.option.splash"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:88
+#: src/apps/code/SessionView.tsx:91
 msgid "Use Standard for this message"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/tierLease/useTierLease.ts:35
+msgid "Use Standard now"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30827,7 +30844,7 @@ msgid "Voice cloning will no longer be able to use this token."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1763
+#: src/shell/pages/ChatPage.tsx:1767
 msgid "Voice conversation"
 msgstr ""
 
@@ -30842,7 +30859,7 @@ msgid "Voice for this synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:481
+#: src/shell/pages/ChatPage.tsx:482
 #: src/shell/useSideChat.tsx:57
 msgid "Voice input needs a one-time download that hasn't finished on this hub yet."
 msgstr ""
@@ -31079,7 +31096,7 @@ msgid "area.Wake word"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:48
+#: src/apps/code/NewSession.tsx:49
 msgid "Walk me through how this project is laid out and where to start."
 msgstr ""
 
@@ -31337,7 +31354,7 @@ msgid "What should it sound like?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:121
+#: src/apps/code/NewSession.tsx:123
 msgid "What should we build?"
 msgstr ""
 
@@ -31702,7 +31719,7 @@ msgid "Who can control what"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:123
+#: src/apps/code/SessionView.tsx:126
 msgid "Who can fix this: {who}."
 msgstr ""
 
@@ -32273,7 +32290,7 @@ msgid "You cannot open this profile."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:85
+#: src/apps/code/SessionView.tsx:88
 msgid "You cannot use that level for coding. Pick another level."
 msgstr ""
 
@@ -32353,12 +32370,12 @@ msgid "You need Chrome or Edge on a computer, Home opened at its https address, 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:92
+#: src/apps/code/CodeThread.tsx:94
 msgid "You said no"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:92
+#: src/apps/code/CodeThread.tsx:94
 msgid "You said yes"
 msgstr ""
 
@@ -32464,7 +32481,7 @@ msgid "Your character will appear here"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ChatPage.tsx:1506
+#: src/shell/pages/ChatPage.tsx:1510
 msgid "Your chats will show up here."
 msgstr ""
 
