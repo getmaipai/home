@@ -34,7 +34,7 @@ export function SessionView({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [notices, setNotices] = useState<{ text: string }[]>([]);
   const [maxNext, setMaxNext] = useState(false);
-  const [paneOpen, setPaneOpen] = useState(!phone);
+  const [paneOpen, setPaneOpen] = useState(!phone && (typeof window === "undefined" || window.innerWidth >= 1280));
   const [paneTab, setPaneTab] = useState("changes");
   const [pinned, setPinned] = useState(true);
   const tree = useQuery({ queryKey: ["code-tree", id, view.data?.session.last_activity_at], queryFn: () => codeApi.tree(id), retry: false, enabled: view.data !== undefined });

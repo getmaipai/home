@@ -103,7 +103,7 @@ const Queue = () => {
   </>;
 };
 const Notice = () => { const s = useState_(); return <span data-slot="code-status">{s.statusLine}</span>; };
-const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
+const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex shrink-0 items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
 const THREAD_COMPONENTS = { ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerExtraEnd: ExtraEnd, composerDensity: "compact" as const, emptyLayout: "top" as const, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 

@@ -12,6 +12,7 @@ let tiers = ["standard", "max"]; let calls: string[] = []; let conns: unknown[] 
 let sessionState = "idle"; let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
 
 beforeEach(() => {
+  window.innerWidth = 1400; // the details pane opens by default only on a wide screen
   tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle";
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
