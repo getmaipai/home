@@ -194,7 +194,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, sessionItems, CodeSidebar |
 | `frontend/src/apps/code/SessionTabs.tsx` | ChangesTab, FilesTab, TerminalTab, PlanTab |
 | `frontend/src/apps/code/SessionView.tsx` | SessionView |
-| `frontend/src/apps/code/layout.tsx` | Stack, codeDensity |
+| `frontend/src/apps/code/layout.tsx` | Stack |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |
 | `frontend/src/apps/people/FaceEnrollmentBody.tsx` | canViewFaceEnrollment, FaceEnrollmentBody |
