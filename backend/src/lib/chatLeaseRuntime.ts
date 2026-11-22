@@ -37,5 +37,17 @@ export function startChatLease(): void {
     started: (personId) => { if (getChatLease().snapshot().state === "held") getChatLease().requestStarted(personId); },
     ended: (personId) => { if (getChatLease().snapshot().state === "held") getChatLease().requestEnded(personId); },
   });
-  setInterval(() => { void getChatLease().tick().catch(() => { /* the next tick retries */ }); }, 5_000).unref();
+  let lastNote = 0;
+  setInterval(() => {
+    const l = getChatLease();
+    void l.tick().catch((error) => { console.warn(`[chat-lease] tick failed: ${error instanceof Error ? error.message : "unknown"}`); });
+    // One line a minute while the lease is up or a return is pending: counts and the policy reason only (no person ids), so a lease that does not end can be explained from the log.
+    const now = Date.now();
+    const snap = l.snapshot();
+    if (snap.state !== "off" && now - lastNote >= 60_000) {
+      lastNote = now;
+      const d = l.decision();
+      console.log(`[chat-lease] state=${snap.state} key=${snap.key} in_flight=${snap.inFlight} holder_jobs=${snap.holderJobs} waiters=${snap.waiters.count} pinned=${snap.pinned} decision=${d.action}:${d.reason} releases_in=${snap.releasesInSeconds ?? "never"}s`);
+    }
+  }, 5_000).unref();
 }

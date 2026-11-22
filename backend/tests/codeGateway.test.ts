@@ -10,7 +10,7 @@ import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { createApiKey, revokeApiKey } from "@/lib/apiKeys";
 import { createGrant } from "@/lib/grants";
-import { __resetChatLeaseForTests } from "@/lib/chatLeaseRuntime";
+import { __resetChatLeaseForTests, getChatLease } from "@/lib/chatLeaseRuntime";
 import { tierFromModel } from "@/lib/codeGatewayTier";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setSelfLoginForTests, __setWhoisForTests } from "@/lib/tailnetNode";
@@ -945,6 +945,27 @@ describe("a personal key picks its tier by the model name", () => {
     const res = await ask(secret, "maipai-coder-max");
     expect(res.status).toBe(200);
     expect(seen.at(-1)?.tier).toBe("max");
+  });
+
+  test("Max hands the model back to Standard once the key has been quiet past the coding grace", async () => {
+    let now = 1_000_000; __resetChatLeaseForTests(() => now);
+    const { p, secret } = adultWithKey(); give(p, "tier.max:coding");
+    expect((await ask(secret, "maipai-coder-max")).status).toBe(200);
+    expect(codingMode).toBe("coding");
+    const lease = getChatLease();
+    expect(lease.snapshot().inFlight).toBe(0);
+    now += 9 * 60_000; await lease.tick(); expect(codingMode).toBe("coding");
+    now += 2 * 60_000; await lease.tick(); expect(codingMode).toBe("normal");
+  });
+
+  test("Max streamed: the lease is free of in-flight work when the stream ends, then it is handed back", async () => {
+    let now = 1_000_000; __resetChatLeaseForTests(() => now);
+    const { p, secret } = adultWithKey(); give(p, "tier.max:coding");
+    const res = await call("/code/v1/chat/completions", { secret, body: { model: "maipai-coder-max", stream: true, messages: [{ role: "user", content: PROMPT }] } });
+    expect(res.status).toBe(200); await res.text();
+    const lease = getChatLease();
+    expect(lease.snapshot().inFlight).toBe(0);
+    now += 11 * 60_000; await lease.tick(); expect(codingMode).toBe("normal");
   });
 
   test("Max while someone else holds the lease is a plain 429 and the engine is not called", async () => {
