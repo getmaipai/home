@@ -105,7 +105,7 @@ const Queue = () => {
 const Notice = () => { const s = useState_(); return <span data-slot="code-status">{s.statusLine}</span>; };
 const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex shrink-0 items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
-const THREAD_COMPONENTS = { ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerExtraEnd: ExtraEnd, composerDensity: "compact" as const, emptyLayout: "top" as const, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
+const THREAD_COMPONENTS = { ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerFooterEnd: ExtraEnd, composerDensity: "compact" as const, emptyLayout: "top" as const, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 
 export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tree }: {
   state: CodeThreadState; messages: readonly CodeMessage[]; tiers: readonly CodeTier[]; onTier: (tier: CodeTier) => void;
@@ -143,7 +143,7 @@ export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tre
   return <AssistantRuntimeProvider runtime={runtime}>
     <StateContext.Provider value={state}>
       <ComposerPrimitive.Unstable_TriggerPopoverRoot>
-        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: session.mode, onModeChange: (id) => state.onMode(id as CodeSession["mode"]), quality } }} />
+        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: session.mode, placement: "footer" as const, onModeChange: (id) => state.onMode(id as CodeSession["mode"]), quality } }} />
         {mentions.length > 0 ? <ComposerMentions items={mentions} formatter={unstable_defaultDirectiveFormatter} /> : null}
       </ComposerPrimitive.Unstable_TriggerPopoverRoot>
     </StateContext.Provider>
