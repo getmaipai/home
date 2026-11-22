@@ -12,13 +12,14 @@ import { TerminalBlock } from "@maipai/ui/src/elements/terminal-block";
 import { Button } from "@maipai/ui/src/ui/button";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { errorLine } from "@/lib/hubReachability";
-import { codeApi, type CodeSession } from "./codeApi";
+import { codeApi, type CodeContext, type CodeSession } from "./codeApi";
+import { ContextRing } from "./Composer";
 import { Stack } from "./layout";
-import { fileTreeOf, languageOf, parseDiff, type SessionActivity } from "./codeTranscript";
+import { fileTreeOf, languageOf, parseDiff, repoLine, type SessionActivity } from "./codeTranscript";
 
 const empty = (icon: string, text: string) => <EmptyState icon={icon} text={text} />;
 
-export function ChangesTab({ session, activity, onUndo, onPush, onPullRequest, busy }: { session: CodeSession; activity: SessionActivity; onUndo: (checkpointId: string) => void; onPush: () => void; onPullRequest: () => void; busy: boolean }) {
+export function ChangesTab({ session, activity, context, onUndo, onPush, onPullRequest, busy }: { session: CodeSession; context: CodeContext | undefined; activity: SessionActivity; onUndo: (checkpointId: string) => void; onPush: () => void; onPullRequest: () => void; busy: boolean }) {
   const [confirming, setConfirming] = useState<"push" | "pr" | null>(null);
   const changes = useQuery({ queryKey: ["code-changes", session.id, session.last_activity_at], queryFn: () => codeApi.changes(session.id), retry: false });
   const { files, additions, deletions } = session.changes;
@@ -29,6 +30,16 @@ export function ChangesTab({ session, activity, onUndo, onPush, onPullRequest, b
     ? <span className="flex items-center gap-2"><Button size="sm" disabled={busy} onClick={() => { setConfirming(null); run(); }}>{i18n._({ id: "Confirm", message: "Confirm" })}</Button><Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button></span>
     : <Button size="sm" variant="outline" disabled={busy || files === 0} onClick={() => setConfirming(what)}>{label}</Button>;
   return <Stack data-slot="code-changes">
+    <Stack gap="tight" data-slot="code-environment">
+      <h3 className="text-body font-semibold">{i18n._({ id: "Environment", message: "Environment" })}</h3>
+      <p className="truncate font-mono text-body text-muted-foreground">{repoLine(session.repo)}</p>
+      {session.repo.kind !== "none" ? <p className="truncate font-mono text-body text-muted-foreground">{session.repo.base_branch}</p> : null}
+    </Stack>
+    <Stack gap="tight" data-slot="code-context-block">
+      <h3 className="text-body font-semibold">{i18n._({ id: "Context", message: "Context" })}</h3>
+      {context ? <ContextRing context={context} /> : <p className="text-body text-muted-foreground">{i18n._({ id: "Not measured yet.", message: "Not measured yet." })}</p>}
+    </Stack>
+    <h3 className="text-body font-semibold">{i18n._({ id: "Changes", message: "Changes" })}</h3>
     <p className="text-body text-muted-foreground">{files === 0 && listed.length === 0 ? i18n._({ id: "No changes yet.", message: "No changes yet." }) : i18n._({ id: "{files} files changed, +{additions} -{deletions}", message: "{files} files changed, +{additions} -{deletions}", values: { files: files || listed.length, additions, deletions } })}</p>
     {changes.isError ? <p role="alert" className="text-body text-muted-foreground">{errorLine(changes.error, i18n._({ id: "Could not read the changes. Try again.", message: "Could not read the changes. Try again." }))}</p> : null}
     {listed.map((file) => byFile[file.path] && byFile[file.path]!.length > 0

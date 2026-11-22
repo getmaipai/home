@@ -15,6 +15,8 @@ beforeEach(() => {
   tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle";
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
+    if (path.endsWith("/context")) return Promise.resolve(Response.json({ used_tokens: 52000, window_tokens: 64000, source: "engine" }));
+    if (path.endsWith("/upload")) return Promise.resolve(Response.json({ path: "uploads/notes.md", bytes: 5 }, { status: 201 }));
     if (path.endsWith("/api/coding/ready")) return Promise.resolve(Response.json({ ready: false, first_missing: { id: "engine", say: "The coding engine needs an update.", who: "an admin" }, items: [] }));
     if (path.endsWith("/git-connections")) return Promise.resolve(Response.json({ connections: conns }));
     if (path.endsWith("/changes")) return Promise.resolve(Response.json({ available: true, files: [{ path: "src/a.ts", additions: 1, deletions: 0, binary: false }], diff: "diff --git a/src/a.ts b/src/a.ts\n@@ -0,0 +1 @@\n+hello\n", truncated: false }));
@@ -95,5 +97,19 @@ describe("the Code app page", () => {
   test("the header says Scratch folder for a session with no repository", async () => {
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="code-subtitle"]')?.textContent).toBe("Scratch folder"));
+  });
+  test("the status bar has the level control with only the offered tiers, the mode and the context ring with its tooltip", async () => {
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="code-status-tier"]')).toBeTruthy());
+    expect(document.querySelector('[data-slot="code-status-tier"]')!.textContent).not.toContain("Boost");
+    await waitFor(() => expect(document.querySelector('[data-slot="code-context"]')?.getAttribute("title")).toBe("52K of 64K tokens used"));
+    expect(document.querySelector('[data-slot="code-statusbar"]')!.textContent).toContain("Asks before changes");
+  });
+  test("adding a file uploads it to the session and shows a chip", async () => {
+    open("/apps/code/csess-abc123");
+    const input = await waitFor(() => { const el = document.querySelector('[data-slot="code-file-input"]') as HTMLInputElement | null; if (!el) throw new Error("no input"); return el; });
+    fireEvent.change(input, { target: { files: [new File(["hello"], "notes.md", { type: "text/markdown" })] } });
+    await waitFor(() => expect(calls).toContain("POST /api/code/sessions/csess-abc123/upload"));
+    expect(await within(document.body).findByText("notes.md")).toBeTruthy();
   });
 });

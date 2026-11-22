@@ -13,6 +13,8 @@ import { cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMess
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
+import { sessionContext } from "@/lib/codingContext";
+import { uploadToWorkspace } from "@/lib/codingUpload";
 import { sessionChanges, sessionFile, sessionTree } from "@/lib/codingWorkspaceView";
 import { pushCodingSession } from "@/lib/codingShare";
 import { createCodingPullRequest } from "@/lib/codingPullRequest";
@@ -155,6 +157,28 @@ const fileR = createRoute({
 });
 codingSessionsRoutes.openapi(fileR, async (c) => {
   try { return c.json(await sessionFile(c.get("person"), c.req.valid("param").id, c.req.valid("query").path), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+
+const contextR = createRoute({
+  method: "get", path: "/{id}/context", tags: ["Code"], summary: "How full the session's context is (engine numbers, or text size divided by four) and the model's window when the Stack reports one", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ used_tokens: z.number(), window_tokens: z.number().nullable(), source: z.enum(["engine", "estimate"]) }) } }, description: "Token figures." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(contextR, async (c) => {
+  try { return c.json(await sessionContext(c.get("person"), c.req.valid("param").id), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+
+const uploadR = createRoute({
+  method: "post", path: "/{id}/upload", tags: ["Code"], summary: "Add one file to the session's workspace (uploads folder; size and type capped, text scanned for credentials, never overwrites)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, body: { content: { "multipart/form-data": { schema: z.object({ file: z.any() }) } } } },
+  responses: { 201: { content: { "application/json": { schema: z.object({ path: z.string(), bytes: z.number() }) } }, description: "Where the file now is, relative to the workspace." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(uploadR, async (c) => {
+  try {
+    const form = await c.req.formData(); const file = form.get("file");
+    if (!(file instanceof File)) return c.json({ error: "No file came with that request. Choose a file and try again." }, 400);
+    return c.json(await uploadToWorkspace(c.get("person"), c.req.valid("param").id, file.name, new Uint8Array(await file.arrayBuffer())), 201);
+  } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
 const okBody = z.object({ ok: z.literal(true) });

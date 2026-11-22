@@ -13,7 +13,9 @@ export type CodingPart =
   | { type: "plan"; items: { text: string; done: boolean }[] }
   | { type: "tool"; tool: "command" | "file_write" | "read" | "fetch"; status: "running" | "done" | "failed"; summary: string; exit_code?: number; output?: string }
   | { type: "approval"; request_id: string; effect: string; status: "pending" | "allowed" | "denied" }
-  | { type: "stopped"; reason: "user" | "wall_clock" | "error" | "denied" }
+  | { type: "stopped"; reason: "user" | "wall_clock" | "error" | "denied"; code?: string }
+  /** Engine-reported token numbers for one turn (a system message; the app never draws it). The context ring reads the latest. */
+  | { type: "usage"; input: number; output: number }
   | { type: "notice"; text: string };
 export interface CodingMessageWire { id: string; session_id: string; seq: number; role: "user" | "agent" | "system"; parts: CodingPart[]; created_at: string }
 

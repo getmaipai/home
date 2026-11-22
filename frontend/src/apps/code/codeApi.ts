@@ -30,7 +30,8 @@ export type CodePart =
   | { type: "plan"; items: { text: string; done: boolean }[] }
   | { type: "tool"; tool: "command" | "file_write" | "read" | "fetch"; status: "running" | "done" | "failed"; summary: string; exit_code?: number; output?: string }
   | { type: "approval"; request_id: string; effect: string; status: "pending" | "allowed" | "denied" }
-  | { type: "stopped"; reason: "user" | "wall_clock" | "error" | "denied" }
+  | { type: "stopped"; reason: "user" | "wall_clock" | "error" | "denied"; code?: string }
+  | { type: "usage"; input: number; output: number }
   | { type: "notice"; text: string };
 
 export interface CodeMessage { id: string; seq: number; role: "user" | "agent" | "system"; parts: CodePart[]; created_at: string }
@@ -42,6 +43,7 @@ export interface TreeEntry { path: string; name: string; depth: number; kind: "f
 export interface GitConnection { id: string; kind: "github" | "gitea"; host: string; account: string; status: string }
 export interface RepoChoice { connectionId: string; fullName: string; baseBranch: string }
 
+export interface CodeContext { used_tokens: number; window_tokens: number | null; source: "engine" | "estimate" }
 export interface CodeReady { ready: boolean; first_missing: { id: string; say: string; who: string } | null }
 
 export const DEFAULT_ENVIRONMENT_ID = "cenv-default";
@@ -61,6 +63,8 @@ export const codeApi = {
   changes: (id: string) => request<CodeChanges>(`${base}/${id}/changes`),
   tree: (id: string) => request<{ entries: TreeEntry[]; truncated: boolean }>(`${base}/${id}/files`),
   file: (id: string, path: string) => request<{ path: string; content: string }>(`${base}/${id}/file?path=${encodeURIComponent(path)}`),
+  context: (id: string) => request<CodeContext>(`${base}/${id}/context`),
+  upload: (id: string, file: File) => { const form = new FormData(); form.append("file", file); return request<{ path: string; bytes: number }>(`${base}/${id}/upload`, { method: "POST", body: form }); },
   ready: () => request<CodeReady>("/api/coding/ready"),
   connections: () => request<{ connections: GitConnection[] }>("/api/settings/git-connections"),
   send: (id: string, text: string) => request<{ turn_id?: string; queued_message_id?: string }>(`${base}/${id}/messages`, json({ text })),
