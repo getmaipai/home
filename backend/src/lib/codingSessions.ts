@@ -9,9 +9,9 @@ import { db } from "@/db";
 import { codingSessions, people } from "@/db/schema";
 import { newCodingSessionId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { codeAdmission } from "@/lib/apiKeys";
+import { codeAdmission, revokeSessionKeys } from "@/lib/apiKeys";
 import { listGitConnections } from "@/lib/gitConnections";
-import { authorizeTier, isTier, type Tier, type TierChoice } from "@/lib/tiers";
+import { authorizeTier, isTier, readSlot, type Tier, type TierChoice } from "@/lib/tiers";
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import { appendLogLine } from "@/lib/log";
 import type { PersonRow } from "@/types";
@@ -57,7 +57,7 @@ export function requireCodingAccess(person: PersonRow): void {
 function wire(row: Row): CodingSessionWire {
   return CodingSession.parse({
     id: row.id, person_id: row.personId, title: row.title, repo: row.repo, environment_id: row.environmentId, mode: row.mode, state: row.state, tier: row.tier,
-    network: row.network, ...(row.mounts ? { mounts: row.mounts } : {}), ...(row.modelId ? { model_id: row.modelId } : {}), ...(row.checkpoints ? { checkpoints: row.checkpoints } : {}), usage: row.usage, changes: row.changes,
+    network: row.network, ...(row.mounts ? { mounts: row.mounts } : {}), ...(row.modelId ? { model_id: row.modelId } : {}), ...(row.checkpoints ? { checkpoints: row.checkpoints } : {}), ...(row.pullRequest ? { pull_request: row.pullRequest } : {}), usage: row.usage, changes: row.changes,
     created_at: row.createdAt, last_activity_at: row.lastActivityAt, ...(row.deletedAt ? { deleted_at: row.deletedAt, trash_until: row.trashUntil } : {}),
     provenance: row.provenance, hlc: row.hlc,
   });
@@ -160,6 +160,7 @@ export function markSessionDeleted(person: Pick<PersonRow, "id">, id: string): b
   const at = now.toISOString();
   db.update(codingSessions).set({ deletedAt: at, trashUntil: new Date(now.getTime() + TRASH_DAYS * 86_400_000).toISOString(), state: "archived", updatedAt: at, hlc: nextHlc() })
     .where(eq(codingSessions.id, id)).run();
+  revokeSessionKeys(id); // a deleted session's keys end here, so restoring the record never brings an old key back
   appendLogLine(`coding session_deleted session=${id} person=${person.id}`);
   return true;
 }
@@ -168,4 +169,22 @@ export function markSessionDeleted(person: Pick<PersonRow, "id">, id: string): b
 export function settleSessionsAtStartup(): number {
   const at = new Date().toISOString();
   return db.update(codingSessions).set({ state: "idle", updatedAt: at, hlc: nextHlc() }).where(inArray(codingSessions.state, ["queued", "starting", "working"])).returning({ id: codingSessions.id }).all().length;
+}
+
+export const TIER_NOT_OFFERED_LINE = "This level of coding is not offered on this computer. Ask an admin to turn it on in Settings, AI and models.";
+/**
+ * CODE-KEYS (slice four): the tier a per-session key's requests run at. It is the session's stored tier clamped again now (and the stored value corrected), so a key cannot
+ * raise it: nothing the tool sends (a header, a model name) is read. A level whose slot is off is refused with the not-offered line. A session that is gone or
+ * not this person's answers as an invalid key.
+ */
+export function sessionTierForKey(personId: string, sessionId: string, keyTier: Tier): { ok: true; tier: Tier } | { ok: false; status: 401 | 403; code: string; message: string } {
+  const row = getSessionRow(personId, sessionId);
+  if (!row) return { ok: false, status: 401, code: "invalid_api_key", message: "This key is not valid or its access has changed." };
+  // The key carries the tier of the turn it was minted for (a one-message Standard fallback, or a tier changed mid-turn, is already in it). It is clamped again
+  // against the person's grants and can only go lower, never up to the stored tier; the stored value is not touched here.
+  const owner = ownerOf(row.personId);
+  if (!owner) return { ok: false, status: 401, code: "invalid_api_key", message: "This key is not valid or its access has changed." };
+  const tier = authorizeTier({ person: owner, category: "coding", requested: keyTier }).tier;
+  if (readSlot("coding", tier).model === "off") return { ok: false, status: 403, code: "tier_not_offered", message: TIER_NOT_OFFERED_LINE };
+  return { ok: true, tier };
 }

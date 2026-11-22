@@ -114,7 +114,8 @@ function wire(row: KeyRow, person: PersonRow) {
     limits: row.limits, hint: row.hint, provenance: row.provenance, hlc: row.hlc };
 }
 export function listApiKeys(person: PersonRow) {
-  return db.select().from(apiKeys).where(eq(apiKeys.personId, person.id)).all().map(r => wire(r, person));
+  // A per-session coding key is internal: it is never listed or counted, and no one is ever shown it.
+  return db.select().from(apiKeys).where(and(eq(apiKeys.personId, person.id), isNull(apiKeys.sessionId))).all().map(r => wire(r, person));
 }
 /** Explicit whitelist: administrative reads carry the short key hint, never a name or activity. */
 export function listApiKeysForAdmin(person: PersonRow) {
@@ -182,7 +183,7 @@ export function revokeApiKey(personId: string, id: string): boolean {
 /** What a bearer secret resolved to. `invalid` covers every case where the secret itself does not open a key (unknown, wrong, expired, revoked, wrong scope), so
  * those cannot be told apart; the other refusals are only reachable by someone holding a real secret. */
 export type ApiKeyOutcome =
-  | { ok: true; person: PersonRow; key: { id: string; limits: KeyRow["limits"] } }
+  | { ok: true; person: PersonRow; key: { id: string; limits: KeyRow["limits"]; sessionId: string | null; tier: KeyRow["tier"] } }
   | { ok: false; reason: "invalid" | Exclude<CodeAdmission, "ok"> };
 export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): ApiKeyOutcome {
   const invalid = { ok: false, reason: "invalid" } as const;
@@ -206,8 +207,9 @@ export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?
   const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
   if (!person || !personMayHoldKeys(person) || !row.scopes.includes(scope) || usable(row)) return invalid;
   if (scope === "code") {
+    // A session key follows the app's admission (Coding on, not paused, `use:code`), not the person's API-key toggle: it is not a key they hold.
     const admission = codeAdmission(person);
-    if (admission !== "ok") return { ok: false, reason: admission };
+    if (admission !== "ok" && !(row.sessionId && admission === "keys_off")) return { ok: false, reason: admission };
   }
   // OPS-KEY-01: read fresh on every call, so a person who stops being an owner or admin loses the key at once.
   if (scope === "settings" && !mayHoldSettingsKey(person)) return invalid;
@@ -219,7 +221,7 @@ export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?
       ...(legacy ? { secretHash: digest, legacyHash: null, hint: hintOf(secret) } : {}), updatedAt: at, hlc: nextHlc(),
     }).where(eq(apiKeys.id, row.id)).run();
   }
-  return { ok: true, person, key: { id: row.id, limits: row.limits } };
+  return { ok: true, person, key: { id: row.id, limits: row.limits, sessionId: row.sessionId, tier: row.tier } };
 }
 /** The same admission again for a key already accepted, read fresh: a request that waited in a queue is checked before it is sent on. `role` is the role it was accepted with. */
 export function recheckCodeKey(keyId: string, role: string): "ok" | "invalid" | Exclude<CodeAdmission, "ok"> {
@@ -227,7 +229,40 @@ export function recheckCodeKey(keyId: string, role: string): "ok" | "invalid" | 
   if (!row || usable(row) || !row.scopes.includes("code")) return "invalid";
   const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
   if (!person || person.deletedAt) return "invalid";
-  return person.role !== role ? "not_allowed" : codeAdmission(person);
+  if (person.role !== role) return "not_allowed";
+  const admission = codeAdmission(person);
+  return row.sessionId && admission === "keys_off" ? "ok" : admission;
+}
+
+/** The longest a per-session key lives, whatever the caller asks: a turn's wall-clock budget plus a margin, never more than this. */
+export const SESSION_KEY_MAX_MS = 6 * 60 * 60_000;
+/**
+ * CODE-KEYS (slice four): a short-lived `code` key bound to one Code session and its owner, minted for one turn and handed only to the sandbox workload.
+ * One live key per session (an older one is revoked first). It never appears in a list, a log, a transcript or a response: the caller gets the secret once.
+ * It ends with the turn (`revokeSessionKeys`), when the session stops or is deleted, at its expiry, and the moment the person loses Coding access.
+ */
+export function createSessionKey(person: PersonRow, sessionId: string, lifetimeMs: number, tier: "standard" | "boost" | "max" = "standard"): string {
+  if (!personMayHoldKeys(person)) throw new Error("Keys are not allowed with your current access. Ask an admin to check your Coding access in Settings.");
+  const admission = codeAdmission(person);
+  if (admission !== "ok" && admission !== "keys_off") throw new Error("Coding is not available to you right now. Ask an admin to check your Coding access in Settings.");
+  return db.transaction(() => {
+    revokeSessionKeys(sessionId);
+    const id = newApiKeyId();
+    const secret = `maipai_${id}_${base32(crypto.randomBytes(32))}`;
+    const at = new Date().toISOString();
+    const rpm = getHouseholdSettingValue("coding.requests_per_minute_per_key");
+    db.insert(apiKeys).values({ id, personId: person.id, sessionId, tier, name: "Code session", scopes: ["code"], createdAt: at,
+      expiresAt: new Date(Date.now() + Math.max(60_000, Math.min(lifetimeMs, SESSION_KEY_MAX_MS))).toISOString(), status: "active", hint: "session",
+      limits: { requests_per_minute: typeof rpm === "number" && Number.isInteger(rpm) && rpm > 0 ? Math.max(rpm, 600) : 600 },
+      secretHash: hashApiKeySecret(secret), compatibility: false, provenance: "Made for one Code session turn", hlc: nextHlc(), updatedAt: at }).run();
+    return secret;
+  });
+}
+/** Ends every live key of a session. Returns how many (a count; the log never names a key). */
+export function revokeSessionKeys(sessionId: string): number {
+  const at = new Date().toISOString();
+  return db.update(apiKeys).set({ revokedAt: at, status: "revoked", updatedAt: at, hlc: nextHlc() })
+    .where(and(eq(apiKeys.sessionId, sessionId), isNull(apiKeys.revokedAt))).returning({ id: apiKeys.id }).all().length;
 }
 export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): PersonRow | null {
   const outcome = resolveApiKeyOutcome(secret, scope, origin);

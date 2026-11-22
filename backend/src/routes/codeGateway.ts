@@ -36,6 +36,7 @@ import {
   type CodeWire, type Usage,
 } from "@/lib/codeWire";
 import { gateStream } from "@/lib/codeStream";
+import { sessionTierForKey } from "@/lib/codingSessions";
 import { ensureCodingPiecesFresh, missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { AppEnv } from "@/types";
 
@@ -117,6 +118,13 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
     const limited = rateRefusal(key.id, key.requestsPerMinute);
     if (limited) return answer(refusedBy(c, limited));
 
+    // A per-session key (Code app): the session's stored, clamped tier picks the model slot. The tool's own words never raise it.
+    let sessionTier: string | null = null;
+    if (key.sessionId) {
+      const resolved = sessionTierForKey(person.id, key.sessionId, key.keyTier ?? "standard");
+      if (!resolved.ok) return answer(refuse(c, resolved.status, resolved.message, resolved.code));
+      sessionTier = resolved.tier;
+    }
     let body;
     try { body = parseBody(wire, await c.req.json().catch(() => undefined)); }
     catch (error) { if (error instanceof CodeRequestError) return answer(refuse(c, 400, error.message, "invalid_request")); throw error; }
@@ -158,7 +166,7 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
     const client = getStackClient();
     if (!client.codingWire) { letGo(); return answer(refuse(c, 503, ENGINE_DOWN, "engine_unavailable", 30)); }
     let upstream;
-    try { upstream = await client.codingWire(WIRE_PATH[wire], shaped, { signal: c.req.raw.signal }); }
+    try { upstream = await client.codingWire(WIRE_PATH[wire], shaped, { signal: c.req.raw.signal, ...(sessionTier ? { headers: { "x-maipai-coding-tier": sessionTier } } : {}) }); }
     catch (error) {
       letGo();
       if (c.req.raw.signal.aborted) return answer(new Response(null, { status: 499 }));

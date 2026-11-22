@@ -16,6 +16,7 @@ import { jobQueueCopy, type JobQueueReason } from "@/lib/jobQueueCopy";
 import { chatLeaseHeldBy, type ChatLease, type LeaseRefusal } from "@/lib/chatLease";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import type { Tier } from "@/lib/tiers";
+import { revokeSessionKeys } from "@/lib/apiKeys";
 import { addCheckpoint, CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
 import { appendCodingMessage } from "@/lib/codingTranscript";
@@ -64,6 +65,7 @@ const newTurnId = () => `ctrn-${randomSuffix(10)}`;
 export const DEFAULT_MESSAGE_MINUTES = 30;
 let budgetOverrideMs: number | null = null;
 export function __setBudgetMsForTests(ms: number | null): void { budgetOverrideMs = ms; }
+export function messageBudgetMs(person: PersonRow): number { return budgetMs(person); }
 function budgetMs(person: PersonRow): number { return budgetOverrideMs ?? (positive(getPersonSettingValue(person, "coding.person.message_minutes")) ?? DEFAULT_MESSAGE_MINUTES) * 60_000; }
 
 const log = (event: string, turn: Pick<Turn, "id" | "sessionId" | "personId">, extra = "") => appendLogLine(`coding ${event} turn=${turn.id} session=${turn.sessionId} person=${turn.personId}${extra ? ` ${extra}` : ""}`);
@@ -118,6 +120,8 @@ registerQueueProvider(codingQueueProvider);
 
 function settle(turn: Turn, state: TurnState): void {
   turn.state = state;
+  // The turn's session key ends with the turn, whatever the outcome.
+  revokeSessionKeys(turn.sessionId);
   if (turn.leaseHeld) { turn.leaseHeld = false; try { runtime?.lease().requestEnded(); } catch { /* the lease's own idle timer ends it */ } }
   turn.finish();
 }
@@ -294,6 +298,7 @@ export function stopCodingSession(person: Pick<PersonRow, "id">, sessionId: stri
   }
   clearQueue(sessionId);
   denyPendingFor(sessionId);
+  revokeSessionKeys(sessionId);
   updateSession(sessionId, { state: "idle" });
   refreshHouseholdQueue();
   return true;

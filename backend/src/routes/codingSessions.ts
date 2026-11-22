@@ -14,6 +14,7 @@ import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
 import { pushCodingSession } from "@/lib/codingShare";
+import { createCodingPullRequest } from "@/lib/codingPullRequest";
 import type { PersonRow } from "@/types";
 
 export const codingSessionsRoutes = apiRouter();
@@ -178,3 +179,12 @@ codingSessionsRoutes.openapi(undoR, async (c) => {
   try { await undoToCheckpoint(c.get("person"), c.req.valid("param").id, c.req.valid("json").checkpoint_id); return c.json({ ok: true as const }, 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
+
+const prR = createRoute({
+  method: "post", path: "/{id}/pull-request", tags: ["Code"], summary: "Open a pull request for the session's branch (the person's confirmation; the secret check runs first)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, body: { content: { "application/json": { schema: z.object({ confirm: z.boolean(), title: z.string().trim().min(1).max(200).optional(), draft: z.boolean().optional() }).strict() } } } },
+  responses: { 201: { content: { "application/json": { schema: z.object({ url: z.string(), number: z.number(), draft: z.boolean() }) } }, description: "The pull request." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(prR, async (c) => {
+  try { const b = c.req.valid("json"); return c.json(await createCodingPullRequest(c.get("person"), c.req.valid("param").id, b), 201); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});

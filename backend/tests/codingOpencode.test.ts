@@ -80,17 +80,35 @@ describe("a turn through the driver", () => {
     const t1 = submitTurn(a, s.id, "one"); await turnFinished(t1.turn_id); const t2 = submitTurn(a, s.id, "two"); await turnFinished(t2.turn_id);
     expect(sbx.execs[1]!.argv).toContain("--continue");
   });
-  test("plan mode turns edits and commands off without asking; ask mode holds the request and a deny turns the permission off", async () => {
+  test("plan mode turns edits and commands off without asking", async () => {
     rig = startRig(); const sbx = execSandbox(() => play([{ exit: 0 }])); wire(sbx);
     const a = owner(); const plan = createCodingSession(a, input({ mode: "plan" }));
     const t1 = submitTurn(a, plan.id, "look"); await turnFinished(t1.turn_id);
     expect(JSON.parse(sbx.execs[0]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "deny", bash: "deny", webfetch: "deny" });
-    const ask = createCodingSession(a, input({ mode: "ask", title: "Ask" }));
-    const t2 = submitTurn(a, ask.id, "do"); await settled();
-    expect(pendingRequestsFor(a.id, ask.id)[0]!.effect).toBe("file_write");
-    answerHostRequest(a, ask.id, pendingRequestsFor(a.id, ask.id)[0]!.request_id, "allow"); await settled();
-    answerHostRequest(a, ask.id, pendingRequestsFor(a.id, ask.id)[0]!.request_id, "deny"); await turnFinished(t2.turn_id);
-    expect(JSON.parse(sbx.execs[1]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "allow", bash: "deny", webfetch: "deny" });
+  });
+  test("ask mode asks per action: the command the agent wanted is held, an allow runs another round with only that permission, a deny ends the turn", async () => {
+    rig = startRig();
+    const refused = (command: string) => line({ type: "tool_use", part: { tool: "bash", state: { status: "error", error: "The user has not granted permission to run this command", input: { command } } } });
+    let round = 0;
+    const sbx = execSandbox(() => play(round++ === 0 ? [{ stream: "stdout", text: refused("npm install left-pad") }, { exit: 0 }] : [{ stream: "stdout", text: bash("npm install left-pad") }, { exit: 0 }]));
+    wire(sbx);
+    const a = owner(); const s = createCodingSession(a, input({ mode: "ask" }));
+    const t = submitTurn(a, s.id, "add left-pad"); await settled();
+    expect(JSON.parse(sbx.execs[0]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "deny", bash: "deny", webfetch: "deny" }); // nothing was asked up front
+    const held = pendingRequestsFor(a.id, s.id); expect(held).toHaveLength(1); expect(held[0]!.effect).toBe("command");
+    answerHostRequest(a, s.id, held[0]!.request_id, "allow"); await turnFinished(t.turn_id);
+    expect(sbx.execs).toHaveLength(2);
+    expect(sbx.execs[1]!.argv).toContain("--continue"); expect(sbx.execs[1]!.argv.at(-1)).toBe("You now have the permission you asked for. Continue the task.");
+    expect(JSON.parse(sbx.execs[1]!.env!.OPENCODE_CONFIG_CONTENT!).permission).toEqual({ edit: "deny", bash: "allow", webfetch: "deny" }); // only what was allowed
+    expect(listCodingEvents(a.id, s.id).map((e) => e.kind)).toEqual(["approval", "command"]);
+    // a deny ends it with one round
+    round = 0; const s2 = createCodingSession(a, input({ mode: "ask", title: "Two" })); const t2 = submitTurn(a, s2.id, "again"); await settled();
+    answerHostRequest(a, s2.id, pendingRequestsFor(a.id, s2.id)[0]!.request_id, "deny"); await turnFinished(t2.turn_id);
+    expect(sbx.execs).toHaveLength(3); expect(turnState(t2.turn_id)).toBe("done");
+  });
+  test("a permission error is mapped to the blocked action; other errors are not", () => {
+    expect(mapOpenCodeEvent({ type: "tool_use", part: { tool: "edit", state: { status: "error", error: "permission denied", input: { filePath: "a.ts" } } } }).blocked).toEqual({ effect: "file_write", detail: { path: "a.ts" } });
+    expect(mapOpenCodeEvent({ type: "tool_use", part: { tool: "bash", state: { status: "error", error: "command not found", input: { command: "x" } } } }).blocked).toBeUndefined();
   });
   test("a non-zero exit fails the turn with a stopped-run and no text in the log", async () => {
     rig = startRig(); wire(execSandbox(() => play([{ stream: "stdout", text: bash("make", 1) }, { exit: 3 }])));

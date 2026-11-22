@@ -138,6 +138,10 @@ export const apiKeys = sqliteTable("api_keys", {
   hint: text("hint").notNull(),
   secretHash: text("secret_hash").unique(),
   legacyHash: text("legacy_hash").unique(),
+  /** CODE-KEYS (slice four): a per-session coding key is bound to one Code session. Null for every ordinary key. Such a key is never listed, never shown, and ends with its turn. */
+  sessionId: text("session_id"),
+  /** The tier of the turn this session key was minted for (never raised by the gateway). Null for ordinary keys. */
+  tier: text("tier", { enum: ["standard", "boost", "max"] }),
   legacyFormat: integer("legacy_format", { mode: "boolean" }).notNull().default(false),
   compatibility: integer("compatibility", { mode: "boolean" }).notNull().default(false),
   provenance: text("provenance").notNull(),
@@ -180,6 +184,8 @@ export const codingSessions = sqliteTable("coding_sessions", {
   mounts: text("mounts", { mode: "json" }).$type<string[]>(),
   modelId: text("model_id"),
   /** CODE-AGENT-01: the sandbox snapshots a session can go back to (spec coding-session.checkpoints), newest last. */
+  /** The pull request Home opened for the session (spec coding-session.pull_request). */
+  pullRequest: text("pull_request", { mode: "json" }).$type<{ url: string; number: number; draft: boolean }>(),
   checkpoints: text("checkpoints", { mode: "json" }).$type<{ id: string; at: string; label: string; files: number }[]>(),
   usage: text("usage", { mode: "json" }).$type<{ input_tokens: number; output_tokens: number }>().notNull(),
   changes: text("changes", { mode: "json" }).$type<{ files: number; additions: number; deletions: number }>().notNull(),

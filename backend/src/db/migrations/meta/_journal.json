@@ -1450,6 +1450,20 @@
       "when": 1795312570250,
       "tag": "0207_coding_checkpoints",
       "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "6",
+      "when": 1795313164535,
+      "tag": "0208_coding_session_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "6",
+      "when": 1795313562433,
+      "tag": "0209_coding_key_tier",
+      "breakpoints": true
     }
   ]
 }

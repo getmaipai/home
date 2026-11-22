@@ -393,7 +393,7 @@ export function requireApiKey(scope: ApiKeyScope, door: ApiKeyDoor = {}) {
     if (!outcome.ok) return refuse(outcome.reason);
     c.set("person", outcome.person);
     const rpm = outcome.key.limits?.requests_per_minute;
-    c.set("apiKey", { id: outcome.key.id, requestsPerMinute: typeof rpm === "number" && rpm > 0 ? rpm : null });
+    c.set("apiKey", { id: outcome.key.id, requestsPerMinute: typeof rpm === "number" && rpm > 0 ? rpm : null, ...(outcome.key.sessionId ? { sessionId: outcome.key.sessionId, keyTier: outcome.key.tier ?? "standard" } : {}) });
     await next();
   });
 }
