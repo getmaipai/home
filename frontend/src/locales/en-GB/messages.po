@@ -29,12 +29,12 @@ msgid " · Household voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:91
+#: ../backend/src/routes/settings.ts:90
 msgid "settings.attention.backups.key_missing"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:90
+#: ../backend/src/routes/settings.ts:89
 msgid "settings.attention.backups.key_saved"
 msgstr ""
 
@@ -59,13 +59,8 @@ msgid " A reply being written right now will be cut off."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:99
+#: ../backend/src/routes/settings.ts:98
 msgid "settings.attention.robots.connected"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:89
-msgid " Max is for admins and anyone an admin assigns."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -74,7 +69,7 @@ msgid " Plan for about {needGb} GB free there."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:100
+#: ../backend/src/routes/settings.ts:99
 msgid "settings.attention.robots.waiting"
 msgstr ""
 
@@ -84,7 +79,6 @@ msgid " You can also turn off an extra above."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:209
 #: src/apps/settings/ReferenceLibrarySettings.tsx:195
 msgid ", {size} free"
 msgstr ""
@@ -264,11 +258,6 @@ msgid "{count, plural, one {# item} other {# items}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:71
-msgid "{count, plural, one {# kept because it is in use. } other {# kept because they are in use. }}"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:362
 msgid "{count, plural, one {# kept until you delete it} other {# kept until you delete them}}"
 msgstr ""
@@ -400,13 +389,8 @@ msgid "{count} alarms"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:89
+#: ../backend/src/routes/settings.ts:88
 msgid "settings.attention.backups.many"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:72
-msgid "{count} did not finish. Try again. "
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -441,7 +425,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:68
+#: ../backend/src/routes/settings.ts:67
 msgid "settings.attention.repairs.many"
 msgstr ""
 
@@ -451,7 +435,7 @@ msgid "{count} restored"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:98
+#: ../backend/src/routes/settings.ts:97
 msgid "settings.attention.robots.many"
 msgstr ""
 
@@ -527,11 +511,6 @@ msgid "{errorLine} Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:186
-msgid "{feature} {level} on or off"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/FeatureAccess.tsx:95
 msgid "{feature} for {name}"
 msgstr ""
@@ -574,11 +553,6 @@ msgid "{greeting}. Here is your household today."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:254
-msgid "{headline} · Memory it needs: {need}"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/reminders/ComingUpRow.tsx:35
 #: src/apps/reminders/ComingUpRow.tsx:36
 msgid "{hourMinute} {dayPeriod}, once, {text}"
@@ -617,11 +591,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/HouseSettings.tsx:50
 msgid "{item} access for {person}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:187
-msgid "{join}. The licences are accepted. Progress shows on the install strip."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -773,11 +742,6 @@ msgid "{length} of 140 characters"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:52
-msgid "{level} needs attention"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:209
 msgid "{made} is ready. Pick it from the list and press Preview to hear it."
 msgstr ""
@@ -790,11 +754,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:50
 msgid "{matches, plural, one {# match} other {# matches}} on {lines, plural, one {# line} other {# lines}}."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:91
-msgid "{memory} free memory · {models} in models · {disk} free disk · {count} downloads waiting"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -919,7 +878,7 @@ msgid "notification.engines.update_failed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:146
+#: src/apps/settings/AiLevelAccess.tsx:57
 msgid "{name} details"
 msgstr ""
 
@@ -1035,24 +994,9 @@ msgid "{name} isn't working: {cause}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:118
-msgid "{name} levels"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:115
-msgid "{name} models"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/statusApps.ts:20
 #: src/shell/statusApps.ts:99
 msgid "{name} needs attention."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:112
-msgid "{name} on or off"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1176,11 +1120,6 @@ msgid "notification.media_time_up"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:53
-msgid "{named}. Follows catalog updates."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusIncident.tsx:22
 msgid "{names} {count, plural, one {is starting up} other {are starting up}}"
 msgstr ""
@@ -1194,11 +1133,6 @@ msgstr ""
 #: src/shell/pages/AdminPages.es.test.tsx:118
 #: src/shell/pages/status/StatusIncident.tsx:22
 msgid "{names} {count, plural, one {needs attention} other {need attention}}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:28
-msgid "{names} and {last}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1335,11 +1269,6 @@ msgid "{sizeGb} will be freed. {value} You can download them again later."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:209
-msgid "{sizeWords} of AI on this computer{value}. Add or remove parts here. Everything stays on this computer."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:27
 msgid "{source} · only if you turn it on"
 msgstr ""
@@ -1373,16 +1302,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:493
 msgid "{thingsLeftLine}. You'll find them in Home settings."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:83
-msgid "{tier} model"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:79
-msgid "{tier}: {state}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1424,11 +1343,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/notificationCopy.ts:21
 msgid "notification.project.done"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:67
-msgid "{title} levels"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1483,18 +1397,8 @@ msgid "{used} tokens used"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:299
-msgid "{usedGb} GB in use of {usableGb} GB"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:272
 msgid "{value} · Snapshot {value2} · {status}{value3}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:66
-msgid "{value} Nothing is deleted or cancelled by turning a level off."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1558,7 +1462,7 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:88
+#: ../backend/src/routes/settings.ts:87
 msgid "settings.attention.backups.one"
 msgstr ""
 
@@ -1580,12 +1484,12 @@ msgid "1 hour"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:67
+#: ../backend/src/routes/settings.ts:66
 msgid "settings.attention.repairs.one"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:97
+#: ../backend/src/routes/settings.ts:96
 msgid "settings.attention.robots.one"
 msgstr ""
 
@@ -1994,11 +1898,6 @@ msgid "setting.robot.face.color.option.rose"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:18
-msgid "A stronger pick when someone asks for more. Other big jobs wait their turn."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:93
 msgid "A style is a sound you can reuse. Words only, never lyrics."
 msgstr ""
@@ -2128,21 +2027,6 @@ msgid "Accent color"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:175
-msgid "Accept"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:155
-msgid "Accept once, and Home installs any of them without asking again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:153
-msgid "Accept the licences for the AI models Home installs"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1907
 msgid "area.Access"
 msgstr ""
@@ -2247,7 +2131,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:124
+#: src/shell/pages/settings/settingsViews.tsx:117
 msgid "Add a robot"
 msgstr ""
 
@@ -2552,7 +2436,7 @@ msgid "Admin"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:156
+#: src/apps/settings/AiLevelAccess.tsx:23
 msgid "Admins and assigned people"
 msgstr ""
 
@@ -2564,11 +2448,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:69
 msgid "api.error.grant_backup_self"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:28
-msgid "Admins only"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2594,10 +2473,10 @@ msgid "Adult controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:150
-#: src/apps/settings/AiGlance.tsx:150
-#: src/apps/settings/AiGlance.tsx:150
-#: src/apps/settings/AiGlance.tsx:150
+#: src/apps/settings/AiLevelAccess.tsx:62
+#: src/apps/settings/AiLevelAccess.tsx:62
+#: src/apps/settings/AiLevelAccess.tsx:62
+#: src/apps/settings/AiLevelAccess.tsx:62
 msgid "Adult gate"
 msgstr ""
 
@@ -2806,18 +2685,8 @@ msgid "area.AI developer settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:91
-msgid "AI is ready"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/StorageStep.tsx:22
 msgid "AI models"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:91
-msgid "AI needs attention"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2831,17 +2700,17 @@ msgid "area.AI settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:81
+#: ../backend/src/routes/settings.ts:80
 msgid "settings.attention.ai.setup"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:76
+#: ../backend/src/routes/settings.ts:75
 msgid "settings.attention.install.running.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:74
+#: ../backend/src/routes/settings.ts:73
 msgid "settings.attention.install.title"
 msgstr ""
 
@@ -3180,8 +3049,8 @@ msgid "Always close"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobCardView.tsx:13
-#: src/apps/settings/AiJobCardView.tsx:17
+#: src/apps/settings/AiJobCardView.tsx:19
+#: src/apps/settings/AiJobCardView.tsx:23
 msgid "Always on"
 msgstr ""
 
@@ -3218,6 +3087,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:238
 msgid "failure.composer.paused_by_admin.teen"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiMigrationNotice.tsx:31
+msgid "An earlier choice"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3724,13 +3598,8 @@ msgid "Asks before changes"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:156
+#: src/apps/settings/AiLevelAccess.tsx:23
 msgid "Assigned"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:28
-msgid "Assigned people only"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3909,7 +3778,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:95
-#: src/apps/settings/AiSlotDialog.tsx:151
 #: src/apps/settings/EngineLinkCredentialSection.tsx:285
 #: src/apps/setup/SetupReviewPage.tsx:65
 #: src/shell/pageHeaderTitle.tsx:148
@@ -4028,6 +3896,7 @@ msgid "setting.backup.max_total_gb.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiModelsPage.tsx:26
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/Routes.tsx:174
@@ -4156,11 +4025,6 @@ msgid "Before this synth is for everyone, check each one."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:103
-msgid "Before you get {label}"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:56
 msgid "Before you start"
 msgstr ""
@@ -4229,11 +4093,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1244
 msgid "setting.resources.preset.option.balanced"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:76
-msgid "Big jobs will not simplify chat, so a Max job that needs more room than the rest leaves is not offered."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4474,9 +4333,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:83
-#: src/apps/settings/AiGlance.tsx:37
-#: src/apps/settings/AiJobSummary.tsx:15
-#: src/apps/settings/AiSlotDialog.tsx:21
+#: src/apps/settings/AiLevelAccess.tsx:22
 #: src/apps/settings/CapabilityTable.tsx:12
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:55
@@ -4503,21 +4360,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:9
 msgid "setting.access.tier.boost.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:74
-msgid "Boost is off for {name}. A request for Boost is made at Standard, and Boost jobs not yet started are made at Standard."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:77
-msgid "Boost is the same as Standard, so Boost will be hidden."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:86
-msgid "Boost: {model}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -4737,8 +4579,7 @@ msgstr ""
 #: src/apps/reminders/RemindersPage.tsx:188
 #: src/apps/settings/AddRobotSection.tsx:258
 #: src/apps/settings/AddVoiceForm.tsx:120
-#: src/apps/settings/AiGlance.tsx:150
-#: src/apps/settings/AiSlotDialog.tsx:151
+#: src/apps/settings/AiLevelAccess.tsx:65
 #: src/apps/settings/AssistantKeysSettings.tsx:98
 #: src/apps/settings/AutoLocksSection.tsx:83
 #: src/apps/settings/CodingSettings.tsx:140
@@ -4943,18 +4784,11 @@ msgid "setting.weather.unit.option_label.celsius"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:111
-#: src/apps/settings/AiGlance.tsx:185
 #: src/apps/settings/RobotPasswordSection.tsx:152
 #: src/apps/settings/SafetyChangesSection.tsx:53
 #: src/shell/pages/musicComposerMode.ts:122
 #: src/shell/pages/settings/SettingField.tsx:157
 msgid "Change"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:111
-msgid "Change {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5118,8 +4952,6 @@ msgid "setting.tts.voice_id.option_label.charles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:138
-#: src/apps/settings/ModelsSection.tsx:143
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
@@ -5156,11 +4988,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:139
 msgid "Chat always comes first. Coding waits or slows down, never chat. See what is running on the"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:22
-msgid "Chat and thinking"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5235,7 +5062,7 @@ msgid "Chat is down"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:82
+#: ../backend/src/routes/settings.ts:81
 msgid "settings.attention.health.title"
 msgstr ""
 
@@ -5282,11 +5109,6 @@ msgid "setting.engines.chat.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:345
-msgid "Chat models"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:228
 msgid "failure.composer.gpu.adult"
 msgstr ""
@@ -5314,11 +5136,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:25
 msgid "setting.access.tier.max.option.chat"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:156
-msgid "Chat runs through the MaiPai Stack."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5359,16 +5176,6 @@ msgid "Chat works, but a part is down."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:228
-msgid "Check"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:224
-msgid "Check a model"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:245
 #: src/apps/setup/PlanStep.tsx:127
 #: src/apps/setup/PlanStep.tsx:168
@@ -5406,19 +5213,8 @@ msgid "Check that Home is running and online, then switch a book off and on agai
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:65
-msgid "Check that Home is running, then open Free up space again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:212
 #: src/shell/pages/StoragePage.tsx:200
 msgid "Check that Home is running, then reload this page."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:66
-msgid "Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5510,20 +5306,8 @@ msgid "Checking the connection"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:138
-msgid "Checking the MaiPai Stack"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:210
 msgid "Checking the picture. This can take a minute."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:84
-#: src/apps/settings/ModelsSection.tsx:172
-#: src/apps/settings/ModelsSection.tsx:231
-msgid "Checking this computer"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5539,11 +5323,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/StatusPage.tsx:99
 msgid "Checking..."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:228
-msgid "Checking…"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5616,6 +5395,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1397
 msgid "setting.safety.alarm.child_line.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiLevelAccess.tsx:62
+msgid "Children"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5706,16 +5490,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/DeviceAppearanceControl.tsx:26
 msgid "Choose a look for this browser. It does not change your personal setting."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:163
-msgid "Choose a model"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:127
-msgid "Choose a model for {level}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6012,17 +5786,12 @@ msgid "setting.coding.engine.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:66
-msgid "Choose which levels exist, the model each one uses and who can use it."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:90
 msgid "Choose which sections show on Home and the order they come in."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:146
+#: src/apps/settings/AiLevelAccess.tsx:57
 msgid "Choose who can use each level and its options."
 msgstr ""
 
@@ -6257,7 +6026,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:414
 #: src/apps/notifications/NotificationsPage.tsx:159
-#: src/apps/settings/FreeUpSpaceDialog.tsx:80
 #: src/shell/pages/ActivityPage.tsx:107
 #: src/shell/pages/ActivityPage.tsx:157
 #: src/shell/pages/StoragePage.tsx:227
@@ -6386,7 +6154,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/code/SessionView.tsx:97
 #: src/apps/settings/EngineLinkCredentialSection.tsx:288
-#: src/apps/settings/FreeUpSpaceDialog.tsx:97
 #: src/apps/settings/StackChanInstallDialog.tsx:153
 #: src/apps/setup/AwayFromHome.tsx:175
 #: src/shell/AmbientCompanionPane.tsx:271
@@ -6456,7 +6223,6 @@ msgid "area.Coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:80
 #: src/apps/settings/CodingSettings.tsx:107
 #: src/apps/settings/CodingSettings.tsx:187
 msgid "Coding"
@@ -6691,11 +6457,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/PersonMore.tsx:16
 msgid "Companions"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:279
-msgid "Compare"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -6982,7 +6743,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:194
 #: src/apps/settings/EngineLinkCredentialSection.tsx:75
-#: src/apps/settings/ModelsSection.tsx:281
 #: src/apps/setup/SetupWizard.tsx:484
 msgid "Copied"
 msgstr ""
@@ -7029,11 +6789,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MicTestPage.tsx:50
 msgid "Copy results"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:281
-msgid "Copy summary"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7118,11 +6873,6 @@ msgid "Could not change access. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:340
-msgid "Could not change the chat model. Try again."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:176
 msgid "Could not change the companion. Check your connection and try again."
 msgstr ""
@@ -7168,11 +6918,6 @@ msgid "Could not check or update Tailscale"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:217
-msgid "Could not check that link."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/EnginesPage.tsx:169
 msgid "Could not check the connection."
 msgstr ""
@@ -7200,11 +6945,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:311
 msgid "Could not continue this side chat. Try again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:282
-msgid "Could not copy. Select the text below instead."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7555,11 +7295,6 @@ msgid "Could not load this article."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:63
-msgid "Could not load this computer's information."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/SiteBlocksSection.tsx:59
 msgid "Could not load this person's blocked sites. Check your connection and try again."
 msgstr ""
@@ -7787,11 +7522,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:44
 msgid "Could not read the changes. Try again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:68
-msgid "Could not remove {label}. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8075,11 +7805,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:125
 msgid "Could not start fresh from the base. Try again from the Synths list."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:62
-msgid "Could not start installing {label}. Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8372,7 +8097,6 @@ msgid "Current work"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/settings/PerformanceSettings.tsx:35
 #: src/apps/settings/ReferenceLibrarySettings.tsx:206
 #: src/apps/settings/VoiceManagerSection.tsx:112
@@ -9000,7 +8724,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:339
-#: src/apps/settings/ModelsSection.tsx:154
 #: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
 #: src/shell/InstallStrip.tsx:122
@@ -9078,11 +8801,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:37
 msgid "Dictionaries"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:42
-msgid "Did not finish"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9265,7 +8983,6 @@ msgstr ""
 #: src/apps/reminders/ComingUpRow.tsx:58
 #: src/apps/settings/AddRobotSection.tsx:213
 #: src/apps/settings/AddRobotSection.tsx:229
-#: src/apps/settings/AiJobSummary.tsx:86
 #: src/apps/settings/CodingSettings.tsx:194
 #: src/apps/settings/EngineLinkCredentialSection.tsx:23
 #: src/apps/settings/StackChanInstallDialog.tsx:151
@@ -9325,11 +9042,6 @@ msgid "Download"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:363
-msgid "Download ({formatBytes})"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:472
 msgid "Download {format}"
 msgstr ""
@@ -9342,11 +9054,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/PersonMore.tsx:136
 msgid "Download {name}'s files"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:72
-msgid "Download about {size}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9405,7 +9112,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:69
-#: src/apps/settings/ModelsAndStorageSection.tsx:87
 msgid "Downloading and installing"
 msgstr ""
 
@@ -9562,7 +9268,6 @@ msgid "Echo"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:81
 #: src/apps/settings/styles/StylesTab.tsx:130
 #: src/apps/settings/VoiceManagerSection.tsx:125
 #: src/shell/library/LibraryViewer.tsx:114
@@ -9572,11 +9277,6 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:74
 #: src/shell/pages/CompanionsPage.tsx:248
 msgid "Edit"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:81
-msgid "Edit {level}: {title}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10065,13 +9765,8 @@ msgid "Every voice Home can speak with. Home's default voice is used by anyone, 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:17
-msgid "Everyday use. Home keeps working normally."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:43
-#: src/apps/settings/AiGlance.tsx:156
+#: src/apps/settings/AiLevelAccess.tsx:23
 #: src/shell/pages/CompanionAudienceDialog.tsx:53
 msgid "Everyone"
 msgstr ""
@@ -10084,11 +9779,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:246
 msgid "Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:28
-msgid "Everyone the age gates allow"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10109,11 +9799,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:175
 msgid "Everything else"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:77
-msgid "Everything installed is in use."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10628,7 +10313,7 @@ msgid "Finish"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:73
+#: ../backend/src/routes/settings.ts:72
 msgid "settings.attention.setup.todo"
 msgstr ""
 
@@ -10670,14 +10355,6 @@ msgid "setting.tours.autostart.enabled.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:158
-#: src/apps/settings/ModelsSection.tsx:233
-msgid "Fit details"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:119
-#: src/apps/settings/AiGlance.tsx:184
 #: src/shell/pages/RepairsPage.tsx:67
 msgid "Fix"
 msgstr ""
@@ -10771,11 +10448,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1165
 msgid "setting.podcasts.auto_download.option_label.followed"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:53
-msgid "Follows catalog updates."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10892,11 +10564,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:268
 msgid "For children"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:22
-msgid "For children and teens"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11070,8 +10737,6 @@ msgid "Free up memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:59
-#: src/shell/pages/settings/settingsViews.tsx:115
 #: src/shell/pages/StoragePage.tsx:198
 msgid "Free up space"
 msgstr ""
@@ -11079,11 +10744,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.advice.disk.next_step"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:69
-msgid "Freed {size}."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11690,6 +11350,7 @@ msgid "failure.tool.bad_arguments.verb"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiMigrationNotice.tsx:32
 #: src/shell/incognitoContext.tsx:63
 msgid "Got it"
 msgstr ""
@@ -11812,11 +11473,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HelperStatusRow.tsx:27
 msgid "Helper not installed"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:119
-msgid "Helpers"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12161,7 +11817,7 @@ msgid "failure.voice.microphone_blocked.adultNoRepairs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:103
+#: ../backend/src/routes/settings.ts:102
 msgid "settings.attention.search.line"
 msgstr ""
 
@@ -12562,11 +12218,6 @@ msgid "Home couldn't save this step. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:144
-msgid "Home couldn't save your accept. Check that the engine is running, then press Accept again."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:409
 msgid "Home couldn't save your account. Check the name and PIN, then press Create owner account again."
 msgstr ""
@@ -12589,11 +12240,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:121
 msgid "Home couldn't start the download. Press Install again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:148
-msgid "Home couldn't start the extras. Check that the engine is running, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12694,11 +12340,6 @@ msgid "setting.ui.home_layout.does_child"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:23
-msgid "Home keeps working normally while this runs. It is the floor, so it stays on."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1813
 msgid "setting.ui.home_layout.label"
 msgstr ""
@@ -12795,22 +12436,12 @@ msgid "Home shows it only once. Give it to the assistant. Anyone with it can do 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:24
-msgid "Home stays up, but other big jobs wait their turn."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:146
 msgid "Home uses its ready-to-use default folder."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:132
-msgid "Home uses the best model that fits this level."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:77
+#: ../backend/src/routes/settings.ts:76
 msgid "settings.attention.install.running.line"
 msgstr ""
 
@@ -13265,30 +12896,15 @@ msgid "setting.robot.vision.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:232
-msgid "How this was worked out"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/WebSearchStep.tsx:67
 #: src/shell/pages/settings/WebSearchSettings.tsx:96
 msgid "http://searx.local:8888"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddChatModel.tsx:31
-msgid "https://huggingface.co/owner/repo"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:89
 #: src/apps/settings/styles/StylesTab.tsx:190
 msgid "Hugging Face"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:227
-msgid "Hugging Face model link"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13309,11 +12925,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:91
 msgid "Humor"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:112
-msgid "I accept, get it"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13543,7 +13154,7 @@ msgid "setting.person.vision.watch.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:70
+#: ../backend/src/routes/settings.ts:69
 msgid "settings.attention.backup_key.line"
 msgstr ""
 
@@ -13558,18 +13169,13 @@ msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:86
+#: ../backend/src/routes/settings.ts:85
 msgid "settings.attention.backups.empty.line"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1724
 msgid "setting.topics.health.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:99
-msgid "Image generation"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13618,10 +13224,7 @@ msgid "setting.music.musicbrainz_match.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:133
-#: src/apps/settings/AiGlance.tsx:139
 #: src/apps/settings/MicrophoneSection.tsx:82
-#: src/apps/settings/ModelsSection.tsx:360
 msgid "In use"
 msgstr ""
 
@@ -13696,30 +13299,10 @@ msgid "Inspired voice ({level})"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:119
-#: src/apps/settings/AiGlance.tsx:139
-#: src/apps/settings/AiGlance.tsx:184
 #: src/apps/settings/CodingSettings.tsx:119
 #: src/apps/settings/CodingSettings.tsx:132
-#: src/apps/settings/FeatureModelChooser.tsx:40
-#: src/apps/settings/FeatureModelLine.tsx:26
-#: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/shell/pages/EnginesPage.tsx:242
 msgid "Install"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:92
-msgid "Install {label}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:119
-#: src/apps/settings/AiGlance.tsx:139
-#: src/apps/settings/AiGlance.tsx:184
-#: src/apps/settings/FeatureModelChooser.tsx:40
-#: src/apps/settings/FeatureModelLine.tsx:26
-msgid "Install {size}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13768,11 +13351,6 @@ msgid "Install Tailscale on your phone, sign in to the same account, then scan t
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:188
-msgid "Install the recommended extras ({size})"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:891
 msgid "setting.install.recommended_auto_on_upgrade.label"
 msgstr ""
@@ -13793,9 +13371,7 @@ msgid "Install without a backup."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:138
 #: src/apps/settings/CodingSettings.tsx:131
-#: src/apps/settings/ModelsAndStorageSection.tsx:43
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/settings/styles/StyleBrowser.tsx:129
@@ -13823,28 +13399,16 @@ msgid "setting.robot.firmware.installed.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:43
-msgid "Installed, needed"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:112
 #: src/apps/settings/CodingSettings.tsx:119
 #: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/settings/CodingSettings.tsx:132
-#: src/apps/settings/FeatureModelLine.tsx:28
-#: src/apps/settings/ModelsAndStorageSection.tsx:41
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/companionFlow/PackSection.tsx:24
 msgid "Installing"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:28
-msgid "Installing {percent}%"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13954,7 +13518,6 @@ msgid "Issue"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:110
 #: src/apps/settings/RobotBody.tsx:232
 msgid "it"
 msgstr ""
@@ -13962,11 +13525,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicSongDetails.tsx:153
 msgid "It appears on this song when it is done. The earlier version stays."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:104
-msgid "It comes with its maker's licence ({name}). Read these points, then accept to start the {sizeWords} download. You only need to accept once for this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13991,7 +13549,7 @@ msgid "It starts for admins only. You choose who else can use it after you try i
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobCardView.tsx:18
+#: src/apps/settings/AiJobCardView.tsx:24
 msgid "It takes {size}."
 msgstr ""
 
@@ -14187,7 +13745,6 @@ msgstr ""
 #: src/apps/settings/DevicesSection.tsx:141
 #: src/apps/settings/DevicesSection.tsx:222
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
-#: src/apps/settings/ModelsAndStorageSection.tsx:124
 #: src/apps/settings/styles/StyleEditor.tsx:182
 #: src/shell/pages/FilesPage.tsx:411
 #: src/shell/pages/MusicStudioPages.tsx:189
@@ -14259,7 +13816,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:428
 #: src/apps/memory/PersonMemories.tsx:449
-#: src/apps/settings/FreeUpSpaceDialog.tsx:113
 #: src/apps/settings/PersonMore.tsx:106
 #: src/apps/settings/UsersSection.tsx:242
 #: src/shell/library/LibraryTrash.tsx:28
@@ -14273,7 +13829,7 @@ msgid "Keep things as they are"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:163
+#: src/shell/pages/settings/settingsViews.tsx:156
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr ""
 
@@ -14563,7 +14119,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:70
+#: src/shell/pages/settings/settingsViews.tsx:67
 msgid "Language"
 msgstr ""
 
@@ -14811,11 +14367,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:127
 msgid "setting.coding.api.away.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:21
-msgid "Let big jobs simplify chat"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15127,16 +14678,6 @@ msgid "Level: {toFixed} percent"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:65
-msgid "Levels"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:64
-msgid "Levels and models"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:88
 #: src/shell/pages/MusicStudioPages.tsx:141
 #: src/shell/pages/personAccessCopy.ts:10
@@ -15182,34 +14723,8 @@ msgid "Licence"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AddChatModel.tsx:45
 #: src/apps/settings/styles/StyleBrowser.tsx:51
 msgid "Licence not stated"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:75
-msgid "Licence: {name}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiModelDialog.tsx:56
-msgid "Licence: {name}, accepted"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiModelDialog.tsx:57
-msgid "Licence: {name}. Accept it in Models and storage before installing."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:151
-msgid "Licences"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:161
-msgid "Licences of the AI models Home installs"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15353,11 +14868,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:400
 msgid "List view"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelChooser.tsx:27
-msgid "Listed in the order Home tries them. Move one to the top to try it first."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15513,13 +15023,11 @@ msgid "setting.news.full_text_prefetch.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:149
 #: src/shell/pages/EnginesPage.tsx:33
 msgid "Loaded"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:64
 #: src/apps/settings/RobotPasswordSection.tsx:138
 msgid "Loading"
 msgstr ""
@@ -15604,11 +15112,6 @@ msgstr ""
 #: src/apps/settings/FeatureAccess.tsx:65
 #: src/apps/settings/FeatureAccess.tsx:80
 msgid "Loading feature access"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:74
-msgid "Loading features…"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15997,11 +15500,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:128
 msgid "Looking at this computer…"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:61
-msgid "Looking for parts nothing uses."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16874,9 +16372,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:83
-#: src/apps/settings/AiGlance.tsx:37
-#: src/apps/settings/AiJobSummary.tsx:15
-#: src/apps/settings/AiSlotDialog.tsx:21
+#: src/apps/settings/AiLevelAccess.tsx:22
 #: src/apps/settings/CapabilityTable.tsx:12
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:56
@@ -16907,33 +16403,8 @@ msgid "Max from the next message"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:75
-msgid "Max is off for {name}. Nobody can start a Max window for it, including admins. A Max job already running finishes."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:175
 msgid "setting.coding.person.max_sessions.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:87
-msgid "Max: {model}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:87
-msgid "Max: no model of its own yet"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:87
-msgid "Max: off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:87
-msgid "Max: recommended"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17055,23 +16526,8 @@ msgid "Memory in use by chat and voice: {gb} GB"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:280
-msgid "Memory it needs"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/performance/QueuesBody.tsx:12
 msgid "Memory judge"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:297
-msgid "Memory right now"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:301
-msgid "Memory used"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17279,11 +16735,6 @@ msgid "Missed at {time}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
-msgid "Missing"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1833
 msgid "setting.ui.look.option_label.mist"
 msgstr ""
@@ -17322,32 +16773,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1649
 msgid "Model:"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:207
-msgid "Models and storage"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelChooser.tsx:26
-#: src/apps/settings/FeatureModelChooser.tsx:30
-msgid "Models for {feature}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:130
-msgid "Models for this level"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:92
-msgid "Models in one family keep the same look and voice at every level, and switch faster."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:302
-msgid "Models using memory"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17498,11 +16923,6 @@ msgid "Move {name} down"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelChooser.tsx:41
-msgid "Move {name} to the top"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:152
 #: src/apps/settings/PerformanceCustomize.tsx:57
 #: src/shell/pages/AllAppsPage.tsx:72
@@ -17532,11 +16952,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/ArrangeHome.tsx:100
 msgid "Move section {title} up"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelChooser.tsx:41
-msgid "Move to top"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17575,7 +16990,6 @@ msgid "Much lower"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/library/LibraryViewer.tsx:131
 #: src/shell/pages/ActivityPage.tsx:43
@@ -17865,16 +17279,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:112
 msgid "Needs a step from you"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:107
-msgid "Needs about {size} of memory (not measured here yet)."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:107
-msgid "Needs about {size} of memory."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18323,17 +17727,17 @@ msgid "No assistant keys"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:69
+#: ../backend/src/routes/settings.ts:68
 msgid "settings.attention.backup_key.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:92
+#: ../backend/src/routes/settings.ts:91
 msgid "settings.attention.backups.empty.summary"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:85
+#: ../backend/src/routes/settings.ts:84
 msgid "settings.attention.backups.empty.title"
 msgstr ""
 
@@ -18371,11 +17775,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:43
 msgid "No changes yet."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:146
-msgid "No chat model selected in the MaiPai Stack"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18471,7 +17870,7 @@ msgid "No files yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:80
+#: ../backend/src/routes/settings.ts:79
 msgid "settings.attention.ai.no_install"
 msgstr ""
 
@@ -18508,26 +17907,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ProjectsPage.tsx:152
 msgid "No matching projects"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:35
-msgid "No model chosen"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:42
-msgid "No model of its own on this computer yet"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:162
-msgid "No model yet"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:115
-msgid "No models listed yet."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18628,12 +18007,12 @@ msgid "No robot found on your network yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:93
+#: ../backend/src/routes/settings.ts:92
 msgid "settings.attention.robots.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:101
+#: ../backend/src/routes/settings.ts:100
 msgid "settings.attention.robots.empty"
 msgstr ""
 
@@ -18938,11 +18317,6 @@ msgid "Not allowed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:384
-msgid "Not available on this computer yet."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/statusChecksFormat.ts:13
 msgid "Not checked"
 msgstr ""
@@ -18959,11 +18333,6 @@ msgid "Not connected yet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:44
-msgid "Not for this computer"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:160
 msgid "Not for you? Turn Videos off above and nothing of it downloads."
 msgstr ""
@@ -18975,17 +18344,11 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:131
-#: src/apps/settings/ModelsAndStorageSection.tsx:47
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:31
 msgid "Not installed"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:252
-msgid "Not known yet"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18995,8 +18358,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FeatureAccess.tsx:44
-#: src/apps/settings/ModelsAndStorageSection.tsx:111
-#: src/apps/settings/ModelsAndStorageSection.tsx:174
 #: src/apps/settings/styles/stylesShared.tsx:24
 #: src/apps/setup/CloseAppsStep.tsx:56
 #: src/apps/setup/CloseAppsStep.tsx:73
@@ -19010,11 +18371,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/CapabilityTable.tsx:16
 msgid "Not offered"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:29
-msgid "Not on this computer"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19056,7 +18412,6 @@ msgid "Not running. Ready: {available}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
 #: src/apps/settings/RobotPasswordSection.tsx:75
 #: src/apps/settings/RobotPasswordSection.tsx:152
 #: src/shell/pages/settings/SettingField.tsx:121
@@ -19114,11 +18469,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/ChatSkillsSection.tsx:58
 msgid "Not used in your chats"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:31
-msgid "Not used yet"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19187,11 +18537,6 @@ msgid "Nothing is being made right now."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:302
-msgid "Nothing is loaded right now."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:161
 msgid "Nothing is queued after this song."
 msgstr ""
@@ -19252,11 +18597,6 @@ msgid "Nothing shared yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:61
-msgid "Nothing to clean up."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/setup/PlanStep.tsx:116
 msgid "Nothing to download: everything you ticked is already installed."
 msgstr ""
@@ -19280,11 +18620,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/FreeUpMemory.tsx:25
 msgid "Nothing was idle, so nothing changed."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:69
-msgid "Nothing was removed."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -19366,19 +18701,12 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:46
-#: src/apps/settings/aiTierSlots.ts:83
 #: src/apps/setup/PlanStep.tsx:202
 msgid "off"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
-#: src/apps/settings/AiGlance.tsx:36
-#: src/apps/settings/AiGlance.tsx:108
-#: src/apps/settings/AiGlance.tsx:162
-#: src/apps/settings/AiJobSummary.tsx:38
-#: src/apps/settings/AiJobSummary.tsx:74
-#: src/apps/settings/AiSlotDialog.tsx:79
 #: src/apps/settings/CloseAppsSettings.tsx:96
 #: src/apps/settings/CloseAppsSettings.tsx:97
 #: src/apps/settings/PerformanceCustomize.tsx:15
@@ -19588,6 +18916,11 @@ msgid "setting.engines.vision.choice.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiLevelAccess.tsx:77
+msgid "Off. Turn it on from the model list above."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1351
 msgid "setting.robot.initiative.accept_phrases.label"
 msgstr ""
@@ -19736,7 +19069,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/reminders/DeviceSchedulesView.tsx:29
-#: src/apps/settings/AiSlotDialog.tsx:79
 #: src/apps/settings/RobotBody.tsx:212
 #: src/apps/settings/RobotBody.tsx:213
 #: src/apps/settings/SafetyChangesSection.tsx:13
@@ -20002,11 +19334,6 @@ msgid "Only if an adult sets it up on purpose, for a specific app or device you 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:128
-msgid "Only models that fit this level on this computer are listed."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:65
 msgid "Only the first files are listed."
 msgstr ""
@@ -20090,12 +19417,12 @@ msgid "Open a song from your list, then choose Studio."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:78
+#: ../backend/src/routes/settings.ts:77
 msgid "settings.attention.ai.open"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:95
+#: ../backend/src/routes/settings.ts:94
 msgid "settings.attention.apps.open"
 msgstr ""
 
@@ -20193,7 +19520,7 @@ msgid "Open pull request"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:84
+#: ../backend/src/routes/settings.ts:83
 msgid "settings.attention.repairs.open"
 msgstr ""
 
@@ -20468,7 +19795,7 @@ msgid "Pair"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:124
+#: src/shell/pages/settings/settingsViews.tsx:117
 msgid "Pair a robot with this home."
 msgstr ""
 
@@ -20551,11 +19878,6 @@ msgid "Parts affected"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:81
-msgid "Parts nothing uses"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:55
 #: src/shell/pages/MicTestPage.tsx:11
 msgid "PASS"
@@ -20591,11 +19913,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1945
 msgid "Past conversations"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:225
-msgid "Paste a Hugging Face link to see if a model will run on this computer before you download it."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20926,11 +20243,6 @@ msgid "Phrases added to the person's words, never replacing them."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:65
-msgid "Pick a level to change its model or who can use it."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "Pick a person to see or change their voice."
 msgstr ""
@@ -21004,16 +20316,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/MediaHomePage.tsx:44
 msgid "Pick up where you left off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:100
-msgid "Pick what to remove"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:346
-msgid "Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21194,7 +20496,6 @@ msgid "pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/performanceModel.ts:9
 #: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/pages/ActivityPage.tsx:41
@@ -21314,7 +20615,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:74
+#: src/shell/pages/settings/settingsViews.tsx:71
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr ""
@@ -21743,11 +21044,6 @@ msgid "Previous song"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:15
-msgid "Primary"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:99
 msgid "Print"
 msgstr ""
@@ -21762,11 +21058,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1963
 msgid "area.Privacy and safety"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
-msgid "Problem"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21786,7 +21077,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:223
-#: src/shell/pages/settings/settingsViews.tsx:64
+#: src/shell/pages/settings/settingsViews.tsx:61
 msgid "Profile"
 msgstr ""
 
@@ -22175,16 +21466,14 @@ msgid "Reading the details…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:79
+#: ../backend/src/routes/settings.ts:78
 msgid "settings.attention.ai.ready"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:60
 #: src/apps/library/appPresentation.ts:18
-#: src/apps/settings/AiGlance.tsx:36
 #: src/apps/settings/CodingSettings.tsx:112
-#: src/apps/settings/ModelsSection.tsx:149
 #: src/apps/settings/RobotBody.tsx:19
 #: src/apps/setup/AwayFromHome.tsx:120
 #: src/apps/setup/AwayFromHome.tsx:127
@@ -22258,30 +21547,8 @@ msgid "setting.videos.library_sort.option_label.recents"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:83
-msgid "recommended"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:132
-#: src/apps/settings/AiJobSummary.tsx:74
 #: src/apps/setup/HostTuneStep.tsx:99
 msgid "Recommended"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:183
-msgid "Recommended extras"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:185
-msgid "Recommended extras are not installed"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:46
-msgid "Recommended, not installed"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -22328,7 +21595,7 @@ msgid "Reduce noise"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:37
+#: src/apps/settings/AiLevelAccess.tsx:22
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:53
 msgid "Reduced"
@@ -22469,7 +21736,6 @@ msgstr ""
 #: src/apps/settings/CodingSettings.tsx:132
 #: src/apps/settings/CodingSettings.tsx:135
 #: src/apps/settings/DevicesSection.tsx:150
-#: src/apps/settings/FreeUpSpaceDialog.tsx:114
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
 #: src/apps/settings/styles/StyleEditor.tsx:98
@@ -22487,11 +21753,6 @@ msgid "Remove “{title}” from Saved?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:100
-msgid "Remove {count} and free {size}"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:237
 msgid "Remove {count} books?"
 msgstr ""
@@ -22499,11 +21760,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/PersonMore.tsx:95
 msgid "Remove {display_name} from your household?"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:109
-msgid "Remove {joinNames}?"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23447,7 +22703,7 @@ msgid "Robots found on your network"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:96
+#: ../backend/src/routes/settings.ts:95
 msgid "settings.attention.robots.off"
 msgstr ""
 
@@ -23653,11 +22909,6 @@ msgid "setting.safety.alarm.volume.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
-msgid "Same as Standard"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:30
 msgid "same time"
 msgstr ""
@@ -23688,8 +22939,7 @@ msgstr ""
 #: src/apps/people/ProfileForm.tsx:194
 #: src/apps/people/ProfileForm.tsx:199
 #: src/apps/reminders/ListMenu.tsx:46
-#: src/apps/settings/AiGlance.tsx:150
-#: src/apps/settings/AiSlotDialog.tsx:152
+#: src/apps/settings/AiLevelAccess.tsx:66
 #: src/apps/settings/CodingSettings.tsx:195
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/PersonMore.tsx:86
@@ -23722,7 +22972,7 @@ msgid "Save audience"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:71
+#: ../backend/src/routes/settings.ts:70
 msgid "settings.attention.backup_key.action"
 msgstr ""
 
@@ -23891,7 +23141,6 @@ msgstr ""
 #: src/apps/people/FaceEnrollmentPage.tsx:631
 #: src/apps/people/ProfileForm.tsx:194
 #: src/apps/people/ProfileForm.tsx:199
-#: src/apps/settings/AiSlotDialog.tsx:152
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/SignInSecretSection.tsx:74
@@ -24396,11 +23645,6 @@ msgid "Second recording (optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelLine.tsx:15
-msgid "Secondary"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:16
 msgid "seconds"
 msgstr ""
@@ -24436,11 +23680,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:281
 msgid "See all activity"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:156
-msgid "See the licences"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24511,7 +23750,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/notifications/NotificationsPage.tsx:170
 #: src/apps/notifications/NotificationsPage.tsx:173
-#: src/apps/settings/FreeUpSpaceDialog.tsx:80
 msgid "Select all"
 msgstr ""
 
@@ -24658,6 +23896,11 @@ msgid "Set a ratio above 1 or some make-up gain in the Compressor panel first."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiLevelAccess.tsx:52
+msgid "Set access"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:124
 msgid "Set as default"
 msgstr ""
@@ -24704,7 +23947,7 @@ msgid "Set up away access"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:87
+#: ../backend/src/routes/settings.ts:86
 msgid "settings.attention.backups.open"
 msgstr ""
 
@@ -24739,12 +23982,12 @@ msgid "Set up standard coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:104
+#: ../backend/src/routes/settings.ts:103
 msgid "settings.attention.search.open"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:106
+#: ../backend/src/routes/settings.ts:105
 msgid "settings.attention.search.setup"
 msgstr ""
 
@@ -24930,7 +24173,7 @@ msgid "setting.setup.checklist_dismissed.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:72
+#: ../backend/src/routes/settings.ts:71
 msgid "settings.attention.setup.complete"
 msgstr ""
 
@@ -25144,8 +24387,8 @@ msgid "Show in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:162
-#: src/shell/pages/settings/settingsViews.tsx:165
+#: src/shell/pages/settings/settingsViews.tsx:155
+#: src/shell/pages/settings/settingsViews.tsx:158
 msgid "Show in the sidebar"
 msgstr ""
 
@@ -25367,7 +24610,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:158
+#: src/shell/pages/settings/settingsViews.tsx:151
 msgid "Sidebar"
 msgstr ""
 
@@ -25441,21 +24684,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:546
 msgid "setting.ease.simple_mode.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:15
-msgid "Simplified chat for big jobs"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:88
-msgid "Simplify chat for big jobs: off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:88
-msgid "Simplify chat for big jobs: on"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25551,11 +24779,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/stylesShared.tsx:41
 msgid "Size unknown"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:182
-msgid "Sized from {sizedModel}."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25764,6 +24987,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StylesTab.tsx:200
 msgid "Some downloads need a free Civitai key. Home keeps it private and never shows it again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiMigrationNotice.tsx:28
+#: src/apps/settings/AiMigrationNotice.tsx:29
+msgid "Some earlier choices were not moved"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26306,9 +25535,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:83
-#: src/apps/settings/AiGlance.tsx:37
-#: src/apps/settings/AiJobSummary.tsx:15
-#: src/apps/settings/AiSlotDialog.tsx:21
+#: src/apps/settings/AiLevelAccess.tsx:22
 #: src/apps/settings/CapabilityTable.tsx:12
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:54
@@ -26372,11 +25599,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:805
 msgid "setting.generation.picture_tier.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:85
-msgid "Standard: {model}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -26495,11 +25717,6 @@ msgid "Starting"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:332
-msgid "Starting {label}. This takes about a minute."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:157
 msgid "Starting {title}…"
 msgstr ""
@@ -26603,7 +25820,6 @@ msgid "Status page"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/shell/pages/MusicStudioPages.tsx:207
 #: src/shell/pages/MusicWorkspacePage.tsx:61
 #: src/shell/pages/MusicWorkspacePage.tsx:85
@@ -26789,9 +26005,9 @@ msgid "Stopwatch running"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiModelsPage.tsx:26
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:98
-#: src/shell/pages/settings/settingsViews.tsx:115
 #: src/shell/pages/StoragePage.tsx:118
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
@@ -26808,6 +26024,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/PerformancePage.tsx:178
 msgid "Storage & hardware"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiModelsPage.tsx:26
+msgid "Storage and backups"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27002,19 +26223,9 @@ msgid "setting.generation.styles.adult_only.option.restricted"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:138
-msgid "Suggested"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/ReferencePage.tsx:50
 #: src/shell/reader/SearchBox.tsx:38
 msgid "Suggested articles"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:282
-msgid "Summary to copy"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27575,12 +26786,8 @@ msgstr ""
 #: src/apps/settings/EngineLinkCredentialSection.tsx:282
 #: src/apps/settings/FeatureAccess.tsx:68
 #: src/apps/settings/FeatureAccess.tsx:83
-#: src/apps/settings/FreeUpSpaceDialog.tsx:66
 #: src/apps/settings/HuggingFaceTokenSection.tsx:89
 #: src/apps/settings/HuggingFaceTokenSection.tsx:104
-#: src/apps/settings/ModelsAndStorageSection.tsx:214
-#: src/apps/settings/ModelsSection.tsx:82
-#: src/apps/settings/ModelsSection.tsx:375
 #: src/apps/settings/PersonAccessEditor.tsx:122
 #: src/apps/settings/PersonMore.tsx:73
 #: src/apps/settings/PersonMore.tsx:99
@@ -28047,11 +27254,6 @@ msgid "The AI is installing. Chat works after."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:213
-msgid "The AI is waiting for its helper to start. The Status page shows what is happening."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:243
 msgid "failure.composer.offline.adult"
 msgstr ""
@@ -28087,12 +27289,12 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:83
+#: ../backend/src/routes/settings.ts:82
 msgid "settings.attention.health.line"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:75
+#: ../backend/src/routes/settings.ts:74
 msgid "settings.attention.install.failed"
 msgstr ""
 
@@ -28129,11 +27331,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:125
 msgid "The base synth is missing. Refresh the Synths list and try again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:19
-msgid "The best this computer can do. It takes the computer while it runs."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28322,6 +27519,11 @@ msgid "The engine computer's address"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiMigrationNotice.tsx:30
+msgid "The engine now keeps your model choices. It did not take these, so they are still saved here and nothing was lost. Choose again below if you want them."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:696
 msgid "setting.engines.stack.where.option.another_computer"
 msgstr ""
@@ -28359,12 +27561,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1404
 msgid "setting.safety.alarm.voice.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:108
-#: src/apps/settings/ModelsAndStorageSection.tsx:169
-msgid "The full licence:"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28480,12 +27676,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:129
 msgid "The line to say"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:65
-#: src/apps/settings/ModelsAndStorageSection.tsx:212
-msgid "The list did not load"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28654,13 +27844,8 @@ msgid "setting.chat.search_assist.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:324
-msgid "The model did not start. Your previous model is still the one answering."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AddChatModel.tsx:16
-msgid "The model link did not open. Check the link, then try again."
+#: src/apps/settings/AiModelsPage.tsx:25
+msgid "The model for each level is chosen above. Here you choose which people may use Boost and Max."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29058,16 +28243,6 @@ msgid "The source says nothing about age."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:161
-msgid "The Stack has not reported a chat model."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:302
-msgid "The Stack has nothing loaded."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:98
 msgid "The StackChan install stopped."
 msgstr ""
@@ -29268,7 +28443,6 @@ msgid "Their safety protections stay on. Their keys work only while Coding is on
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:110
 #: src/apps/settings/RobotBody.tsx:232
 msgid "them"
 msgstr ""
@@ -29301,11 +28475,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.advice.disk.cause"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:162
-msgid "These are the licences that come with parts Home installs for you. Accepting covers all of them."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29482,26 +28651,6 @@ msgid "This computer needs to be a Mac with 128 GB of memory for Coding mode. Yo
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:117
-msgid "This computer: {cards}."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:114
-msgid "This computer: Apple Silicon, {memory} GB memory."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:119
-msgid "This computer: no graphics card detected, {memory} GB memory. AI models will run slowly."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:303
-msgid "This counts only what the Stack has loaded. Home's own engines still run: {describeHomeOwnedRoles}."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1987
 msgid "area.This device"
 msgstr ""
@@ -29514,11 +28663,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:214
 msgid "This device's camera"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/aiTierSlots.ts:108
-msgid "This does not fit this level on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29539,11 +28683,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:213
 msgid "This frees {size}. Models can be installed again, and caches rebuild when needed."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:121
-msgid "This frees {sizeWords}. You can install it again later."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29594,11 +28733,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:115
 msgid "This makes a new voice based on the recording. It is not a copy of the voice."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:178
-msgid "This may run slowly on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -29789,11 +28923,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:254
 msgid "This synth comes with Home, so it can't be changed. Make a copy and edit that."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:25
-msgid "This takes the computer. Everything big waits."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30019,7 +29148,6 @@ msgid "Too many tries. Wait a minute, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/shell/pages/MusicWorkspacePage.tsx:140
 #: src/shell/pages/MusicWorkspacePage.tsx:140
 msgid "Tools"
@@ -30224,9 +29352,6 @@ msgstr ""
 #: src/apps/settings/AutoLocksSection.tsx:77
 #: src/apps/settings/AutoLocksSection.tsx:78
 #: src/apps/settings/CommandsSection.tsx:113
-#: src/apps/settings/FeatureModelChooser.tsx:40
-#: src/apps/settings/FeatureModelLine.tsx:27
-#: src/apps/settings/ModelsAndStorageSection.tsx:92
 #: src/apps/settings/StackChanInstallDialog.tsx:152
 #: src/apps/settings/styles/StyleBrowser.tsx:160
 #: src/apps/settings/VoiceBrowserSection.tsx:95
@@ -30263,11 +29388,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/HostTuneStep.tsx:12
 msgid "Try again, or skip this step. Home works without it."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:92
-msgid "Try again: {label}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30332,7 +29452,6 @@ msgid "api.next.totp_already_on"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:170
 #: src/apps/settings/TwoStepSignInSection.tsx:52
 #: src/apps/settings/UsersSection.tsx:284
 #: src/shell/pages/settings/SettingField.tsx:269
@@ -30345,7 +29464,6 @@ msgid "Turn off the timer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:163
 #: src/apps/settings/styles/stylesShared.tsx:25
 #: src/apps/settings/TwoStepSignInSection.tsx:43
 msgid "Turn on"
@@ -30538,7 +29656,7 @@ msgid "Two computers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:77
+#: src/shell/pages/settings/settingsViews.tsx:74
 msgid "Two-step sign-in"
 msgstr ""
 
@@ -30614,12 +29732,6 @@ msgid "Type your own style first, or pick one of the styles."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelDialog.tsx:47
-#: src/apps/settings/ModelsSection.tsx:358
-msgid "Uncensored"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FamilyPage.tsx:76
 msgid "Unconfirmed"
 msgstr ""
@@ -30661,22 +29773,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/AutoLocksSection.tsx:55
 msgid "Undo could not be completed. Look again and try once more."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:95
-#: src/apps/settings/ModelsAndStorageSection.tsx:125
-msgid "Uninstall"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:95
-msgid "Uninstall {label}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:120
-msgid "Uninstall {label}?"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30990,7 +30086,6 @@ msgid "Urgent"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:139
 #: src/shell/pages/MusicWorkspacePage.tsx:137
 msgid "Use"
 msgstr ""
@@ -31070,11 +30165,6 @@ msgid "Use Max"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:133
-msgid "Use recommended"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:110
 msgid "Use SearXNG"
 msgstr ""
@@ -31097,11 +30187,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:134
 msgid "Use the companion's voice"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FeatureModelChooser.tsx:46
-msgid "Use the default order"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31165,11 +30250,6 @@ msgid "Use the password printed in the robot's setup guide."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiSlotDialog.tsx:87
-msgid "Use the recommended model"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CloseAppsSettings.tsx:48
 msgid "Use the starter list"
 msgstr ""
@@ -31192,11 +30272,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/MicrophoneSection.tsx:82
 msgid "Use this microphone"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:361
-msgid "Use this model"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31225,38 +30300,8 @@ msgid "Used"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:35
-msgid "Used {days} days ago"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:37
-msgid "Used {months} months ago"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:36
-msgid "Used {weeks} weeks ago"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:74
-msgid "Used by: {apps}"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/settings/ChatSkillsSection.tsx:56
 msgid "Used in chat"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:33
-msgid "Used today"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:34
-msgid "Used yesterday"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31270,16 +30315,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1990
 msgid "area.Users"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:72
-msgid "Uses {size}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:161
-msgid "Uses about {formatBytes} of memory."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31395,7 +30430,6 @@ msgid "setting.ease.reading_level.option_label.very_simple"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:23
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/pages/CompanionsPage.tsx:261
 #: src/shell/pages/FilesPage.tsx:166
@@ -31421,11 +30455,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:738
 msgid "setting.engines.video.tier.standard.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:100
-msgid "Video generation"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31546,11 +30575,6 @@ msgid "Violet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:80
-msgid "Vision"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:741
 msgid "setting.engines.vision.choice.label"
 msgstr ""
@@ -31590,7 +30614,6 @@ msgid "Vocals, drums, bass and the rest. This takes a minute or two. The rows ap
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsAndStorageSection.tsx:22
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/AmbientCompanionPane.tsx:184
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
@@ -31599,7 +30622,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:367
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:179
+#: src/shell/pages/settings/settingsViews.tsx:172
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr ""
@@ -31733,7 +30756,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:104
-#: src/shell/pages/settings/settingsViews.tsx:98
+#: src/shell/pages/settings/settingsViews.tsx:95
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 msgid "Voices"
@@ -31803,7 +30826,6 @@ msgid "setting.stack.engines.stt.smart_turn.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:36
 #: src/shell/pages/ActivityPage.tsx:25
 #: src/shell/pages/musicSongStatus.tsx:30
 #: src/shell/pages/status/StatusComponents.tsx:159
@@ -32013,17 +31035,17 @@ msgid "area.Web search and memory settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:102
+#: ../backend/src/routes/settings.ts:101
 msgid "settings.attention.search.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:105
+#: ../backend/src/routes/settings.ts:104
 msgid "settings.attention.search.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:107
+#: ../backend/src/routes/settings.ts:106
 msgid "settings.attention.search.ready"
 msgstr ""
 
@@ -32213,12 +31235,6 @@ msgid "What we never do"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/ModelsSection.tsx:160
-#: src/apps/settings/ModelsSection.tsx:235
-msgid "What would help?"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:168
 msgid "What you asked for"
 msgstr ""
@@ -32231,12 +31247,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:112
 msgid "setting.chat.pick_up_threads.help"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:20
-#: src/apps/settings/AiSlotDialog.tsx:26
-msgid "When a Max job needs more room than is free, chat switches to a simpler model while it runs."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -32573,8 +31583,7 @@ msgid "Who can use {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:166
-#: src/apps/settings/AiSlotDialog.tsx:131
+#: src/apps/settings/AiLevelAccess.tsx:79
 msgid "Who can use {tier}"
 msgstr ""
 
@@ -32584,13 +31593,18 @@ msgid "Who can use Coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:120
+#: src/apps/settings/AiLevelAccess.tsx:52
+msgid "Who can use each {feature} level"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiLevelAccess.tsx:49
+#: src/apps/settings/AiModelsPage.tsx:25
 msgid "Who can use each level"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiGlance.tsx:165
-#: src/apps/settings/AiSlotDialog.tsx:130
+#: src/apps/settings/AiLevelAccess.tsx:78
 #: src/apps/settings/styles/StyleEditor.tsx:101
 msgid "Who can use it"
 msgstr ""
@@ -33075,16 +32089,6 @@ msgid "You are responsible for having the right to use this voice."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:61
-msgid "You can free {size}. Nothing is removed until you pick it and confirm."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/FreeUpSpaceDialog.tsx:110
-msgid "You can get {value} back later. It is a download of the same size, {joinNames}, and your settings stay. Backups are not affected: they hold your family's data and settings, and models are not part of them."
-msgstr ""
-
-#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:74
 msgid "api.error.grants_view_forbidden"
 msgstr ""
@@ -33534,12 +32538,6 @@ msgid "Your password is set."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiJobSummary.tsx:30
-#: src/apps/settings/aiTierSlots.ts:83
-msgid "your pick"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:125
 msgid "Your picture is ready."
 msgstr ""
@@ -33570,12 +32568,12 @@ msgid "api.error.upload_profile_gone"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:94
+#: ../backend/src/routes/settings.ts:93
 msgid "settings.attention.robots.line"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:66
+#: ../backend/src/routes/settings.ts:65
 msgid "settings.attention.personal.summary"
 msgstr ""
 
