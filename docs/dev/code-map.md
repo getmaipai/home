@@ -550,14 +550,15 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
 | `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
-| `backend/src/lib/codingOpencode.ts` | MAX_ARG_CHARS, GATEWAY_MODEL, openCodeConfig, mapOpenCodeEvent, createOpenCodeAgent |
+| `backend/src/lib/codingOpencode.ts` | MAX_ARG_CHARS, GATEWAY_MODEL, openCodeConfig, mapOpenCodeEvent, MAX_ROUNDS, createOpenCodeAgent |
+| `backend/src/lib/codingPullRequest.ts` | __setPullRequestDepsForTests, createCodingPullRequest |
 | `backend/src/lib/codingRedact.ts` | REDACTED, redactCredentials, redactDeep |
-| `backend/src/lib/codingRuntime.ts` | startCodingRuntime |
+| `backend/src/lib/codingRuntime.ts` | DEFAULT_SANDBOX_GATEWAY_HOST, sandboxGatewayUrl, mintSessionKeyFor, startCodingRuntime |
 | `backend/src/lib/codingSandbox.ts` | SandboxClientError, sandboxIdOf, createStackSandbox |
 | `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess, getSessionRow |
 | `backend/src/lib/codingShare.ts` | setSecretScanner, __setWorkspaceRootForTests, codingWorkspace, __setShareRemoteForTests, checkSecretsBeforeShare, pushCodingSession |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
-| `backend/src/lib/codingTurns.ts` | setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, DEFAULT_MAX_SESSIONS, __setSessionCapForTests, householdSessionCap |
+| `backend/src/lib/codingTurns.ts` | setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, messageBudgetMs, DEFAULT_MAX_SESSIONS, __setSessionCapForTests |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, __setCompanionArtStatusReadersForTests, promptHash, resolveCompanionStillFromCatalog |
