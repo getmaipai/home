@@ -20,6 +20,8 @@ export interface CodeSession {
   archived_at?: string | null;
   /** The session settled (done, failed or asked for you) after the owner last opened it. */
   unread?: boolean;
+  /** CODE-FIX-01: why the last turn stopped, as a plain sentence with the next step. Set on a failed session and on one settled to idle with the reason kept. Retry is offered while it is set. */
+  failure?: string | null;
 }
 
 export interface CodeView {
@@ -79,6 +81,8 @@ export const codeApi = {
   rename: (id: string, title: string) => request<CodeSession>(`${base}/${id}/title`, { method: "PUT", body: JSON.stringify({ title }) }),
   pin: (id: string, pinned: boolean) => request<CodeSession>(`${base}/${id}/pin`, { method: "PUT", body: JSON.stringify({ pinned }) }),
   archive: (id: string, archived: boolean) => request<CodeSession>(`${base}/${id}/archive`, { method: "PUT", body: JSON.stringify({ archived }) }),
+  /** CODE-FIX-01: run the last message again after a turn that stopped on an error. */
+  retry: (id: string) => request<{ turn_id: string; tier: CodeTier }>(`${base}/${id}/retry`, json({})),
   opened: (id: string) => request<CodeSession>(`${base}/${id}/opened`, json({})),
   /** Delete moves the session to the household Trash; restore is the Trash's own route (the Undo on the toast). */
   remove: (id: string) => request<{ ok: true }>(`${base}/${id}`, { method: "DELETE" }),

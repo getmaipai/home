@@ -35,6 +35,8 @@ export function SessionRow({ session, currentId, actions, onOpen, mobile = false
   const pinned = Boolean(session.pinned_at);
   const archived = Boolean(session.archived_at);
   const unread = rowMarker(session, currentId) === "unread";
+  // CODE-FIX-01: a failed row says why in one plain line and offers Retry; the red dot is off once it is opened or retried.
+  const failedLine = session.state === "failed" ? (session.failure ?? null) : null;
   // A session that is working or waiting for you is not archived (the hub refuses it too): the item is off, not hidden.
   const mayArchive = archived || !["queued", "starting", "working", "needs_you"].includes(session.state);
   const [renaming, setRenaming] = useState(false);
@@ -55,7 +57,7 @@ export function SessionRow({ session, currentId, actions, onOpen, mobile = false
     void actions.rename(session.id, next).then((ok) => { if (ok) finish(focus); else { settled.current = false; inputRef.current?.focus(); } });
   };
   return <div data-slot="code-session-row" data-active={active ? "" : undefined} data-unread={unread ? "" : undefined} data-archived={archived ? "" : undefined}
-    className={cn("group relative flex items-center gap-1 rounded-lg pe-1 transition-colors hover:bg-muted has-focus-visible:bg-muted has-aria-expanded:bg-muted data-active:bg-muted", mobile ? "min-h-12" : "h-9 min-h-9")}>
+    className={cn("group relative flex items-center gap-1 rounded-lg pe-1 transition-colors hover:bg-muted has-focus-visible:bg-muted has-aria-expanded:bg-muted data-active:bg-muted", failedLine ? "min-h-12 py-1" : mobile ? "min-h-12" : "h-9 min-h-9")}>
     {renaming
       ? <Input ref={inputRef} data-slot="code-session-rename" aria-label={i18n._({ id: "Rename session", message: "Rename session" })} value={name} maxLength={120}
         onChange={(event) => setName(event.target.value)} onBlur={() => commit(false)}
@@ -67,10 +69,14 @@ export function SessionRow({ session, currentId, actions, onOpen, mobile = false
         className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 text-start text-row outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
         <span data-slot="code-row-marker-slot" className="flex size-4 shrink-0 items-center justify-center"><Marker session={session} currentId={currentId} /></span>
         {pinned ? <PinIcon aria-hidden data-slot="code-row-pinned" className="size-3 shrink-0 text-muted-foreground" /> : null}
-        <span className={cn("min-w-0 flex-1 truncate", unread && "font-semibold")}>{session.title}</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={cn("min-w-0 truncate", unread && "font-semibold")}>{session.title}</span>
+          {failedLine ? <span data-slot="code-row-failure" className="line-clamp-2 text-supporting text-muted-foreground">{failedLine}</span> : null}
+        </span>
         {mobile && session.state === "needs_you" ? <span data-slot="code-row-needs-you" className="shrink-0 text-supporting" style={{ color: "var(--status-attention-ink)" }}>{stateWord("needs_you")}</span> : null}
         {unread ? <span className="sr-only">{i18n._({ id: "New activity", message: "New activity" })}</span> : null}
       </a>}
+    {failedLine ? <Button type="button" size="xs" variant="outline" data-slot="code-row-retry" onClick={() => void actions.retry(session.id)}>{i18n._({ id: "Retry", message: "Retry" })}</Button> : null}
     <span data-slot="code-session-more-wrap" className={cn("shrink-0", !mobile && "opacity-0 focus-within:opacity-100 group-hover:opacity-100 group-data-active:opacity-100 has-aria-expanded:opacity-100")}>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button ref={triggerRef} variant="ghost" size="icon-xs" data-slot="code-session-more" aria-label={i18n._({ id: "More options for {title}", message: "More options for {title}", values: { title: session.title } })} />}>

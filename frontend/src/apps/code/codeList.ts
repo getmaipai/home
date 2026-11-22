@@ -15,8 +15,8 @@ export function rowMarker(session: Pick<CodeSession, "id" | "state" | "unread">,
   return session.unread === true && session.id !== currentId ? "unread" : null;
 }
 
-/** The open session, when the hub says it is unread: the page tells the hub it was seen so the dot never lights for a session in view. */
-export const needsSeenMark = (session: Pick<CodeSession, "id" | "unread"> | undefined, currentId: string | undefined): boolean => Boolean(session && session.id === currentId && session.unread === true);
+/** The open session, when the hub says it is unread or it is failed (opening a failed session turns its red dot off, CODE-FIX-01): the page tells the hub it was seen so the dot never lights for a session in view. */
+export const needsSeenMark = (session: Pick<CodeSession, "id" | "unread"> & { state?: CodeSession["state"] } | undefined, currentId: string | undefined): boolean => Boolean(session && session.id === currentId && (session.unread === true || session.state === "failed"));
 
 export interface SessionGroup { id: string; label: string; rows: CodeSession[] }
 export interface Arranged { groups: SessionGroup[]; archivedCount: number; shown: CodeSession[] }

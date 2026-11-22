@@ -10,7 +10,7 @@ import {
   CodingSessionError, createCodingSession, offeredCodingTiers, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionMode, setSessionTier, codingSessionRefusal,
   CodingSessionListed, renameSession, setSessionPinned, setSessionArchived, markSessionOpened,
 } from "@/lib/codingSessions";
-import { warmCodingSession, cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
+import { warmCodingSession, cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, retryLastTurn, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
@@ -139,6 +139,15 @@ const openedR = createRoute({
 });
 codingSessionsRoutes.openapi(openedR, (c) => {
   try { return c.json(markSessionOpened(c.get("person"), c.req.valid("param").id), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+
+const retryR = createRoute({
+  method: "post", path: "/{id}/retry", tags: ["Code"], summary: "Run the last message again after a turn that stopped on an error", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam },
+  responses: { 202: { content: { "application/json": { schema: z.object({ turn_id: z.string(), tier: Tier }) } }, description: "The turn started or queued." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(retryR, (c) => {
+  try { return c.json(retryLastTurn(c.get("person"), c.req.valid("param").id), 202); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
 const messageR = createRoute({

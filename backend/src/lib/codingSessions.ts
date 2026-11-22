@@ -14,6 +14,8 @@ import { gitConnectionRefusal, listGitConnections } from "@/lib/gitConnections";
 import { authorizeTier, isTier, readSlot, type Tier, type TierChoice } from "@/lib/tiers";
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import { appendLogLine } from "@/lib/log";
+import { codingFailureLine } from "@/lib/codingFailureCopy";
+import { appendCodingMessage, lastErrorStopCode } from "@/lib/codingTranscript";
 import { trigger } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
 
@@ -26,6 +28,8 @@ export const CodingSessionListed = CodingSession.extend({
   archived_at: z.string().nullable(),
   /** The session finished a turn, failed or asked for the owner since the owner last opened it. */
   unread: z.boolean(),
+  /** CODE-FIX-01: why the last turn stopped, as a plain sentence with the next step, or null. Set while the session is failed, and after a restart or an open settled it to idle with the reason kept. Retry is offered whenever this is set. */
+  failure: z.string().nullable(),
 });
 export type CodingSessionWire = z.infer<typeof CodingSessionListed>;
 export type CodingSessionState = Row["state"];
@@ -76,7 +80,11 @@ function wire(row: Row): CodingSessionWire {
     created_at: row.createdAt, last_activity_at: row.lastActivityAt, ...(row.deletedAt ? { deleted_at: row.deletedAt, trash_until: row.trashUntil } : {}),
     provenance: row.provenance, hlc: row.hlc,
   });
-  return { ...spec, pinned_at: row.pinnedAt, archived_at: row.archivedAt, unread: isUnread(row) };
+  // Only a failed or quiet session can hold a kept failure: the newest message is its stopped card (rule 6a: the sentence comes from the stored code).
+  // A later run (a retry that worked, or a new message) moves the activity time past the card, so a kept failure never outlives a good turn.
+  const found = row.state === "failed" || row.state === "idle" ? lastErrorStopCode(row.personId, row.id) : null;
+  const kept = found && (row.state === "failed" || row.lastActivityAt <= found.at) ? found : null;
+  return { ...spec, pinned_at: row.pinnedAt, archived_at: row.archivedAt, unread: isUnread(row), failure: kept ? codingFailureLine(kept.code) : (row.state === "failed" ? codingFailureLine(null) : null) };
 }
 
 /** What an admin sees (rule 6a): ids, state and tier only. No title, repository or path. */
@@ -224,6 +232,8 @@ export function markSessionOpened(person: PersonRow, id: string): CodingSessionW
   const row = getSessionRow(person.id, id);
   if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
   if (row.lastOpenedAt === null || row.lastOpenedAt < row.lastActivityAt) updateSession(id, { lastOpenedAt: row.lastActivityAt });
+  // CODE-FIX-01: a failed session that has been opened is seen: it goes quiet (idle) with its reason kept in the transcript, so no red dot stays for a failure the person has read.
+  if (row.state === "failed") updateSession(id, { state: "idle" });
   return wire(getSessionRow(person.id, id)!);
 }
 
@@ -242,7 +252,14 @@ export function markSessionDeleted(person: Pick<PersonRow, "id">, id: string): b
 /** Startup: a turn does not survive a restart (its transcript store is a later slice), so a session that was queued or working reads as idle again. The stored tier stays. */
 export function settleSessionsAtStartup(): number {
   const at = new Date().toISOString();
-  return db.update(codingSessions).set({ state: "idle", updatedAt: at, hlc: nextHlc() }).where(inArray(codingSessions.state, ["queued", "starting", "working"])).returning({ id: codingSessions.id }).all().length;
+  // CODE-FIX-01: a failed session is settled too: nobody can still be looking at that failure, so it gets a stopped message and goes quiet with its reason kept.
+  const failed = db.select().from(codingSessions).where(eq(codingSessions.state, "failed")).all();
+  for (const row of failed) {
+    const kept = lastErrorStopCode(row.personId, row.id);
+    appendCodingMessage({ sessionId: row.id, personId: row.personId, role: "agent", parts: [{ type: "stopped", reason: "error", code: kept?.code ?? "restarted" }] });
+    updateSession(row.id, { state: "idle" });
+  }
+  return failed.length + db.update(codingSessions).set({ state: "idle", updatedAt: at, hlc: nextHlc() }).where(inArray(codingSessions.state, ["queued", "starting", "working"])).returning({ id: codingSessions.id }).all().length;
 }
 
 export const TIER_NOT_OFFERED_LINE = "This level of coding is not offered on this computer. Ask an admin to turn it on in Settings, AI and models.";

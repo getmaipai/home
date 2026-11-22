@@ -25,6 +25,7 @@ beforeEach(() => {
     { ...base, id: "csess-aaaaaa", title: "Fix the thermostat", last_activity_at: at(1) },
     { ...base, id: "csess-bbbbbb", title: "Wire the lamp", last_activity_at: at(2), unread: true },
     { ...base, id: "csess-cccccc", title: "Ship the release", last_activity_at: at(3), state: "needs_you" },
+    { ...base, id: "csess-eeeeee", title: "Broken build", last_activity_at: at(1), state: "failed", unread: true, failure: "The sandbox is not ready yet. Wait a minute, then tap Retry." },
     { ...base, id: "csess-dddddd", title: "Old experiment", last_activity_at: at(4), archived_at: at(5) },
   ];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -37,6 +38,7 @@ beforeEach(() => {
     if (path.endsWith("/title") && row) { row.title = JSON.parse(String(init!.body)).title; return Promise.resolve(Response.json(row)); }
     if (path.endsWith("/pin") && row) { row.pinned_at = JSON.parse(String(init!.body)).pinned ? at(0) : null; return Promise.resolve(Response.json(row)); }
     if (path.endsWith("/archive") && row) { row.archived_at = JSON.parse(String(init!.body)).archived ? at(0) : null; return Promise.resolve(Response.json(row)); }
+    if (path.endsWith("/retry") && row) { row.state = "queued"; row.failure = null; return Promise.resolve(Response.json({ turn_id: "ctrn-1", tier: "standard" }, { status: 202 })); }
     if (path.endsWith("/opened") && row) { row.unread = false; return Promise.resolve(Response.json(row)); }
     if (method === "DELETE" && row) { rows = rows.filter((r) => r.id !== id); return Promise.resolve(Response.json({ ok: true })); }
     if (path.includes("/api/trash/coding_session/")) return Promise.resolve(Response.json({ success: true }));
@@ -58,6 +60,20 @@ async function choose(title: string, item: string) {
   fireEvent.click(row.querySelector('[data-slot="code-session-more"]')!);
   fireEvent.click(await within(document.body).findByText(item, { selector: '[role="menuitem"]' }));
 }
+
+describe("a failed session in the column", () => {
+  test("the row shows the plain sentence and a red dot, and Retry calls the hub and clears the dot", async () => {
+    open();
+    const row = await rowOf("Broken build");
+    expect(row.querySelector('[data-slot="code-row-failure"]')?.textContent).toContain("The sandbox is not ready yet");
+    expect(row.textContent).not.toContain("lock_not_ready");
+    expect(row.querySelector('[data-marker="failed"]')).toBeTruthy();
+    fireEvent.click(row.querySelector('[data-slot="code-row-retry"]')!);
+    await waitFor(() => expect(calls).toContain("POST /api/code/sessions/csess-eeeeee/retry {}"));
+    await waitFor(() => expect((findRow("Broken build"))!.querySelector('[data-marker="failed"]')).toBeNull());
+    expect(findRow("Broken build")!.querySelector('[data-slot="code-row-failure"]')).toBeNull();
+  });
+});
 
 describe("the sessions column manages sessions", () => {
   test("the rows show an unread dot and a Needs you state, and an archived session stays behind the toggle", async () => {

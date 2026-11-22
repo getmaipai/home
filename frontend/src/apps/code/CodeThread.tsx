@@ -39,6 +39,8 @@ export interface CodeThreadState {
   held: readonly PendingAction[];
   queued: readonly { id: string; text: string }[];
   failure: string | null;
+  /** CODE-FIX-01: run the last message again (the failure card's Retry). */
+  onRetry: () => void;
   problem: string;
   notices: readonly string[];
   onAnswer: (requestId: string, answer: "allow" | "deny") => void;
@@ -107,7 +109,7 @@ const Queue = () => {
     {s.stage ? <ThinkingIndicator label={s.stage.label} elapsed={s.stage.elapsed} /> : null}
     {s.held.length > 0 ? <PendingActions actions={[...s.held]} /> : null}
     {s.queued.length > 0 ? <MessageQueue running={s.statusLine} queued={s.queued} onCancel={s.onCancelQueued} /> : null}
-    {s.failure ? <StatusCard kind="problem" title={i18n._({ id: "The agent stopped", message: "The agent stopped" })} line={s.failure} /> : null}
+    {s.failure ? <StatusCard kind="problem" title={i18n._({ id: "The agent stopped", message: "The agent stopped" })} line={s.failure} action={{ label: i18n._({ id: "Retry", message: "Retry" }), onSelect: s.onRetry }} /> : null}
     {s.problem ? <ErrorState title={s.problem} retrying={false} layout="inline" /> : null}
     {draft ? <DraftRestore {...draft} /> : null}
   </>;

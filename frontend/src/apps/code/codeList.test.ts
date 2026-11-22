@@ -22,6 +22,9 @@ describe("rowMarker", () => {
     expect(needsSeenMark(row("a", { unread: true }), "b")).toBe(false);
     expect(needsSeenMark(row("a"), "a")).toBe(false);
     expect(needsSeenMark(undefined, "a")).toBe(false);
+    // CODE-FIX-01: a failed session that is open is marked seen too, so its red dot goes.
+    expect(needsSeenMark(row("a", { state: "failed" }), "a")).toBe(true);
+    expect(needsSeenMark(row("a", { state: "failed" }), "b")).toBe(false);
   });
 });
 

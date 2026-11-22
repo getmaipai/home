@@ -3465,7 +3465,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:221
 #: src/apps/chat/chatHeaderBar.tsx:310
-#: src/apps/code/SessionRow.tsx:84
+#: src/apps/code/SessionRow.tsx:90
 msgid "Archive"
 msgstr ""
 
@@ -3554,7 +3554,7 @@ msgid "Ask anything"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:125
+#: src/apps/code/CodeThread.tsx:127
 msgid "Ask before changes"
 msgstr ""
 
@@ -3719,7 +3719,7 @@ msgid "setting.coding.engine.option_label.auto"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:126
+#: src/apps/code/CodeThread.tsx:128
 msgid "Auto edit"
 msgstr ""
 
@@ -4900,7 +4900,7 @@ msgid "Changed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:81
+#: src/apps/code/CodeThread.tsx:83
 msgid "Changed {path}"
 msgstr ""
 
@@ -6919,7 +6919,7 @@ msgid "Could not change access. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:119
+#: src/apps/code/SessionView.tsx:120
 msgid "Could not change that. Try again."
 msgstr ""
 
@@ -7646,6 +7646,11 @@ msgid "Could not restore this chat. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:118
+msgid "Could not retry. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:66
 msgid "Could not revoke that."
 msgstr ""
@@ -7829,7 +7834,7 @@ msgid "Could not send that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:120
+#: src/apps/code/SessionView.tsx:121
 msgid "Could not send your answer. Try again."
 msgstr ""
 
@@ -8530,7 +8535,7 @@ msgstr ""
 #: src/apps/chat/chatHeaderBar.tsx:313
 #: src/apps/clock/AlarmEditor.tsx:115
 #: src/apps/clock/TimersTab.tsx:165
-#: src/apps/code/SessionRow.tsx:86
+#: src/apps/code/SessionRow.tsx:92
 #: src/apps/people/VoiceEnrollmentBody.tsx:105
 #: src/apps/reminders/ListMenu.tsx:38
 #: src/apps/settings/CommandsSection.tsx:203
@@ -8638,7 +8643,7 @@ msgid "Delete voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/sessionActions.ts:34
+#: src/apps/code/sessionActions.ts:42
 msgid "Deleted ‘{title}’. It stays in Trash for 30 days."
 msgstr ""
 
@@ -10232,7 +10237,7 @@ msgid "Files"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:156
+#: src/apps/code/CodeThread.tsx:158
 msgid "Files I added:"
 msgstr ""
 
@@ -14752,7 +14757,7 @@ msgid "setting.coding.api.away.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:129
+#: src/apps/code/CodeThread.tsx:131
 #: src/apps/code/SessionView.tsx:107
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
@@ -16652,7 +16657,7 @@ msgid "setting.chat.paused_message.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:123
+#: src/apps/code/CodeThread.tsx:125
 msgid "Message the agent. Type @ to point at a file."
 msgstr ""
 
@@ -16951,7 +16956,7 @@ msgid "More options for {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionRow.tsx:76
+#: src/apps/code/SessionRow.tsx:82
 msgid "More options for {title}"
 msgstr ""
 
@@ -17537,7 +17542,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionRow.tsx:27
-#: src/apps/code/SessionRow.tsx:72
+#: src/apps/code/SessionRow.tsx:77
 msgid "New activity"
 msgstr ""
 
@@ -17609,7 +17614,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/CodePage.tsx:57
-#: src/apps/code/CodeThread.tsx:166
+#: src/apps/code/CodeThread.tsx:168
 #: src/apps/code/NewSession.tsx:128
 #: src/apps/code/SessionList.tsx:51
 #: src/apps/code/SessionList.tsx:63
@@ -18744,7 +18749,7 @@ msgid "Nothing was idle, so nothing changed."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:99
+#: src/apps/code/CodeThread.tsx:101
 msgid "Nothing yet. Tell the agent what to do."
 msgstr ""
 
@@ -20715,7 +20720,7 @@ msgid "Pictures, videos and songs you make show up here while they are made and 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionRow.tsx:82
+#: src/apps/code/SessionRow.tsx:88
 #: src/shell/pages/ProjectsPage.tsx:184
 msgid "Pin"
 msgstr ""
@@ -20815,14 +20820,14 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:127
+#: src/apps/code/CodeThread.tsx:129
 #: src/apps/code/SessionTabs.tsx:79
 #: src/apps/code/SessionView.tsx:91
 msgid "Plan"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:83
+#: src/apps/code/CodeThread.tsx:85
 msgid "Plan updated: {done} of {total} steps done."
 msgstr ""
 
@@ -22053,7 +22058,7 @@ msgstr ""
 #: src/apps/chat/chatHeaderBar.tsx:251
 #: src/apps/chat/chatHeaderBar.tsx:301
 #: src/apps/clock/TimersTab.tsx:164
-#: src/apps/code/SessionRow.tsx:80
+#: src/apps/code/SessionRow.tsx:86
 #: src/apps/reminders/ListMenu.tsx:36
 #: src/apps/settings/CodingSettings.tsx:187
 #: src/apps/settings/VoiceManagerSection.tsx:126
@@ -22094,7 +22099,7 @@ msgid "Rename quick timer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionRow.tsx:60
+#: src/apps/code/SessionRow.tsx:62
 msgid "Rename session"
 msgstr ""
 
@@ -22464,6 +22469,8 @@ msgstr ""
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/TimersTab.tsx:148
+#: src/apps/code/CodeThread.tsx:112
+#: src/apps/code/SessionRow.tsx:79
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:147
@@ -24439,7 +24446,7 @@ msgid "Shortcuts for chat and navigation."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:166
+#: src/apps/code/CodeThread.tsx:168
 #: src/apps/code/NewSession.tsx:128
 msgid "Shortcuts for coding and navigation."
 msgstr ""
@@ -27103,7 +27110,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:121
+#: src/apps/code/SessionView.tsx:122
 msgid "That message is not waiting any more."
 msgstr ""
 
@@ -27336,7 +27343,7 @@ msgid "The agent is asking first"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:110
+#: src/apps/code/CodeThread.tsx:112
 #: src/apps/code/codeTranscript.ts:63
 msgid "The agent stopped"
 msgstr ""
@@ -29859,7 +29866,7 @@ msgid "Type your own style first, or pick one of the styles."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionRow.tsx:84
+#: src/apps/code/SessionRow.tsx:90
 #: src/apps/code/SessionView.tsx:103
 msgid "Unarchive"
 msgstr ""
@@ -29895,7 +29902,7 @@ msgid "Understood the request"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/sessionActions.ts:35
+#: src/apps/code/sessionActions.ts:43
 #: src/apps/settings/AutoLocksSection.tsx:73
 #: src/shell/library/TranscriptPanel.tsx:428
 #: src/shell/pages/FilesPage.tsx:190
@@ -30001,7 +30008,7 @@ msgid "Unmute microphone"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionRow.tsx:82
+#: src/apps/code/SessionRow.tsx:88
 #: src/shell/pages/ProjectsPage.tsx:184
 msgid "Unpin"
 msgstr ""
@@ -31688,7 +31695,7 @@ msgid "Who can control what"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:118
+#: src/apps/code/SessionView.tsx:119
 msgid "Who can fix this: {who}."
 msgstr ""
 
@@ -32339,12 +32346,12 @@ msgid "You need Chrome or Edge on a computer, Home opened at its https address, 
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:88
+#: src/apps/code/CodeThread.tsx:90
 msgid "You said no"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:88
+#: src/apps/code/CodeThread.tsx:90
 msgid "You said yes"
 msgstr ""
 

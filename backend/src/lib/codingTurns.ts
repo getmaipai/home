@@ -22,7 +22,7 @@ import { createTurnHost, denyAllPending, denyPendingFor, startTaint, type Coding
 import { sandboxListenerFailure } from "@/lib/codingSandboxListener";
 import { trigger } from "@/lib/notifications";
 import { readChangeCounts } from "@/lib/codingChanges";
-import { appendCodingMessage } from "@/lib/codingTranscript";
+import { appendCodingMessage, lastErrorStopCode, lastUserText } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
 import type { PersonRow } from "@/types";
 
@@ -271,7 +271,7 @@ const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown 
 }
 
 /** The person sends a message: it becomes one turn in the household queue. One turn per session at a time; messages typed meanwhile belong to the message queue (UI slice). */
-export function submitTurn(person: PersonRow, sessionId: string, message: string): { turn_id: string; tier: Tier } {
+export function submitTurn(person: PersonRow, sessionId: string, message: string, opts: { retry?: boolean } = {}): { turn_id: string; tier: Tier } {
   const refusal = codingSessionRefusal(person);
   if (refusal) throw new CodingSessionError("not_allowed", refusal);
   if (!runtime) throw new CodingSessionError("not_allowed", "Code sessions are not available on this home yet. Try again after the next update.");
@@ -290,8 +290,10 @@ export function submitTurn(person: PersonRow, sessionId: string, message: string
     queueReason: null, position: null, standardOnce: false, leaseHeld: false, stopReason: null, abort: new AbortController(), done, finish };
   turns.set(turn.id, turn);
   startTaint(sessionId, (session.repo as { kind?: string }).kind ?? "none");
-  appendCodingMessage({ sessionId, personId: person.id, role: "user", parts: [{ type: "text", text: message }] });
-  updateSession(sessionId, { state: "queued", lastActivityAt: new Date().toISOString() });
+  // A retry runs the message already in the transcript again: it is not written twice.
+  if (!opts.retry) appendCodingMessage({ sessionId, personId: person.id, role: "user", parts: [{ type: "text", text: message }] });
+  const now = new Date().toISOString();
+  updateSession(sessionId, { state: "queued", lastActivityAt: now, ...(opts.retry ? { lastOpenedAt: now } : {}) });
   // TIER-LEASE-01: sending is the holder acting, so a Max lease this person holds restarts its grace at submit. The take itself is the queue job (`startTurn`).
   if (turn.tier === "max") { try { runtime.lease().touch(person.id); } catch { /* the lease is advisory here */ } }
   log("turn_queued", turn, `tier=${turn.tier}`);
@@ -350,6 +352,15 @@ export function sendMessage(person: PersonRow, sessionId: string, message: strin
   queue.push({ id, text: message }); messageQueues.set(sessionId, queue);
   appendLogLine(`coding message_queued session=${sessionId} person=${person.id} waiting=${queue.length}`);
   return { queued_message_id: id, position: queue.length };
+}
+/** CODE-FIX-01: Retry. Runs the person's last message again for a session whose last turn stopped on an error (failed, or settled to idle with the reason kept). Owner only, like every route here. */
+export function retryLastTurn(person: PersonRow, sessionId: string): { turn_id: string; tier: Tier } {
+  requireCodingAccess(person);
+  const session = getSessionRow(person.id, sessionId);
+  if (!session) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  const text = session.state === "failed" || session.state === "idle" ? (lastErrorStopCode(person.id, sessionId) ? lastUserText(person.id, sessionId) : null) : null;
+  if (text === null) throw new CodingSessionError("bad_input", "There is nothing to retry in this session. Send a new message instead.");
+  return submitTurn(person, sessionId, text, { retry: true });
 }
 /** The ✕ on a queued message. */
 export function cancelQueuedMessage(person: Pick<PersonRow, "id">, sessionId: string, messageId: string): boolean {

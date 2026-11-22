@@ -19,6 +19,7 @@ export function useSessionActions(currentId: string | undefined) {
   const pin = useHubMutation({ verb: "pin or unpin this session", mutationFn: (v: { id: string; pinned: boolean }) => codeApi.pin(v.id, v.pinned), onSuccess: apply });
   const archive = useHubMutation({ verb: "archive or unarchive this session", mutationFn: (v: { id: string; archived: boolean }) => codeApi.archive(v.id, v.archived), onSuccess: apply });
   const remove = useHubMutation({ verb: "delete this session", mutationFn: (session: Pick<CodeSession, "id" | "title">) => codeApi.remove(session.id).then(() => session) });
+  const retry = useHubMutation({ verb: "retry this session", mutationFn: (id: string) => codeApi.retry(id), onSuccess: (_, id) => { void refresh(); void queryClient.invalidateQueries({ queryKey: ["code-session", id] }); void queryClient.invalidateQueries({ queryKey: ["code-messages", id] }); } });
   const restore = useHubMutation({ verb: "bring this session back", mutationFn: (id: string) => codeApi.restore(id), onSuccess: () => void refresh() });
   /** A failed action leaves the row as the hub has it: ask again at once. */
   const settle = (result: unknown): boolean => { if (result === undefined) void refresh(); return result !== undefined; };
@@ -26,6 +27,13 @@ export function useSessionActions(currentId: string | undefined) {
     rename: async (id: string, title: string): Promise<boolean> => settle(await rename.run({ id, title })),
     pin: async (id: string, pinned: boolean): Promise<boolean> => settle(await pin.run({ id, pinned })),
     archive: async (id: string, archived: boolean): Promise<boolean> => settle(await archive.run({ id, archived })),
+    /** CODE-FIX-01: run the last message of a failed session again. The red dot goes at once and the next poll shows the turn working. */
+    retry: async (id: string): Promise<boolean> => {
+      const done = await retry.run(id);
+      if (done === undefined) { void refresh(); return false; }
+      queryClient.setQueryData<CodeSession[]>(CODE_SESSIONS_KEY, (rows) => rows?.map((row) => (row.id === id ? { ...row, state: "queued", failure: null } : row)));
+      return true;
+    },
     /** Moves the session to the household Trash and offers Undo on the toast. */
     remove: async (session: Pick<CodeSession, "id" | "title">): Promise<boolean> => {
       if (!(await remove.run(session))) { void refresh(); return false; }

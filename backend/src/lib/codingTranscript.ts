@@ -1,6 +1,6 @@
 // CODE-AGENT-01: a Code session's transcript, stored like a conversation's message list in part form. Every part is credential-redacted on the way in
 // (lib/codingRedact.ts); what is stored is what the page shows, so a leaked token is never recoverable from disk.
-import { and, asc, eq, max } from "drizzle-orm";
+import { and, asc, desc, eq, max } from "drizzle-orm";
 import { db } from "@/db";
 import { codingMessages } from "@/db/schema";
 import { newCodingMessageId } from "@/lib/id";
@@ -38,4 +38,19 @@ export function replaceCodingMessageParts(personId: string, messageId: string, p
 export function listCodingMessages(personId: string, sessionId: string): CodingMessageWire[] {
   return db.select().from(codingMessages).where(and(eq(codingMessages.sessionId, sessionId), eq(codingMessages.personId, personId))).orderBy(asc(codingMessages.seq)).all()
     .map((r) => ({ id: r.id, session_id: r.sessionId, seq: r.seq, role: r.role, parts: r.parts as unknown as CodingPart[], created_at: r.createdAt }));
+}
+
+/** CODE-FIX-01: the reason code of the session's last stop when it was an error and nothing came after it (the agent's stopped part is the newest message), else null. */
+export function lastErrorStopCode(personId: string, sessionId: string): { code: string; at: string } | null {
+  const row = db.select().from(codingMessages).where(and(eq(codingMessages.sessionId, sessionId), eq(codingMessages.personId, personId))).orderBy(desc(codingMessages.seq)).limit(1).get();
+  if (!row || row.role !== "agent") return null;
+  const stop = (row.parts as unknown as CodingPart[]).find((p) => p.type === "stopped" && p.reason === "error");
+  return stop && stop.type === "stopped" ? { code: stop.code ?? "error", at: row.createdAt } : null;
+}
+
+/** CODE-FIX-01: the text of the person's newest message, for Retry. Null when there is none. */
+export function lastUserText(personId: string, sessionId: string): string | null {
+  const rows = db.select().from(codingMessages).where(and(eq(codingMessages.sessionId, sessionId), eq(codingMessages.personId, personId), eq(codingMessages.role, "user"))).orderBy(desc(codingMessages.seq)).limit(1).all();
+  const part = (rows[0]?.parts as unknown as CodingPart[] | undefined)?.find((p) => p.type === "text");
+  return part && part.type === "text" ? part.text : null;
 }

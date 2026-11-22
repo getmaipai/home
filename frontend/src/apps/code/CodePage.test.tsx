@@ -12,11 +12,11 @@ import { readDraft } from "@/apps/chat/draftStore";
 const realFetch = globalThis.fetch;
 const session = { id: "csess-abc123", title: "Fix the thermostat", repo: { kind: "none", base_branch: "main", work_branch: "code/x" }, mode: "ask", state: "idle", tier: "standard", changes: { files: 0, additions: 0, deletions: 0 }, last_activity_at: "2026-11-21T10:00:00.000Z" };
 let tiers = ["standard", "max"]; let calls: string[] = []; let conns: unknown[] = [];
-let sessionState = "idle"; let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
+let sessionState = "idle"; let failureLine: string | null = null; let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
 
 beforeEach(() => {
   Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 1400 }); // the details pane opens by default only on a wide screen
-  tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle";
+  tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle"; failureLine = null;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
     if (path.endsWith("/context")) return Promise.resolve(Response.json({ used_tokens: 52000, window_tokens: 64000, source: "engine" }));
@@ -29,7 +29,7 @@ beforeEach(() => {
     if (path.endsWith("/tiers")) return Promise.resolve(Response.json({ tiers, last: "standard" }));
     if (path.endsWith("/messages") && (init?.method ?? "GET") === "GET") return Promise.resolve(Response.json([]));
     if (path.includes("/use-standard")) return Promise.resolve(Response.json({ ok: true }));
-    if (path.endsWith("/api/code/sessions/csess-abc123")) return Promise.resolve(Response.json({ session: { ...session, state: waiting ? "queued" : sessionState, tier: "max" }, waiting, requests: [], queued_messages: [] }));
+    if (path.endsWith("/api/code/sessions/csess-abc123")) return Promise.resolve(Response.json({ session: { ...session, state: waiting ? "queued" : sessionState, tier: "max", failure: failureLine }, waiting, requests: [], queued_messages: [] }));
     if (path.endsWith("/api/code/sessions")) return Promise.resolve(Response.json([session]));
     return Promise.resolve(Response.json({}));
   }) as unknown as typeof fetch;
@@ -128,6 +128,13 @@ describe("the Code app page", () => {
     open("/apps/code/csess-abc123");
     expect(await within(document.body).findByText(/The coding engine needs an update\./)).toBeTruthy();
     expect(document.querySelector('[data-slot="code-status"]')?.textContent).toBe("The agent stopped");
+  });
+  test("a failed session shows the hub's sentence, not a code, and Retry runs the last message again", async () => {
+    sessionState = "failed"; failureLine = "The sandbox is not ready yet. Wait a minute, then tap Retry.";
+    open("/apps/code/csess-abc123");
+    expect(await within(document.body).findByText(/The sandbox is not ready yet\. Wait a minute/)).toBeTruthy();
+    fireEvent.click(await within(document.body).findByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(calls).toContain("POST /api/code/sessions/csess-abc123/retry"));
   });
   test("the one shared composer carries the level chip with only the offered tiers, the mode and the context ring", async () => {
     open("/apps/code/csess-abc123");
