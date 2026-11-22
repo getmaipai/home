@@ -36251,6 +36251,161 @@
         }
       }
     },
+    "/api/coding/ready": {
+      "get": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Can this home run a Code session and an outside coding tool right now, and what is missing",
+        "responses": {
+          "200": {
+            "description": "Plain-word checks in order; `first_missing` is the one to fix first. Read-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "first_missing": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "enum": [
+                            "coding_on",
+                            "not_paused",
+                            "engine",
+                            "model",
+                            "folder",
+                            "sandbox",
+                            "gateway"
+                          ]
+                        },
+                        "say": {
+                          "type": "string"
+                        },
+                        "who": {
+                          "type": "string",
+                          "enum": [
+                            "an admin",
+                            "the computer's owner",
+                            "nobody"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "say",
+                        "who"
+                      ]
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "coding_on",
+                              "not_paused",
+                              "engine",
+                              "model",
+                              "folder",
+                              "sandbox",
+                              "gateway"
+                            ]
+                          },
+                          "ok": {
+                            "type": "boolean"
+                          },
+                          "say": {
+                            "type": "string"
+                          },
+                          "who": {
+                            "type": "string",
+                            "enum": [
+                              "an admin",
+                              "the computer's owner",
+                              "nobody"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ok",
+                          "say",
+                          "who"
+                        ]
+                      }
+                    },
+                    "tiers": {
+                      "type": "object",
+                      "properties": {
+                        "standard": {
+                          "type": "string",
+                          "enum": [
+                            "on"
+                          ]
+                        },
+                        "boost": {
+                          "type": "string",
+                          "enum": [
+                            "on",
+                            "off"
+                          ]
+                        },
+                        "max": {
+                          "type": "string",
+                          "enum": [
+                            "on",
+                            "off"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ]
+                    },
+                    "gateway": {
+                      "type": "object",
+                      "properties": {
+                        "loopback_url": {
+                          "type": "string"
+                        },
+                        "away_access": {
+                          "type": "boolean"
+                        },
+                        "sandbox_url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "loopback_url",
+                        "away_access",
+                        "sandbox_url"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "first_missing",
+                    "items",
+                    "tiers",
+                    "gateway"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup-checklist": {
       "get": {
         "tags": [
