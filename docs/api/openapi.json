@@ -59269,6 +59269,215 @@
         }
       }
     },
+    "/api/code/sessions/{id}/context": {
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "How full the session's context is (engine numbers, or text size divided by four) and the model's window when the Stack reports one",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token figures.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "used_tokens": {
+                      "type": "number"
+                    },
+                    "window_tokens": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "engine",
+                        "estimate"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "used_tokens",
+                    "window_tokens",
+                    "source"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/upload": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Add one file to the session's workspace (uploads folder; size and type capped, text scanned for credentials, never overwrites)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Where the file now is, relative to the workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/sessions/{id}/stop": {
       "post": {
         "tags": [
