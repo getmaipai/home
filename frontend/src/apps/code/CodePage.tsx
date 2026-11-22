@@ -36,14 +36,14 @@ export function CodePage({ person: _person }: { person: Roster }) {
   if (phone) {
     if (id) return <div className="flex min-h-0 flex-1 flex-col" data-workspace-fill=""><SessionView id={id} /></div>;
     return <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-workspace-fill="" data-slot="code-sessions-page">
-      <NewSession />
+      <div className="flex min-h-[28rem] flex-1 flex-col" data-slot="code-new-session"><NewSession /></div>
       {rows.length > 0 ? <List label={i18n._({ id: "Sessions", message: "Sessions" })} items={rows} getKey={(s) => s.id} onSelect={(s) => navigate(`/apps/code/${s.id}`)} getLabel={(s) => s.title}
         renderItem={(s) => <span className="flex min-w-0 flex-col"><span className="truncate text-body font-medium">{s.title}</span><span className="truncate text-body text-muted-foreground">{sessionMeta(s)}</span></span>} /> : null}
     </div>;
   }
   return <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="code-frame">
     <CodeSidebar sessions={rows} currentId={id} column={column} />
-    {id ? <SessionView key={id} id={id} /> : <div className="flex min-h-0 min-w-0 flex-1 items-start overflow-y-auto pt-10"><NewSession /></div>}
+    {id ? <SessionView key={id} id={id} /> : <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-slot="code-new-session"><NewSession /></div>}
   </div>;
 }
 

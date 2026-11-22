@@ -44,16 +44,16 @@ describe("the Code app page", () => {
   });
   test("the new session row shows the tier control with only the tiers the hub offers", async () => {
     open("/apps/code");
-    expect(await within(document.body).findByText("What should we work on?")).toBeTruthy();
-    await waitFor(() => expect(document.querySelector('[data-slot="code-tier"]')).toBeTruthy());
+    expect(await within(document.body).findByText("What should we build?")).toBeTruthy();
+    await waitFor(() => expect(document.querySelector('[data-slot="code-new-session"] button[aria-label^="Level"]')).toBeTruthy());
     expect(within(document.body).queryByText("Boost")).toBeNull();
   });
   test("one tier on offer draws no tier control", async () => {
     tiers = ["standard"];
     open("/apps/code");
-    await within(document.body).findByText("What should we work on?");
+    await within(document.body).findByText("What should we build?");
     await new Promise((r) => setTimeout(r, 50));
-    expect(document.querySelector('[data-slot="code-tier"]')).toBeNull();
+    expect(document.querySelector('[data-slot="code-new-session"] button[aria-label^="Level"]')).toBeNull();
   });
   test("a held Max message offers Use Standard for this message, and the click calls the hub", async () => {
     waiting = { turn_id: "ctrn-x1", line: "Waiting for Max, 2 ahead", offers_standard: true };
@@ -67,6 +67,33 @@ describe("the Code app page", () => {
     open("/apps/code/csess-abc123");
     for (const name of ["Changes", "Files", "Terminal", "Plan"]) expect((await within(document.body).findAllByText(name)).length).toBeGreaterThan(0);
   });
+  test("the New session page is the kit's Thread with Chat's composer, one quiet heading and starting ideas that fill the box", async () => {
+    open("/apps/code");
+    await within(document.body).findByText("What should we build?");
+    const shell = await waitFor(() => { const el = document.querySelector('[data-slot="code-new-session"] [data-slot="aui_composer-shell"]'); if (!el) throw new Error("no composer"); return el; });
+    expect(shell.getAttribute("data-density")).toBe(THREAD_SLOTS.composerDensity);
+    expect(document.querySelector('[data-slot="code-new-session"] textarea')?.getAttribute("rows")).not.toBeNull();
+    expect(document.querySelector('[data-slot="composer-mode-pill"]')!.textContent).toContain("Ask before changes");
+    fireEvent.click(within(document.body).getByText("Fix a failing test"));
+    await waitFor(() => expect((document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement).value).toContain("failing test"));
+  });
+  test("the first message creates the session, sends it and opens it", async () => {
+    open("/apps/code");
+    const box = await waitFor(() => { const el = document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement | null; if (!el) throw new Error("no box"); return el; });
+    fireEvent.change(box, { target: { value: "Fix the thermostat" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(calls).toContain("POST /api/code/sessions"));
+  });
+  test("a failed start says what went wrong and keeps the words", async () => {
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/code/sessions") && init?.method === "POST" ? Promise.resolve(Response.json({ error: "The coding engine is off. Ask an admin to turn it on." }, { status: 503 })) : base(input, init)) as unknown as typeof fetch;
+    open("/apps/code");
+    const box = await waitFor(() => { const el = document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement | null; if (!el) throw new Error("no box"); return el; });
+    fireEvent.change(box, { target: { value: "Fix the thermostat" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(await within(document.body).findByText("That did not work")).toBeTruthy();
+    await waitFor(() => expect((document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement).value).toBe("Fix the thermostat"));
+  });
   test("the repository picker appears only with an active git connection, and a chosen one asks for owner/name", async () => {
     conns = [{ id: "gitc-abc123", kind: "github", host: "github.com", account: "willow", status: "active" }];
     open("/apps/code");
@@ -75,7 +102,7 @@ describe("the Code app page", () => {
   });
   test("no connection means no picker (an empty repository is the default)", async () => {
     open("/apps/code");
-    await within(document.body).findByText("What should we work on?");
+    await within(document.body).findByText("What should we build?");
     await new Promise((r) => setTimeout(r, 50));
     expect(document.querySelector('[data-slot="code-repo"]')).toBeNull();
   });

@@ -5,7 +5,7 @@
 import { i18n } from "@lingui/core";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { AssistantRuntimeProvider, ComposerPrimitive, unstable_defaultDirectiveFormatter, useExternalStoreRuntime, type AppendMessage, type AttachmentAdapter, type ThreadMessageLike, type ToolCallMessagePartComponent } from "@assistant-ui/react";
-import { Thread } from "@maipai/ui/src/elements/thread.aui";
+import { Thread, type ThreadComposerModes } from "@maipai/ui/src/elements/thread.aui";
 import { ComposerMentions } from "@maipai/ui/src/elements/composer-mentions.aui";
 import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
@@ -109,6 +109,19 @@ const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-sta
 // The density is Chat's, read from its one definition (THREAD_SLOTS), so a change there moves both. The mode and level controls stay inside the pill, as in Chat.
 const THREAD_COMPONENTS = { composerDensity: THREAD_SLOTS.composerDensity, ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerExtraEnd: ExtraEnd, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 
+/** The composer's mode pill and level chip, one definition for the session view and the New session page so they cannot drift. */
+export function codeComposerModes({ mode, onMode, tier, tiers, onTier }: { mode: CodeSession["mode"]; onMode: (mode: CodeSession["mode"]) => void; tier: CodeTier; tiers: readonly CodeTier[]; onTier: (tier: CodeTier) => void }): ThreadComposerModes {
+  const placeholder = i18n._({ id: "Message the agent. Type @ to point at a file.", message: "Message the agent. Type @ to point at a file." });
+  const modes: ComposerModeData[] = [
+    { id: "ask", label: i18n._({ id: "Ask before changes", message: "Ask before changes" }), icon: "shield-check", placeholder },
+    { id: "auto_edit", label: i18n._({ id: "Auto edit", message: "Auto edit" }), icon: "pencil", placeholder },
+    { id: "plan", label: i18n._({ id: "Plan", message: "Plan" }), icon: "square-pen", placeholder },
+  ];
+  const quality: ComposerQualityData = { value: tier, onValueChange: (v) => onTier(v as CodeTier), options: tiers.map((t) => ({ value: t, label: tierWord(t) })), band: "adult", label: i18n._({ id: "Level", message: "Level" }) };
+  // One tier on offer is no choice, so the chip is left out.
+  return { modes, mode, onModeChange: (id) => onMode(id as CodeSession["mode"]), ...(tiers.length > 1 ? { quality } : {}) };
+}
+
 export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tree }: {
   state: CodeThreadState; messages: readonly CodeMessage[]; tiers: readonly CodeTier[]; onTier: (tier: CodeTier) => void;
   onSend: (text: string) => Promise<void>; onStop: () => void; tree: readonly TreeEntry[];
@@ -134,18 +147,12 @@ export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tre
     onCancel: async () => onStop(),
     adapters: { attachments },
   });
-  const quality: ComposerQualityData = { value: session.tier ?? "standard", onValueChange: (v) => onTier(v as CodeTier), options: tiers.map((t) => ({ value: t, label: tierWord(t) })), band: "adult", label: i18n._({ id: "Level", message: "Level" }) };
-  const placeholder = i18n._({ id: "Message the agent. Type @ to point at a file.", message: "Message the agent. Type @ to point at a file." });
-  const modes: ComposerModeData[] = [
-    { id: "ask", label: i18n._({ id: "Ask before changes", message: "Ask before changes" }), icon: "shield-check", placeholder },
-    { id: "auto_edit", label: i18n._({ id: "Auto edit", message: "Auto edit" }), icon: "pencil", placeholder },
-    { id: "plan", label: i18n._({ id: "Plan", message: "Plan" }), icon: "square-pen", placeholder },
-  ];
+  const composerModes = codeComposerModes({ mode: session.mode, onMode: state.onMode, tier: session.tier ?? "standard", tiers, onTier });
   const mentions = tree.filter((e) => e.kind === "file").slice(0, 400).map((e) => ({ id: e.path, type: "file", label: e.path }));
   return <AssistantRuntimeProvider runtime={runtime}>
     <StateContext.Provider value={state}>
       <ComposerPrimitive.Unstable_TriggerPopoverRoot>
-        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: session.mode, onModeChange: (id) => state.onMode(id as CodeSession["mode"]), quality } }} />
+        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes }} />
         {mentions.length > 0 ? <ComposerMentions items={mentions} formatter={unstable_defaultDirectiveFormatter} /> : null}
       </ComposerPrimitive.Unstable_TriggerPopoverRoot>
     </StateContext.Provider>
