@@ -3,6 +3,7 @@ export type AppState = "operational" | "degraded" | "down" | "waiting_for_intern
 export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
 import { serviceDetail, serviceState } from "@/lib/serviceHealth";
 import { serviceComponent } from "@/lib/serviceComponent";
+import { codingReadiness } from "@/lib/codingReadiness";
 import { codingConcern, roleHealth, STACK_REFUSAL_KEY, type CodingConcern } from "@/lib/roleHealth";
 import { countActiveSessions } from "@/lib/codingSessions";
 import { syncCodingHealthIssue } from "@/lib/codingHealthIssue";
@@ -196,6 +197,7 @@ export async function appResponseWithLiveRoleHealth(app: StatusApp, events: Stat
   const paused = new Set<string>();
   const isCode = app.id === "code";
   const coding = isCode ? await codingConcern() : null;
+  const readiness = isCode ? await codingReadiness() : null;
   if (coding) await syncCodingHealthIssue(coding);
   const needs = await Promise.all(currentNeedStates(app, events).map(async (need) => {
     if (coding && need.kind === "engine" && need.id === "coding") return { ...need, state: coding.availability === "unavailable" ? "down" as const : coding.availability === "starting" ? "degraded" as const : "operational" as const };
@@ -222,7 +224,7 @@ export async function appResponseWithLiveRoleHealth(app: StatusApp, events: Stat
   // starting, so the app will be back on its own; an optional part that is
   // down is not a pause. The header pill reads this, never the reason text.
   const pausedApp = state === "degraded" && needs.some((need) => need.required && need.kind === "engine" && need.state === "degraded");
-  return { ...response, state, ...(coding ? { activity: codingActivityLine(countActiveSessions(), coding) } : {}), paused: pausedApp, reason: pausedRequired ? `${app.name} is paused.` : appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
+  return { ...response, state, ...(coding ? { activity: codingActivityLine(countActiveSessions(), coding) } : {}), ...(readiness ? { code_ready: { ready: readiness.ready, reason: readiness.reason } } : {}), paused: pausedApp, reason: pausedRequired ? `${app.name} is paused.` : appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
 }
 
 export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed & { state: NeedState }>): string | null {

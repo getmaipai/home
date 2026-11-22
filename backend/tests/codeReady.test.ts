@@ -6,7 +6,7 @@ import { people } from "@/db/schema";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { codeReady, type CodeReadyDeps } from "@/lib/codeReady";
+import { codeReady, probeRoute, type CodeReadyDeps } from "@/lib/codeReady";
 
 const healthy: CodeReadyDeps = {
   setting: (key) => (key === "coding.enabled" ? true : key === "coding.api.away" ? true : undefined),
@@ -14,6 +14,8 @@ const healthy: CodeReadyDeps = {
   pieces: async () => ({ stack: "ok", missing: null }),
   cannotFit: async () => null,
   runtime: async () => ({ kind: "ok", container_system: "running", image: "maipai-sandbox:local", image_built: true, network: true, detail: "" }),
+  execRoutes: async () => "present",
+  gatewayProblem: () => null,
   workspaceRoot: () => "/hub/stack/data/coding",
   stackCodingFolder: () => "/hub/stack/data/coding",
   folderWritable: () => true,
@@ -67,6 +69,16 @@ describe("codeReady", () => {
   test("a slot an admin turned on shows Boost on", async () => {
     expect((await codeReady(with_({ slotOn: (_c, tier) => tier === "boost" }))).tiers).toEqual({ standard: "on", boost: "on", max: "off" });
   });
+  test("a Stack without the exec or snapshot routes says every message would fail; an unanswered probe is not a guess", async () => {
+    const r = await codeReady(with_({ execRoutes: async () => "missing" }));
+    expect(r.first_missing).toMatchObject({ id: "exec", who: "the computer's owner" });
+    expect(r.first_missing!.say).toContain("Update the engine");
+    expect((await codeReady(with_({ execRoutes: async () => "unknown" }))).first_missing?.id).toBe("exec");
+  });
+  test("a gateway port another program holds, and a bridge address that is not IPv4, are named", async () => {
+    expect((await codeReady(with_({ gatewayProblem: () => "port_in_use" }))).first_missing?.say).toContain("port");
+    expect((await codeReady(with_({ gatewayProblem: () => "no_bridge" }))).first_missing?.id).toBe("gateway");
+  });
   test("no gateway address is a named blocker", async () => {
     expect((await codeReady(with_({ sandboxUrl: () => "" }))).first_missing?.id).toBe("gateway");
   });
@@ -80,12 +92,23 @@ describe("GET /api/coding/ready", () => {
     const res = await client.get("/api/coding/ready");
     expect(res.status).toBe(200);
     const body = await res.json() as { ready: boolean; items: Array<{ id: string; say: string }>; first_missing: { say: string } | null };
-    expect(body.items.map((item) => item.id)).toEqual(["coding_on", "not_paused", "engine", "model", "folder", "sandbox", "gateway"]);
+    expect(body.items.map((item) => item.id)).toEqual(["coding_on", "not_paused", "engine", "model", "folder", "sandbox", "exec", "gateway"]);
     expect(body.ready).toBe(false);
     expect(body.first_missing?.say.length).toBeGreaterThan(10);
     const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
     db.update(people).set({ role: "adult" }).where(eq(people.id, actor.id)).run();
     invalidateSessionCacheForPerson(actor.id);
     expect((await client.get("/api/coding/ready")).status).toBe(403);
+  });
+});
+
+describe("probeRoute", () => {
+  const answer = (status: number, text: string) => ({ sandboxCall: async () => ({ status, headers: new Headers(), body: new Response(text).body }) });
+  test("the Stack's unknown-route answer means the route is missing; a served route's own refusals mean it is present", async () => {
+    expect(await probeRoute(answer(404, JSON.stringify({ error: "Not found" })), "/x", {})).toBe(false);
+    expect(await probeRoute(answer(404, "not json"), "/x", {})).toBe(false);
+    expect(await probeRoute(answer(405, ""), "/x", {})).toBe(false);
+    expect(await probeRoute(answer(404, JSON.stringify({ error: "No sandbox has this id. List the sandboxes and use one of those ids." })), "/x", {})).toBe(true);
+    expect(await probeRoute(answer(400, JSON.stringify({ error: "The body must be {argv}." })), "/x", {})).toBe(true);
   });
 });

@@ -12,15 +12,18 @@ import { readDraft } from "@/apps/chat/draftStore";
 const realFetch = globalThis.fetch;
 const session = { id: "csess-abc123", title: "Fix the thermostat", repo: { kind: "none", base_branch: "main", work_branch: "code/x" }, mode: "ask", state: "idle", tier: "standard", changes: { files: 0, additions: 0, deletions: 0 }, last_activity_at: "2026-11-21T10:00:00.000Z" };
 let tiers = ["standard", "max"]; let calls: string[] = []; let conns: unknown[] = [];
+let readiness: { ready: boolean; reason: string; line: string | null; can_fix: boolean } = { ready: true, reason: "ready", line: null, can_fix: true };
 let sessionState = "idle"; let failureLine: string | null = null; let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
 
 beforeEach(() => {
   Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 1400 }); // the details pane opens by default only on a wide screen
+  readiness = { ready: true, reason: "ready", line: null, can_fix: true };
   tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle"; failureLine = null;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
     if (path.endsWith("/context")) return Promise.resolve(Response.json({ used_tokens: 52000, window_tokens: 64000, source: "engine" }));
     if (path.endsWith("/upload")) return Promise.resolve(Response.json({ path: "uploads/notes.md", bytes: 5 }, { status: 201 }));
+    if (path.endsWith("/api/code/readiness")) return Promise.resolve(Response.json(readiness));
     if (path.endsWith("/api/coding/ready")) return Promise.resolve(Response.json({ ready: false, first_missing: { id: "engine", say: "The coding engine needs an update.", who: "an admin" }, items: [] }));
     if (path.endsWith("/git-connections")) return Promise.resolve(Response.json({ connections: conns }));
     if (path.endsWith("/changes")) return Promise.resolve(Response.json({ available: true, files: [{ path: "src/a.ts", additions: 1, deletions: 0, binary: false }], diff: "diff --git a/src/a.ts b/src/a.ts\n@@ -0,0 +1 @@\n+hello\n", truncated: false }));
@@ -37,6 +40,36 @@ beforeEach(() => {
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
 
 const open = (at: string) => renderWithQueryClient(<MemoryRouter initialEntries={[at]}><CodePage /></MemoryRouter>);
+
+describe("the Code readiness notice (CODE-FIX-02)", () => {
+  const notReady = (can_fix: boolean) => ({ ready: false, reason: "exec", line: can_fix ? "Code is not ready. The engine cannot run commands in a sandbox yet. Update the engine." : "Code is not ready. Ask an admin to check it in Settings, Coding.", can_fix });
+  test("ready: no notice line on the New session page", async () => {
+    open("/apps/code");
+    await within(document.body).findByText("What should we build?");
+    await waitFor(() => expect(calls.some((c) => c.endsWith("/api/code/readiness"))).toBe(true));
+    expect(document.querySelector("[data-chat-notice]")).toBeNull();
+  });
+  test("not ready, owner or admin: the sentence with the next step and a Repairs link in Chat's notice line", async () => {
+    readiness = notReady(true);
+    open("/apps/code");
+    const line = await within(document.body).findByText(/The engine cannot run commands in a sandbox yet/);
+    const notice = line.closest("[data-chat-notice]") as HTMLElement;
+    expect(notice.getAttribute("data-level")).toBe("red");
+    expect(within(notice).getByRole("link", { name: "Open Repairs" }).getAttribute("href")).toBe("/repairs");
+  });
+  test("not ready, anyone else: the plain line and no Repairs link", async () => {
+    readiness = notReady(false);
+    open("/apps/code");
+    const line = await within(document.body).findByText(/Ask an admin to check it in Settings, Coding/);
+    expect(within(line.closest("[data-chat-notice]") as HTMLElement).queryByRole("link")).toBeNull();
+  });
+  test("the session view shows the same line in place of the status line", async () => {
+    readiness = notReady(true);
+    open("/apps/code/csess-abc123");
+    expect(await within(document.body).findByText(/The engine cannot run commands in a sandbox yet/)).toBeTruthy();
+    expect(document.querySelector('[data-slot="code-status"]')).toBeNull();
+  });
+});
 
 describe("the Code app page", () => {
   test("the session id is read from the address", () => {

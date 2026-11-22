@@ -23,6 +23,8 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { codeApi, type CodeContext, type CodeMessage, type CodeSession, type CodeTier, type TreeEntry } from "./codeApi";
 import { approvalWords, outputLines, stopWords, tierWord } from "./codeTranscript";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
+import { ChatComposerNotice } from "@/apps/chat/chatThreadSlots";
+import { ChatComposerNoticeContext } from "@/apps/chat/chatThreadContexts";
 import { ContextRing } from "./ContextRing";
 import { CodeComposerContexts } from "./codeShared";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
@@ -114,7 +116,8 @@ const Queue = () => {
     {draft ? <DraftRestore {...draft} /> : null}
   </>;
 };
-const Notice = () => { const s = useState_(); return <span data-slot="code-status">{s.statusLine}</span>; };
+/** The composer line: Chat's notice while Code cannot run a message (CODE-FIX-02), else the session's own status line. */
+const Notice = () => { const s = useState_(); const readiness = useContext(ChatComposerNoticeContext); return readiness ? <ChatComposerNotice /> : <span data-slot="code-status">{s.statusLine}</span>; };
 const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex shrink-0 items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
 // The density is Chat's, read from its one definition (THREAD_SLOTS), so a change there moves both. The mode and level controls stay inside the pill, as in Chat.

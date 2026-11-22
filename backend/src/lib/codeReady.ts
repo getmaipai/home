@@ -6,6 +6,7 @@ import path from "node:path";
 import { codingPausedByAdmin } from "@/lib/codingPause";
 import { codingWorkspaceRoot } from "@/lib/codingShare";
 import { sandboxGatewayUrl } from "@/lib/codingGatewayAddress";
+import { sandboxBridgeAddress, sandboxBridgePort, sandboxListenerFailure } from "@/lib/codingSandboxListener";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { listCodingPieces } from "@/lib/stackCodingPieces";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -13,7 +14,7 @@ import { stackDataDir } from "@/lib/localStackService";
 import { homePort } from "@/lib/ports";
 import { readSlot, type TierCategory } from "@/lib/tiers";
 
-export type CodeReadyId = "coding_on" | "not_paused" | "engine" | "model" | "folder" | "sandbox" | "gateway";
+export type CodeReadyId = "coding_on" | "not_paused" | "engine" | "model" | "folder" | "sandbox" | "exec" | "gateway";
 export interface CodeReadyItem { id: CodeReadyId; ok: boolean; say: string; who: "an admin" | "the computer's owner" | "nobody" }
 export interface CodeReady {
   ready: boolean;
@@ -32,12 +33,18 @@ export type RuntimeReading =
   | { kind: "old_engine" }
   | { kind: "unreachable" };
 
+/** Whether the Stack serves the sandbox exec and snapshot routes a turn needs (they are probed against an id that never exists, so nothing runs and nothing is made). */
+export type ExecRoutesReading = "present" | "missing" | "unknown";
+
 export interface CodeReadyDeps {
   setting(key: string): unknown;
   paused(): boolean;
   pieces(): Promise<{ stack: "ok" | "unreachable"; missing: string | null }>;
   cannotFit(): Promise<string | null>;
   runtime(): Promise<RuntimeReading>;
+  execRoutes(): Promise<ExecRoutesReading>;
+  /** What stops the bridge address from serving sandboxes: another program on its port, or an address that is not a plain IPv4 one. Null when nothing does. */
+  gatewayProblem(): "port_in_use" | "no_bridge" | null;
   workspaceRoot(): string;
   /** The folder the local Stack mounts workspaces from, or null when the Stack is on another computer. */
   stackCodingFolder(): string | null;
@@ -45,6 +52,23 @@ export interface CodeReadyDeps {
   slotOn(category: TierCategory, tier: "boost" | "max"): boolean;
   sandboxUrl(): string;
   port(): number;
+}
+
+/** The Stack answers an unknown route with {"error":"Not found"}; a served route answers a sandbox that does not exist with its own sentence (or a 400 for a bad body). */
+export async function probeRoute(client: Pick<ReturnType<typeof getStackClient>, "sandboxCall">, path: string, body: unknown): Promise<boolean> {
+  const res = await client.sandboxCall!("POST", path, body, { timeoutMs: 5_000 });
+  let said = ""; try { said = String((await new Response(res.body).json() as { error?: unknown }).error ?? ""); } catch { /* not JSON: an unknown route */ }
+  return !((res.status === 404 || res.status === 405) && (said === "" || said === "Not found"));
+}
+async function probeExecRoutes(): Promise<ExecRoutesReading> {
+  try {
+    if (!isStackConfigured()) return "unknown";
+    const client = getStackClient();
+    if (!client.sandboxCall) return "missing";
+    const id = "/stack/v1/sandboxes/readiness-probe";
+    const [exec, snap] = await Promise.all([probeRoute(client, `${id}/exec`, { argv: ["true"] }), probeRoute(client, `${id}/snapshots`, { label: "readiness-probe" })]);
+    return exec && snap ? "present" : "missing";
+  } catch { return "unknown"; }
 }
 
 const realDeps: CodeReadyDeps = {
@@ -64,6 +88,8 @@ const realDeps: CodeReadyDeps = {
       return { kind: "ok", container_system: body.container_system === "running" ? "running" : "stopped", image: String(body.image ?? ""), image_built: body.image_built === true, network: body.network === true, detail: String(body.detail ?? "") };
     } catch { return { kind: "unreachable" }; }
   },
+  execRoutes: probeExecRoutes,
+  gatewayProblem: () => (sandboxListenerFailure() === "port_in_use" ? "port_in_use" : sandboxBridgeAddress() === null || sandboxBridgePort() === null ? "no_bridge" : null),
   workspaceRoot: () => codingWorkspaceRoot(),
   stackCodingFolder: () => (getHouseholdSettingValue("engines.stack.where") === "another_computer" ? null : process.env.STACK_CODING_ROOT?.trim() || path.join(stackDataDir(), "coding")),
   folderWritable: (folder) => {
@@ -110,8 +136,17 @@ export async function codeReady(deps: CodeReadyDeps = realDeps): Promise<CodeRea
   else if (!runtime.network) add("sandbox", true, "The sandbox system is running and its image is built. Its network is made when the first session starts.");
   else add("sandbox", true, "The sandbox system is running, its image is built and its network exists.");
 
+  const routes = await deps.execRoutes();
+  if (routes === "missing") add("exec", false, "The engine cannot run commands or save checkpoints in a sandbox yet, so every Code message would fail. Update the engine, then open this page again.", "the computer's owner");
+  else if (routes === "unknown") add("exec", false, "Home could not ask the engine whether it can run commands in a sandbox. Open this page again when the engine answers.", "the computer's owner");
+  else add("exec", true, "The engine can run commands and save checkpoints in a sandbox.");
+
   const url = deps.sandboxUrl();
-  add("gateway", url.length > 0, url.length > 0 ? "A session's sandbox can reach Home's coding address." : "Code does not know Home's address for sandboxes. Set MAIPAI_SANDBOX_GATEWAY_URL and restart Home.", "the computer's owner");
+  const problem = url.length > 0 ? deps.gatewayProblem() : null;
+  if (url.length === 0) add("gateway", false, "Code does not know Home's address for sandboxes. Set MAIPAI_SANDBOX_GATEWAY_URL and restart Home.", "the computer's owner");
+  else if (problem === "port_in_use") add("gateway", false, "Another program is using the port the coding gateway needs. Close it or change the gateway port, then restart Home.", "the computer's owner");
+  else if (problem === "no_bridge") add("gateway", false, "Home's address for sandboxes is not a plain network address, so the coding gateway cannot start. Set MAIPAI_SANDBOX_GATEWAY_URL to one and restart Home.", "the computer's owner");
+  else add("gateway", true, "A session's sandbox can reach Home's coding address.");
 
   const firstBad = items.find((item) => !item.ok);
   return {

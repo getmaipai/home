@@ -51,6 +51,8 @@ export interface GitConnection { id: string; kind: "github" | "gitea"; host: str
 export interface RepoChoice { connectionId: string; fullName: string; baseBranch: string }
 
 export interface CodeContext { used_tokens: number; window_tokens: number | null; source: "engine" | "estimate" }
+/** CODE-FIX-02: GET /api/code/readiness. `line` is the plain sentence with the next step (the owner's or admin's detail when `can_fix`); `reason` is a code for tests, never shown. */
+export interface CodeReadiness { ready: boolean; reason: string; line: string | null; can_fix: boolean }
 export interface CodeReady { ready: boolean; first_missing: { id: string; say: string; who: string } | null }
 
 export const DEFAULT_ENVIRONMENT_ID = "cenv-default";
@@ -73,6 +75,7 @@ export const codeApi = {
   context: (id: string) => request<CodeContext>(`${base}/${id}/context`),
   upload: (id: string, file: File) => { const form = new FormData(); form.append("file", file); return request<{ path: string; bytes: number }>(`${base}/${id}/upload`, { method: "POST", body: form }); },
   ready: () => request<CodeReady>("/api/coding/ready"),
+  readiness: () => request<CodeReadiness>("/api/code/readiness"),
   connections: () => request<{ connections: GitConnection[] }>("/api/settings/git-connections"),
   send: (id: string, text: string) => request<{ turn_id?: string; queued_message_id?: string }>(`${base}/${id}/messages`, json({ text })),
   setTier: (id: string, tier: CodeTier) => request<CodeSession>(`${base}/${id}/tier`, { method: "PUT", body: JSON.stringify({ tier }) }),

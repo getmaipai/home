@@ -20,6 +20,8 @@ import { sessionChanges, sessionFile, sessionTree } from "@/lib/codingWorkspaceV
 import { pushCodingSession } from "@/lib/codingShare";
 import { createCodingPullRequest } from "@/lib/codingPullRequest";
 import { codingConcern } from "@/lib/roleHealth";
+import { codingReadiness, readinessLineFor } from "@/lib/codingReadiness";
+import { isOwnerOrAdmin } from "@/lib/access";
 import { codingNotice } from "@/lib/failureCopy";
 import type { PersonRow } from "@/types";
 
@@ -27,7 +29,7 @@ export const codingSessionsRoutes = apiRouter();
 
 const STATUS = { not_allowed: 403, not_found: 404, bad_input: 400, busy: 409 } as const;
 const failure = (e: unknown): { status: 400 | 403 | 404 | 409; error: string } | null => (e instanceof CodingSessionError ? { status: STATUS[e.code], error: e.message } : null);
-const errors = { 400: "The request is not valid", 401: "Not signed in", 403: "Not allowed", 404: "Not found", 409: "The session is busy" };
+const errors = { 400: "The request is not valid", 401: "Not signed in", 403: "Not allowed", 404: "Not found", 409: "The session is busy, or Code is not ready to run a message (the error says why and what to do)" };
 const Tier = z.enum(["standard", "boost", "max"]);
 const sessionIdParam = z.object({ id: z.string().regex(/^csess-[a-z0-9]{6,}$/) });
 
@@ -53,7 +55,14 @@ const createR = createRoute({
   request: { body: { content: { "application/json": { schema: CreateCodingSessionInput } } } },
   responses: { 201: { content: { "application/json": { schema: CodingSession } }, description: "The new session." }, ...errorResponses(errors) },
 });
-codingSessionsRoutes.openapi(createR, (c) => {
+codingSessionsRoutes.openapi(createR, async (c) => {
+  // CODE-FIX-02: a session is never started into a certain failure. The access rules answer first (their copy is the household's); then the readiness check, asked fresh.
+  const person = c.get("person");
+  const access = codingSessionRefusal(person);
+  if (!access) {
+    const readiness = await codingReadiness({ fresh: true });
+    if (!readiness.ready) return c.json({ error: readinessLineFor(readiness, isOwnerOrAdmin(person)) }, 409);
+  }
   try { return c.json(createCodingSession(c.get("person"), c.req.valid("json")), 201); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 

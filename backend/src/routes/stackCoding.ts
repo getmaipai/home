@@ -85,7 +85,7 @@ stackCodingRoutes.openapi(selfTestRoute, async c => {
   }
 });
 
-const ItemSchema = z.object({ id: z.enum(["coding_on", "not_paused", "engine", "model", "folder", "sandbox", "gateway"]), ok: z.boolean(), say: z.string(), who: z.enum(["an admin", "the computer's owner", "nobody"]) });
+const ItemSchema = z.object({ id: z.enum(["coding_on", "not_paused", "engine", "model", "folder", "sandbox", "exec", "gateway"]), ok: z.boolean(), say: z.string(), who: z.enum(["an admin", "the computer's owner", "nobody"]) });
 const readyRoute = createRoute({
   method: "get", path: "/ready", tags: ["Coding"], summary: "Can this home run a Code session and an outside coding tool right now, and what is missing", middleware: [requireRole("owner", "admin")] as const,
   responses: { 200: { content: { "application/json": { schema: z.object({

@@ -118,7 +118,7 @@ export function ChatComposerNotice() {
   const notice = useContext(ChatComposerNoticeContext);
   const apps = useStatusApps().data;
   if (!notice) return null;
-  const level = chatNoticeLevel(apps);
+  const level = notice.level ?? chatNoticeLevel(apps);
   return (
     // CHAT-NOTICE-LED-01 (owner, 2026-10-06): ChatGPT's quiet status line, a small
     // LED dot then one sentence in the normal foreground. The dot is the

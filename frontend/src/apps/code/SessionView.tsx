@@ -20,6 +20,8 @@ import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
 import { Stack } from "./layout";
 import { codeErrorLine, pollDelay } from "./codeShared";
 import { CodeThread } from "./CodeThread";
+import { useCodeReadiness } from "./useCodeReadiness";
+import { ChatComposerNoticeContext } from "@/apps/chat/chatThreadContexts";
 
 const TerminalIcon = getIcon("terminal");
 
@@ -40,6 +42,7 @@ export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions
   const tree = useQuery({ queryKey: ["code-tree", id, view.data?.session.last_activity_at], queryFn: () => codeApi.tree(id), retry: false, enabled: view.data !== undefined });
   const [now, setNow] = useState(() => Date.now());
   const context = useQuery({ queryKey: ["code-context", id], queryFn: () => codeApi.context(id), retry: false, refetchInterval: (q) => q.state.data && view.data && isBusy(view.data.session.state) ? 4000 : 20000 });
+  const readiness = useCodeReadiness();
   const ready = useQuery({ queryKey: ["code-ready"], queryFn: codeApi.ready, retry: false, enabled: false });
   const list = (messages.data ?? []).filter((m) => !m.parts.every((p) => p.type === "usage"));
   const session = view.data?.session;
@@ -109,6 +112,7 @@ export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions
           </div>} />
         <p className="truncate px-4 pb-1 text-body text-muted-foreground" data-slot="code-subtitle">{subtitle}</p>
         <div className="flex min-h-0 flex-1 flex-col pb-(--phone-nav-offset)" data-slot="code-thread">
+          <ChatComposerNoticeContext.Provider value={readiness.notice}>
           <CodeThread messages={list} tiers={tiers.data?.tiers ?? ["standard"]} tree={tree.data?.entries ?? []} onTier={(next) => void changeTier(next)}
             onSend={(message) => run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }))}
             onStop={() => void run(() => codeApi.stop(id), i18n._({ id: "Could not stop. Try again.", message: "Could not stop. Try again." }))}
@@ -120,6 +124,7 @@ export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions
               onMode: (mode) => void run(() => codeApi.setMode(id, mode), i18n._({ id: "Could not change that. Try again.", message: "Could not change that. Try again." })),
               onAnswer: (rid, answer) => void run(() => codeApi.answer(id, rid, answer), i18n._({ id: "Could not send your answer. Try again.", message: "Could not send your answer. Try again." })),
               onCancelQueued: (qid) => void run(() => codeApi.cancelQueued(id, qid), i18n._({ id: "That message is not waiting any more.", message: "That message is not waiting any more." })) }} />
+          </ChatComposerNoticeContext.Provider>
         </div>
       </Stack>
       {pane}

@@ -183,12 +183,15 @@ const keepPagesOffline = async (): Promise<void> => {
 await import("@/lib/packageHost");
 await import("@/lib/blocklists/listStore");
 await import("@/lib/searchAssist/shadow");
+const codingReadinessModule = await import("@/lib/codingReadiness");
 afterEach(keepPagesOffline);
 beforeEach(async () => {
   await keepPagesOffline();
   // MINOR-SEARCH-01e-5: tests that are not about the blocked-site lists run as if every enabled list had loaded.
   // Imported here, not at the top, so paths.ts reads MAIPAI_DATA_DIR after this file has set it.
   (await import("@/lib/blocklists/listStore")).__setListsReadyForTests(true);
+  // CODE-FIX-02: a test that is not about Code readiness runs as if the home could run a Code turn (a session start asks the Stack otherwise).
+  codingReadinessModule.__setCodingReadinessForTests(codingReadinessModule.__READY_FOR_TESTS);
   __setDefaultStackClientForTests(defaultScriptedStack.client);
   // ROUTER-BUILD-01g: the production weights are now pinned, so an unstubbed turn would download them from GitHub.
   // Tests that are not about the search assist see "no weights"; the assist's own tests install their manifest after this runs.
