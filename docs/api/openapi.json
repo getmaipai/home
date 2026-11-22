@@ -35709,9 +35709,7 @@
                             "enum": [
                               "engine",
                               "model",
-                              "draft",
-                              "heavy_model",
-                              "heavy_draft"
+                              "draft"
                             ]
                           },
                           "name": {
@@ -35857,9 +35855,7 @@
               "enum": [
                 "engine",
                 "model",
-                "draft",
-                "heavy_model",
-                "heavy_draft"
+                "draft"
               ]
             },
             "required": true,
@@ -35884,9 +35880,7 @@
                       "enum": [
                         "engine",
                         "model",
-                        "draft",
-                        "heavy_model",
-                        "heavy_draft"
+                        "draft"
                       ]
                     }
                   },
@@ -35964,9 +35958,7 @@
               "enum": [
                 "engine",
                 "model",
-                "draft",
-                "heavy_model",
-                "heavy_draft"
+                "draft"
               ]
             },
             "required": true,
@@ -35987,9 +35979,7 @@
                       "enum": [
                         "engine",
                         "model",
-                        "draft",
-                        "heavy_model",
-                        "heavy_draft"
+                        "draft"
                       ]
                     },
                     "removed": {
