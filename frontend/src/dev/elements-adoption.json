@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T02:39:35.232Z",
+  "generatedAt": "2026-11-22T04:57:02.165Z",
   "kitTag": "ui-v0.5.727",
   "items": [
     {
@@ -1304,7 +1304,7 @@
       "group": "light",
       "verdict": "support",
       "verdictReason": "The short-text formatter inside the creation header's collapsible description, which the Library viewer adopts through CreationHeader; no separate Home surface.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "light-tile.tsx",
