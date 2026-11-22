@@ -6,6 +6,19 @@ function job(id: string, personId: string, category: ScoreJob["category"], creat
   return { id, personId, category, state: "queued", createdAt, ...extra };
 }
 describe("job scoring", () => {
+  test("coding weighs the same as tools, below music, above background, and ages like any job", () => {
+    expect(DEFAULT_POLICY.classWeights.coding).toBe(DEFAULT_POLICY.classWeights.tools);
+    const jobs = [job("bg", "a", "background", now), job("code", "b", "coding", now), job("song", "c", "music", now), job("pic", "d", "picture", now)];
+    expect(scoreJobs(jobs, DEFAULT_POLICY, now, {}).map((item) => item.id)).toEqual(["pic", "song", "code", "bg"]);
+    const aged = scoreJobs([job("old-code", "a", "coding", now - 5 * 60_000), job("new-song", "b", "music", now)], DEFAULT_POLICY, now, {});
+    expect(aged.find((item) => item.id === "old-code")!.terms.aging).toBe(5);
+    expect(aged.map((item) => item.id)).toEqual(["new-song", "old-code"]);
+    // Aging is capped at the gap to music (10), where the older job wins the tie, so a coding turn is never starved.
+    const waited = scoreJobs([job("old-code", "a", "coding", now - 40 * 60_000), job("new-song", "b", "music", now)], DEFAULT_POLICY, now, {});
+    expect(waited[0]!.id).toBe("old-code");
+    expect(waited[0]!.terms.aging).toBe(10);
+  });
+
   test("orders classes and caps smooth aging below the next class", () => {
     const jobs = [job("p", "a", "picture", now), job("v", "b", "video", now), job("m", "c", "music", now)];
     expect(scoreJobs(jobs, DEFAULT_POLICY, now, {}).map((item) => item.id)).toEqual(["p", "v", "m"]);

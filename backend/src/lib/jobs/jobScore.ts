@@ -1,4 +1,4 @@
-export type JobCategory = "picture" | "video" | "music" | "tools" | "background";
+export type JobCategory = "picture" | "video" | "music" | "tools" | "coding" | "background";
 export interface ScoreJob { id: string; personId: string; category: JobCategory; state: "queued" | "running"; createdAt: number; adminBoost?: number; childDailyCapReached?: boolean }
 export interface ScorePolicy {
   classWeights: Record<JobCategory, number>;
@@ -8,7 +8,7 @@ export interface ScorePolicy {
   maxWaitBeforeAgingMinutes?: Partial<Record<JobCategory, number>>;
 }
 export const DEFAULT_POLICY: ScorePolicy = {
-  classWeights: { picture: 60, video: 40, music: 30, tools: 20, background: 5 },
+  classWeights: { picture: 60, video: 40, music: 30, tools: 20, coding: 20, background: 5 },
   agingPerMinute: 1,
   fairShareMax: 20,
   maxConcurrentPerPerson: 1,

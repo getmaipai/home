@@ -4,7 +4,7 @@ export type JobQueueKind = "picture" | "video" | "song";
 export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "memory_stopped_failure" | "started"
-  | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
+  | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room" | "coding.max_sessions" | "coding.person.max_sessions"
   | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "aged_guard" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
@@ -67,6 +67,15 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
   },
   tier_ask: { adult: "It is not ready right now. Pick below.", child: "Waiting for a grown-up to say yes." },
   tier_no_room: { adult: "Waiting for its turn.", child: "Waiting for its turn." },
+  // CODE-TIER-03: admission reasons for a Code session turn over a cap. What it waits for and what to do; no counts, titles or paths for people.
+  "coding.max_sessions": {
+    adult: "Too many code sessions are running at once. This one starts by itself when another finishes, or tap Cancel.",
+    child: "Waiting for its turn.",
+  },
+  "coding.person.max_sessions": {
+    adult: "You already have the most code sessions running that you can. This one starts when one of yours finishes, or tap Cancel.",
+    child: "Waiting for its turn.",
+  },
   quiet_wait: { adult: "Waiting for a quiet moment in chat.", child: "Waiting for a quiet moment." },
   profile_lowered: { adult: "Waiting for another job to finish. It starts by itself, or tap Cancel.", child: "Waiting for another job to finish." },
   cooldown_wait: { adult: "Chat just returned to normal. Your job starts in a few minutes, or tap Cancel.", child: "Your job starts in a few minutes." },

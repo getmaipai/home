@@ -2,6 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { JOB_QUEUE_COPY, jobQueueCopy, type JobQueueReason, type JobQueueState } from "@/lib/jobQueueCopy";
 
 describe("job queue copy", () => {
+  test("coding admission reasons say what to do and show no counts or paths", () => {
+    for (const reason of ["coding.max_sessions", "coding.person.max_sessions"] as const) {
+      for (const audience of ["adult", "child"] as const) {
+        const line = jobQueueCopy("queued", reason, 2, 60, audience);
+        expect(line).toBe(JOB_QUEUE_COPY[reason][audience]);
+        expect(line).not.toMatch(/[—!\d/]/);
+      }
+      expect(jobQueueCopy("queued", reason, null, null, "adult")).toMatch(/starts/);
+    }
+  });
+
   test("every table entry has adult and child wording without prohibited punctuation", () => {
     for (const [reason, lines] of Object.entries(JOB_QUEUE_COPY)) {
       expect(lines.adult, reason).toBeString();

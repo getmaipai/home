@@ -7,6 +7,8 @@ import { setQueuePolicySource } from "./householdQueue";
 import { getHouseholdSettingValue } from "@/lib/settings";
 
 const KINDS = [["image", "picture"], ["video", "video"], ["music", "music"]] as const satisfies readonly (readonly [string, JobCategory])[];
+/** Kinds with their own strict and max-wait settings: the three above plus Code session turns (weight 20, as tools; its place in `resources.priority` is not reorderable yet). */
+const SETTING_KINDS = [...KINDS, ["coding", "coding"]] as const satisfies readonly (readonly [string, JobCategory])[];
 /** Added to a strict kind's class weight: larger than any gap between the ordinary weights plus aging and fair share. */
 export const STRICT_BONUS = 1000;
 
@@ -18,7 +20,7 @@ export function queuePolicyFromSettings(read: (key: string) => unknown): ScorePo
   const ordered = KINDS.map(([, category]) => category).sort((a, b) => (importance[b] ?? 0) - (importance[a] ?? 0) || KINDS.findIndex(([, c]) => c === a) - KINDS.findIndex(([, c]) => c === b));
   if (KINDS.every(([, category]) => importance[category] !== undefined)) ordered.forEach((category, index) => { classWeights[category] = slots[index]!; });
   const maxWaitBeforeAgingMinutes: Partial<Record<JobCategory, number>> = {};
-  for (const [kind, category] of KINDS) {
+  for (const [kind, category] of SETTING_KINDS) {
     if (read(`resources.strict.${kind}`) === true) classWeights[category] += STRICT_BONUS;
     const wait = read(`resources.max_wait_before_aging.${kind}`);
     if (typeof wait === "number" && Number.isFinite(wait) && wait > 0) maxWaitBeforeAgingMinutes[category] = wait;

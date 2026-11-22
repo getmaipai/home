@@ -15,6 +15,15 @@ beforeEach(() => { resetDb(); resetTierStateForTests(); wireQueuePolicy(); });
 afterEach(() => { setQueuePolicySource(null); });
 
 describe("queuePolicyFromSettings", () => {
+  test("coding keeps weight 20 whatever the priority order, and takes strict and max-wait settings", () => {
+    const reordered = queuePolicyFromSettings((key) => key === "resources.priority" ? '["chat","music","video","image"]' : undefined);
+    expect(reordered.classWeights.coding).toBe(20);
+    const strict = queuePolicyFromSettings((key) => ({ "resources.strict.coding": true, "resources.max_wait_before_aging.coding": 5 })[key]);
+    expect(strict.classWeights.coding).toBe(20 + 1000);
+    expect(strict.maxWaitBeforeAgingMinutes).toEqual({ coding: 5 });
+    expect(strict.classWeights.picture).toBe(60);
+  });
+
   test("the shipped settings give exactly the shipped policy", () => {
     const policy = queuePolicyFromSettings(() => undefined);
     expect(policy.classWeights).toEqual(DEFAULT_POLICY.classWeights);
