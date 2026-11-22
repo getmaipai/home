@@ -41,6 +41,13 @@ describe("the Code package", () => {
     setHouseholdSettingValue("coding.enabled", false);
     expect(appVisibleTo(actor, manifest())).toBe(false);
   });
+  test("a teen with an admin grant sees it, and a teen without one does not", async () => {
+    const { createGrant } = await import("@/lib/grants");
+    const withGrant = person("teen"); const without = person("teen");
+    expect(createGrant({ id: actor.id, role: "owner" }, { person: withGrant.id, action: "use:code", effect: "allow" }).ok).toBe(true);
+    expect(appVisibleTo(withGrant, manifest())).toBe(true);
+    expect(appVisibleTo(without, manifest())).toBe(false);
+  });
   test("a person without the use:code pass does not see it", () => {
     setHouseholdSettingValue("coding.adults_by_default", false);
     expect(appVisibleTo(person("teen"), manifest())).toBe(false);

@@ -39,6 +39,24 @@ describe("Changes", () => {
     expect(out.files.map((f) => [f.path, f.binary])).toEqual([["bin.dat", true], ["src/a.ts", false]]);
     expect(out.diff).toContain("+export const a = 1;");
   });
+  test("uncommitted edits, new files and deletions show too, and the agent's own repository is left untouched", async () => {
+    const { a, s, ws } = await ready();
+    writeFileSync(join(ws, "src", "a.ts"), "export const a = 2;\n");   // edit of a committed file
+    writeFileSync(join(ws, "fresh.txt"), "brand new\n");              // untracked
+    mkdirSync(join(ws, "node_modules")); writeFileSync(join(ws, "node_modules", "skip.js"), "x");
+    const before = git(ws, "status", "--porcelain");
+    const out = await sessionChanges(a, s.id);
+    expect(out.files.map((f) => f.path).sort()).toEqual(["bin.dat", "fresh.txt", "src/a.ts"]);
+    expect(out.diff).toContain("+brand new");
+    expect(out.diff).toContain("+export const a = 2;");
+    expect(out.diff).not.toContain("skip.js");
+    expect(git(ws, "status", "--porcelain")).toBe(before);
+  });
+  test("a credential in an uncommitted file is removed from the diff", async () => {
+    const { a, s, ws } = await ready();
+    writeFileSync(join(ws, "env.txt"), "key " + "maipai_" + "a1B2".repeat(6) + "\n");
+    expect((await sessionChanges(a, s.id)).diff).not.toContain("maipai_a1B2");
+  });
   test("a git hook the agent planted does not run while the diff is read", async () => {
     const { a, s, ws } = await ready();
     const mark = join(base, "ran"); mkdirSync(join(ws, ".git", "hooks"), { recursive: true }); writeFileSync(join(ws, ".git", "hooks", "post-checkout"), `#!/bin/sh\ntouch ${mark}\n`, { mode: 0o755 });

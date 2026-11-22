@@ -234,10 +234,36 @@ export async function pushSessionBranch(input: PushInput): Promise<void> {
   } finally { await fs.rm(copy, { recursive: true, force: true }); }
 }
 
-/** CODE-APP-01: the Changes tab. The session's committed work against its base branch, read from a clean copy the hub makes (hooks, filters, monitors and the folder's own settings
- * off, no textconv or external diff), never by running git inside the workspace. Output is capped; a binary file shows in the list without a body. */
+/** CODE-APP-01: the Changes tab: what a person reviews before Push. The diff is the session's base branch against the workspace as it is now, uncommitted edits and new files
+ * included, computed in a clean copy the hub makes (the base's objects fetched from the workspace's repository, the working files copied without any `.git`, links, `node_modules`
+ * or oversized files; hooks, filters, monitors and the folder's own settings off; no textconv or external diff). The agent's own `.git` is never written to or run. Output is
+ * capped; a binary file shows in the list without a body. */
 export interface BranchDiff { files: { path: string; additions: number; deletions: number; binary: boolean }[]; diff: string; truncated: boolean }
 export const DIFF_BODY_CAP = 200 * 1024;
+const COPY_MAX_FILE = 1024 * 1024;
+const COPY_MAX_TOTAL = 64 * 1024 * 1024;
+const COPY_MAX_ENTRIES = 20_000;
+const SKIP_DIRS = new Set([".git", "node_modules"]);
+
+async function copyWorkingFiles(from: string, to: string): Promise<void> {
+  let total = 0; let entries = 0;
+  const walk = async (rel: string): Promise<void> => {
+    for (const entry of await fs.readdir(path.join(from, rel), { withFileTypes: true })) {
+      if (SKIP_DIRS.has(entry.name) || entry.isSymbolicLink()) continue;
+      if (++entries > COPY_MAX_ENTRIES) throw new GitHostError("The workspace holds too many files for Home to compare. Remove generated files and try again.");
+      const at = path.join(rel, entry.name);
+      if (entry.isDirectory()) { await fs.mkdir(path.join(to, at), { recursive: true }); await walk(at); continue; }
+      if (!entry.isFile()) continue;
+      const info = await fs.lstat(path.join(from, at));
+      if (info.size > COPY_MAX_FILE) continue;
+      total += info.size;
+      if (total > COPY_MAX_TOTAL) throw new GitHostError("The workspace is larger than Home will compare. Remove generated files and try again.");
+      await fs.copyFile(path.join(from, at), path.join(to, at));
+    }
+  };
+  await walk("");
+}
+
 export async function diffBranchAgainstBase(input: { workspace: string; branch: string; baseBranch: string }): Promise<BranchDiff | null> {
   const { branch, baseBranch } = input;
   if (!BRANCH_PATTERN.test(branch) || branch.includes("..") || /[\s~^:?*\[\\]/.test(baseBranch) || baseBranch.includes("..") || baseBranch.startsWith("-")) return null;
@@ -248,16 +274,19 @@ export async function diffBranchAgainstBase(input: { workspace: string; branch: 
   const copy = await fs.mkdtemp(path.join(os.tmpdir(), "maipai-diff-"));
   try {
     if ((await runGit(["init", "--quiet", "--template=", copy])).code !== 0) throw new GitHostError("Home could not read the changes. Try again.");
-    const fetched = await runGit(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", git, `refs/heads/${baseBranch}:refs/heads/base`, `refs/heads/${branch}:refs/heads/work`],
-      { cwd: copy, allowFile: true, extraConfig: [["safe.directory", "*"]] });
+    const fetched = await runGit(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", git, `refs/heads/${baseBranch}:refs/heads/base`], { cwd: copy, allowFile: true, extraConfig: [["safe.directory", "*"]] });
     if (fetched.code !== 0) return { files: [], diff: "", truncated: false };
-    const flags = ["--no-color", "--no-ext-diff", "--no-textconv", "--no-renames"];
-    const stat = await runGit(["diff", ...flags, "--numstat", "refs/heads/base...refs/heads/work"], { cwd: copy });
+    if ((await runGit(["read-tree", "refs/heads/base"], { cwd: copy })).code !== 0) return { files: [], diff: "", truncated: false };
+    await copyWorkingFiles(input.workspace, copy);
+    // Only in the copy: stage everything (new files, edits and deletions) so the index equals the workspace as it is now.
+    if ((await runGit(["add", "-A", "--force", "--", "."], { cwd: copy })).code !== 0) throw new GitHostError("Home could not read the changes. Try again.");
+    const flags = ["--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--cached"];
+    const stat = await runGit(["diff", ...flags, "--numstat", "refs/heads/base"], { cwd: copy });
     const files = stat.stdout.split("\n").filter(Boolean).slice(0, 2000).map((line) => {
       const [add, del, ...rest] = line.split("\t");
       return { path: rest.join("\t"), additions: Number(add) || 0, deletions: Number(del) || 0, binary: add === "-" };
     });
-    const body = await runGit(["diff", ...flags, "-U3", "refs/heads/base...refs/heads/work"], { cwd: copy });
+    const body = await runGit(["diff", ...flags, "-U3", "refs/heads/base"], { cwd: copy });
     const truncated = body.stdout.length > DIFF_BODY_CAP;
     return { files, diff: truncated ? body.stdout.slice(0, DIFF_BODY_CAP) : body.stdout, truncated };
   } finally { await fs.rm(copy, { recursive: true, force: true }); }
