@@ -34393,6 +34393,130 @@
                     },
                     "pause_max_minutes": {
                       "type": "integer"
+                    },
+                    "notice": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "released_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "paused_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
                     }
                   },
                   "required": [
@@ -34404,7 +34528,10 @@
                     "waiters",
                     "holder_jobs",
                     "decision",
-                    "pause_max_minutes"
+                    "pause_max_minutes",
+                    "notice",
+                    "released_notice",
+                    "paused_notice"
                   ]
                 }
               }
@@ -34542,6 +34669,130 @@
                     },
                     "pause_max_minutes": {
                       "type": "integer"
+                    },
+                    "notice": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "released_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "paused_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
                     }
                   },
                   "required": [
@@ -34553,7 +34804,10 @@
                     "waiters",
                     "holder_jobs",
                     "decision",
-                    "pause_max_minutes"
+                    "pause_max_minutes",
+                    "notice",
+                    "released_notice",
+                    "paused_notice"
                   ]
                 }
               }
@@ -34691,6 +34945,130 @@
                     },
                     "pause_max_minutes": {
                       "type": "integer"
+                    },
+                    "notice": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "released_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "paused_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
                     }
                   },
                   "required": [
@@ -34702,7 +35080,10 @@
                     "waiters",
                     "holder_jobs",
                     "decision",
-                    "pause_max_minutes"
+                    "pause_max_minutes",
+                    "notice",
+                    "released_notice",
+                    "paused_notice"
                   ]
                 }
               }
@@ -34840,6 +35221,130 @@
                     },
                     "pause_max_minutes": {
                       "type": "integer"
+                    },
+                    "notice": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "released_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "paused_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
                     }
                   },
                   "required": [
@@ -34851,7 +35356,10 @@
                     "waiters",
                     "holder_jobs",
                     "decision",
-                    "pause_max_minutes"
+                    "pause_max_minutes",
+                    "notice",
+                    "released_notice",
+                    "paused_notice"
                   ]
                 }
               }
@@ -35366,6 +35874,130 @@
                     },
                     "pause_max_minutes": {
                       "type": "integer"
+                    },
+                    "notice": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "released_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
+                    },
+                    "paused_notice": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "holder_idle",
+                            "holder_waiting",
+                            "paused",
+                            "released",
+                            "waiter",
+                            "waiter_pinned"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "more": {
+                          "type": "string"
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "keep",
+                              "lower",
+                              "pause",
+                              "resume",
+                              "standard_now"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "more",
+                        "actions"
+                      ]
                     }
                   },
                   "required": [
@@ -35377,7 +36009,10 @@
                     "waiters",
                     "holder_jobs",
                     "decision",
-                    "pause_max_minutes"
+                    "pause_max_minutes",
+                    "notice",
+                    "released_notice",
+                    "paused_notice"
                   ]
                 }
               }

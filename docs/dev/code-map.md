@@ -167,7 +167,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/chatHeaderBar.tsx` | ChatHeaderBar |
 | `frontend/src/apps/chat/chatHeaderData.tsx` | ChatHeaderDataProvider, useChatHeaderData, useSetChatHeaderData |
 | `frontend/src/apps/chat/chatProjects.tsx` | chatFoldersQueryKey, useChatProjects |
-| `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ChatComposerNotice, ChatMessageQueue, ComposerTrailingWithThinkingMode |
+| `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ComposerEngage, ChatComposerNotice, ChatMessageQueue |
 | `frontend/src/apps/chat/chatToolUis.tsx` | SpecSheetToolRender, ArtifactCardToolRender, ProducedArtifactCard, ConfirmToolRender, AskToolRender, ProjectFinishedArtifact |
 | `frontend/src/apps/chat/companionComposerMentions.tsx` | CompanionComposerMentions |
 | `frontend/src/apps/chat/composerAddMenu.tsx` | unwiredControlsAreEnabled, __setUnwiredControlsForTests, PackageScopeContext, AudioUploadsContext, PhotoUploadsContext, attachmentAddErrorMessage |
@@ -443,6 +443,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/reader/SearchBox.tsx` | ReaderSearchBox |
 | `frontend/src/shell/reader/SearchResults.tsx` | SearchResults |
 | `frontend/src/shell/sessionLockContext.tsx` | useSessionLocked, SessionLockGate |
+| `frontend/src/shell/tierLease/TierLeaseNotice.tsx` | TierLeaseNotice |
 | `frontend/src/shell/useAmbientCompanion.tsx` | useAmbientCompanion |
 | `frontend/src/shell/useSideChat.tsx` | SPOKEN_IDLE_NEW_CONVERSATION_MS, useSideChat |
 
@@ -1335,6 +1336,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
 | `backend/src/lib/tierLease/policy.ts` | ENGAGED_PROTECTION_MS, LEASE_REGISTRY, isLeaseKey, leaseKeyForCategory, NO_QUEUE_SIGNALS, graceMsFor |
+| `backend/src/lib/tierLeaseCopy.ts` | holderNotice, pausedNotice, releasedNotice, waiterNotice |
 | `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, MODEL_OF_CHOICE, copyLegacyIntoSlot, migrateTierSlots |
 | `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, writeSlotModel |
 | `backend/src/lib/timerStatus.ts` | timerStatusReply |
