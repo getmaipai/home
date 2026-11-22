@@ -12,7 +12,7 @@ export function ContextRing({ context }: { context: CodeContext | undefined }) {
     : i18n._({ id: "{used} tokens used", message: "{used} tokens used", values: { used: tokenWords(context.used_tokens) } });
   return <span data-slot="code-context" title={words} className="inline-flex items-center gap-1 text-body text-muted-foreground">
     <ProgressRing value={fraction ?? 0} size={18} strokeWidth={3} label={words} animated={false} tone={contextTone(fraction)} />
-    <span className="tabular-nums max-sm:sr-only" {...(contextTone(fraction) === "primary" ? { style: { color: contextInk(fraction) } } : {})}>{fraction === null ? tokenWords(context.used_tokens) : `${Math.round(fraction * 100)}%`}</span>
+    <span className="tabular-nums" {...(contextTone(fraction) === "primary" ? { style: { color: contextInk(fraction) } } : {})}>{fraction === null ? tokenWords(context.used_tokens) : `${Math.round(fraction * 100)}%`}</span>
   </span>;
 }
 

@@ -178,13 +178,15 @@ describe("the Code app page", () => {
     expect(document.querySelector('[data-slot="composer-input"], textarea.aui-composer-input')).toBeTruthy();
   });
 
-  test("the composer is Chat's: the same density, with the mode and level inside the pill, not a footer row", async () => {
+  test("the composer has Chat's density, with the mode, level and context ring in the footer row below it, not in the pill", async () => {
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
     const shell = document.querySelector('[data-slot="aui_composer-shell"]')!;
     expect(shell.getAttribute("data-density")).toBe(THREAD_SLOTS.composerDensity);
-    expect(document.querySelector('[data-slot="aui_composer-footer"]')).toBeNull();
-    await waitFor(() => expect(shell.querySelector('[data-slot="composer-quality"]')).toBeTruthy());
+    const footer = await waitFor(() => { const el = document.querySelector('[data-slot="aui_composer-footer"]'); if (!el) throw new Error("no footer"); return el; });
+    expect(footer.querySelector('[data-slot="composer-mode-pill"]')).toBeTruthy();
+    expect(shell.querySelector('[data-slot="composer-mode-pill"]')).toBeNull();
+    await waitFor(() => expect(footer.querySelector('[data-slot="composer-quality"]')).toBeTruthy());
   });
   test("adding a file goes through the composer's attachment adapter to the session's upload route", async () => {
     open("/apps/code/csess-abc123");
@@ -200,10 +202,10 @@ describe("the Code app page", () => {
   });
 
   // CODE-UI-01: Code and Chat share one composer, one density and one history column, so they cannot drift.
-  test("Code sets no density of its own and draws no composer or column config of its own", () => {
+  test("Code sets no density of its own and draws no composer density or column config of its own", () => {
     const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
     const code = ["./CodePage.tsx", "./SessionView.tsx", "./CodeThread.tsx", "./layout.tsx", "./NewSession.tsx"].map(read).join("\n");
-    expect(code).not.toMatch(/codeDensity|composerDensity:\s*"|emptyLayout|placement:\s*"footer"|--font-size-body|--spacing/);
+    expect(code).not.toMatch(/codeDensity|composerDensity:\s*"|emptyLayout|--font-size-body|--spacing/);
     const list = read("./SessionList.tsx");
     expect(list).toContain("useChatColumn");
     expect(list).toContain("chatColumnShortcutLabel");

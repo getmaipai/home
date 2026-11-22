@@ -33,6 +33,9 @@ The layout is still Claude Code on the web (rule S2: its layout, not its styling
 - **Changes, Files, Terminal, Plan** are tabs of the standard right pane, after the companion, which stays its first tab (S2). It opens when the person clicks a file, a diff card or a
   command, and can be pinned. This replaces the note's custom right panel.
 - **Composer.** The shipped `composer-parts`, the `message-queue` above it, and the one status line under it (rule S6).
+  Chat's density, but the permission mode, the level chip and the context ring sit in the quiet footer row below the composer
+  (`composerModes.placement: "footer"`, one `codeComposerModes` for the session view and New session), not inside the pill. Owner reversal,
+  2026-11-22, of the earlier "inside the pill, as in Chat" choice.
 - **A held turn** (queued, or Max not free) shows the kit `pending-actions` row, which carries "Use Standard for this message".
 - **Approvals.** The agent's actions get effect classes and go through the tool brake like every other tool. Ask shows the kit
   `approval-card`; a finished action that can be undone shows the `confirmation` receipt, and its Undo restores the checkpoint. No second

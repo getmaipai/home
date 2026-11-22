@@ -1,6 +1,6 @@
 // CODE-COMPOSER: the session's transcript and composer are the kit's shared Thread (the one chat, Create and projects mount), on an external-store runtime fed by
 // the hub's transcript. The kit draws the composer, the + files menu, drag and drop, attachment chips and the Quality chip (the level control); this file only
-// passes data and fills the kit's own slots: ComposerQueue (held request cards, the waiting line, failures), ComposerNotice (the status line), ComposerExtraEnd
+// passes data and fills the kit's own slots: ComposerQueue (held request cards, the waiting line, failures), ComposerNotice (the status line), ComposerFooterEnd
 // (the context ring) and ToolFallback (commands, file changes, approvals). Nothing is wrapped or restyled.
 import { i18n } from "@lingui/core";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
@@ -122,8 +122,8 @@ const Queue = () => {
 const Notice = () => { const s = useState_(); const readiness = useContext(ChatComposerNoticeContext); return readiness ? <ChatComposerNotice /> : <span data-slot="code-status">{s.statusLine}{s.onEngage ? <ComposerEngage onEngage={s.onEngage} /> : null}</span>; };
 const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex shrink-0 items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
-// The density is Chat's, read from its one definition (THREAD_SLOTS), so a change there moves both. The mode and level controls stay inside the pill, as in Chat.
-const THREAD_COMPONENTS = { composerDensity: THREAD_SLOTS.composerDensity, ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, composerNoticeLayout: "wrap" as const, ComposerExtraEnd: ExtraEnd, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
+// The density is Chat's, read from its one definition (THREAD_SLOTS), so a change there moves both. The mode, level and context ring sit in the quiet footer row below the composer (owner reversal, 2026-11-22).
+const THREAD_COMPONENTS = { composerDensity: THREAD_SLOTS.composerDensity, ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, composerNoticeLayout: "wrap" as const, ComposerFooterEnd: ExtraEnd, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 
 /** The composer's mode pill and level chip, one definition for the session view and the New session page so they cannot drift. */
 export function codeComposerModes({ mode, onMode, tier, tiers, onTier }: { mode: CodeSession["mode"]; onMode: (mode: CodeSession["mode"]) => void; tier: CodeTier; tiers: readonly CodeTier[]; onTier: (tier: CodeTier) => void }): ThreadComposerModes {
@@ -135,7 +135,7 @@ export function codeComposerModes({ mode, onMode, tier, tiers, onTier }: { mode:
   ];
   const quality: ComposerQualityData = { value: tier, onValueChange: (v) => onTier(v as CodeTier), options: tiers.map((t) => ({ value: t, label: tierWord(t) })), band: "adult", label: i18n._({ id: "Level", message: "Level" }) };
   // One tier on offer is no choice, so the chip is left out.
-  return { modes, mode, onModeChange: (id) => onMode(id as CodeSession["mode"]), ...(tiers.length > 1 ? { quality } : {}) };
+  return { modes, mode, placement: "footer" as const, onModeChange: (id) => onMode(id as CodeSession["mode"]), ...(tiers.length > 1 ? { quality } : {}) };
 }
 
 export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tree }: {
