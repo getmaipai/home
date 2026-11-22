@@ -39,3 +39,28 @@ test("listing marks links and never follows them", async () => {
   expect(names.find((e) => e.name === "out")?.kind).toBe("link");
   expect(await listWorkspaceDir(root, "out").catch((e) => e)).toBeInstanceOf(WorkspacePathError);
 });
+
+import { execFileSync } from "node:child_process";
+import { appendFileSync, renameSync } from "node:fs";
+import { __setWorkspaceReadHooksForTests } from "@/lib/workspaceFs";
+
+test("a FIFO in the workspace is refused and does not hang the read", async () => {
+  execFileSync("mkfifo", [join(root, "pipe")]);
+  const result = await Promise.race([readWorkspaceFile(root, "pipe").catch((e) => e), new Promise((r) => setTimeout(() => r("HUNG"), 3000))]);
+  expect(result).toBeInstanceOf(WorkspacePathError);
+});
+
+test("a folder swapped for a link between the check and the open is refused", async () => {
+  mkdirSync(join(outside, "src"), { recursive: true }); writeFileSync(join(outside, "src", "a.txt"), "TOP SECRET");
+  __setWorkspaceReadHooksForTests({ beforeOpen: () => { renameSync(join(root, "src"), join(root, "src-moved")); symlinkSync(join(outside, "src"), join(root, "src")); } });
+  try {
+    const err = await readWorkspaceFile(root, "src/a.txt").catch((e) => e);
+    expect(err).toBeInstanceOf(WorkspacePathError);
+  } finally { __setWorkspaceReadHooksForTests({}); }
+});
+
+test("the read is bounded by maxBytes even when the file grows after the size check", async () => {
+  __setWorkspaceReadHooksForTests({ afterStat: () => appendFileSync(join(root, "src", "a.txt"), "x".repeat(5000)) });
+  try { expect(await readWorkspaceFile(root, "src/a.txt", 100).catch((e) => e)).toBeInstanceOf(WorkspacePathError); }
+  finally { __setWorkspaceReadHooksForTests({}); }
+});

@@ -4,7 +4,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { gitConnections } from "@/db/schema";
+import { gitConnections, people } from "@/db/schema";
 import { newGitConnectionId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
@@ -17,6 +17,8 @@ export type GitConnectionKind = "github" | "gitea";
 export type GitConnectionStatus = "active" | "expired" | "revoked" | "failing";
 type Row = typeof gitConnections.$inferSelect;
 
+/** What a revoked connection keeps in place of its host and account: the record stays (spec shape), the details do not. */
+const REMOVED = "removed";
 export const GITHUB_HOST = "github.com";
 const GITHUB_API = "https://api.github.com/user";
 const HOST_PATTERN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?$/;
@@ -130,7 +132,7 @@ export function listGitConnectionsForAdmin(person: Pick<PersonRow, "id">): GitCo
 /** Revokes one connection and wipes the stored token. True when the person had it. Used for the person and, with the target's id, for an admin. */
 export function revokeGitConnection(personId: string, id: string): boolean {
   const at = new Date().toISOString();
-  return db.update(gitConnections).set({ revokedAt: at, status: "revoked", tokenEncrypted: "", updatedAt: at, hlc: nextHlc() })
+  return db.update(gitConnections).set({ revokedAt: at, status: "revoked", tokenEncrypted: "", host: REMOVED, account: REMOVED, provenance: "Revoked", lastCheckedAt: null, expiresAt: null, updatedAt: at, hlc: nextHlc() })
     .where(and(eq(gitConnections.personId, personId), eq(gitConnections.id, id))).returning({ id: gitConnections.id }).all().length > 0;
 }
 export function revokeAllGitConnections(personId: string): number {
@@ -151,5 +153,8 @@ export interface GitCredential { id: string; kind: GitConnectionKind; host: stri
 export function gitCredentialFor(personId: string, id: string): GitCredential | null {
   const row = db.select().from(gitConnections).where(and(eq(gitConnections.personId, personId), eq(gitConnections.id, id))).get();
   if (!row || statusOf(row) !== "active" || !row.tokenEncrypted) return null;
+  // Admission is read NOW, every call: a disabled person, a removed grant, Coding turned off or paused ends use at once.
+  const owner = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
+  if (!owner || gitConnectionRefusal(owner)) return null;
   return { id: row.id, kind: row.kind, host: row.host, account: row.account, token: decryptSecret(row.tokenEncrypted) };
 }

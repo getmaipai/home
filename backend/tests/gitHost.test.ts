@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, chmodSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { __allowFileRemotesForTests, __observeGitForTests, cloneIntoWorkspace, gitChildConfig, LFS_REFUSAL, pushSessionBranch, remoteUrlFor, SUBMODULE_REFUSAL, GitHostError } from "@/lib/gitHost";
+import { ATTRIBUTES_LIMIT, ATTRIBUTES_TOO_BIG, CREDENTIAL_HELPER, setMaxRepoBytes, DEFAULT_MAX_REPO_BYTES, __allowFileRemotesForTests, __observeGitForTests, cloneIntoWorkspace, gitChildConfig, LFS_REFUSAL, pushSessionBranch, remoteUrlFor, SUBMODULE_REFUSAL, GitHostError } from "@/lib/gitHost";
 import type { GitCredential } from "@/lib/gitConnections";
 
 const TOKEN = "gho_SUPERSECRETTOKEN123456";
@@ -117,4 +117,37 @@ test("the token reaches git only through the child's environment: never argv, ne
   expect(Object.fromEntries(config)["core.hooksPath"]).toBe("/dev/null"); expect(Object.fromEntries(config)["core.fsmonitor"]).toBe("false");
   expect(Object.fromEntries(config)["protocol.file.allow"]).toBe("never");
   logs.forEach((s) => s.mockRestore());
+});
+
+test("the credential helper answers only for the connection's own host over https", () => {
+  const ask = (stdin: string) => execFileSync("sh", ["-c", `${CREDENTIAL_HELPER.slice(1)} get`], { input: stdin, encoding: "utf8", env: { PATH: "/usr/bin:/bin", MAIPAI_GIT_USER: "x-access-token", MAIPAI_GIT_TOKEN: TOKEN, MAIPAI_GIT_HOST: "github.com" } });
+  expect(ask("protocol=https\nhost=github.com\n\n")).toContain(`password=${TOKEN}`);
+  for (const other of ["protocol=https\nhost=evil.example.com\n\n", "protocol=https\nhost=github.com.evil.example.com\n\n", "protocol=http\nhost=github.com\n\n", "host=github.com\n\n"]) expect(ask(other)).not.toContain(TOKEN);
+  expect(Object.fromEntries(gitChildConfig({ token: true }))["http.followRedirects"]).toBe("false");
+});
+
+test("a workspace repository with an alternates file or any link inside .git is refused before anything is read", async () => {
+  makeRemote(); await open(); commit();
+  mkdirSync(join(ws, ".git", "objects", "info"), { recursive: true });
+  writeFileSync(join(ws, ".git", "objects", "info", "alternates"), "/etc\n");
+  const a = await push().catch((e) => e); expect(a).toBeInstanceOf(GitHostError); expect(a.message).toContain("alternates");
+  rmSync(join(ws, ".git", "objects", "info", "alternates"));
+  writeFileSync(join(base, "x"), ""); rmSync(join(ws, ".git", "objects", "pack"), { recursive: true, force: true });
+  mkdirSync(join(base, "elsewhere")); symlinkSync(join(base, "elsewhere"), join(ws, ".git", "objects", "pack"));
+  const b = await push().catch((e) => e); expect(b).toBeInstanceOf(GitHostError); expect(b.message).toContain("link");
+  expect(remoteBranches()).toEqual(["refs/heads/main"]);
+});
+
+test("a repository over the size limit is refused", async () => {
+  makeRemote(); await open(); commit();
+  setMaxRepoBytes(2000);
+  try { const err = await push().catch((e) => e); expect(err).toBeInstanceOf(GitHostError); expect(err.message).toContain("larger than Home will push"); }
+  finally { setMaxRepoBytes(DEFAULT_MAX_REPO_BYTES); }
+  await push(); // under the default it goes
+});
+
+test("an oversized .gitattributes is refused with a plain message, not half-read", async () => {
+  makeRemote(); await open();
+  writeFileSync(join(ws, ".gitattributes"), "# pad\n".repeat(Math.ceil(ATTRIBUTES_LIMIT / 6) + 10) + "*.bin filter=lfs\n"); git(ws, "add", "-A"); git(ws, "commit", "-m", "big attrs");
+  expect((await push().catch((e) => e)).message).toBe(ATTRIBUTES_TOO_BIG);
 });

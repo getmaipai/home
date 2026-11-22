@@ -27,15 +27,36 @@ export async function resolveInsideWorkspace(root: string, relative: string): Pr
   return real;
 }
 
-/** Reads a regular file inside the workspace, at most `maxBytes`. O_NOFOLLOW closes the gap between the check and the open. */
+let hooks: { beforeOpen?: () => void; afterStat?: () => void } = {};
+/** Tests only: runs code at the points an attacker's race would land (after the path check, after the size check). */
+export function __setWorkspaceReadHooksForTests(next: typeof hooks): void { hooks = next; }
+
+const LEAVES = "That path changed while Home was opening it, so Home did not read it. Try again.";
+
+/** Reads a regular file inside the workspace, at most `maxBytes`. O_NOFOLLOW stops a final link, O_NONBLOCK stops a pipe from hanging the open,
+ * and after the open the real path is checked again against the real root and against the opened file's identity (a folder swapped for a link
+ * between the check and the open lands outside and is refused). The read itself is bounded by `maxBytes`, whatever the size was a moment ago. */
 export async function readWorkspaceFile(root: string, relative: string, maxBytes = 1_048_576): Promise<Buffer> {
   const real = await resolveInsideWorkspace(root, relative);
-  const handle = await fs.open(real, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => { throw new WorkspacePathError("That path is a link, and Home does not follow links in a workspace. Open the real file instead."); });
+  const realRoot = await fs.realpath(root);
+  hooks.beforeOpen?.();
+  const handle = await fs.open(real, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch(() => { throw new WorkspacePathError("That path is a link, and Home does not follow links in a workspace. Open the real file instead."); });
   try {
     const info = await handle.stat();
-    if (!info.isFile()) throw new WorkspacePathError("That path is not a file. Choose a file inside the workspace.");
+    if (!info.isFile()) throw new WorkspacePathError("That path is not a regular file. Choose a file inside the workspace.");
+    const again = await fs.realpath(real).catch(() => { throw new WorkspacePathError(LEAVES); });
+    const now = await fs.stat(again).catch(() => { throw new WorkspacePathError(LEAVES); });
+    if (!inside(realRoot, again) || now.ino !== info.ino || now.dev !== info.dev) throw new WorkspacePathError(LEAVES);
     if (info.size > maxBytes) throw new WorkspacePathError("That file is too large to open here. Choose a smaller file.");
-    return await handle.readFile();
+    hooks.afterStat?.();
+    const buffer = Buffer.alloc(maxBytes + 1); let filled = 0;
+    while (filled < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, filled);
+      if (bytesRead === 0) break;
+      filled += bytesRead;
+    }
+    if (filled > maxBytes) throw new WorkspacePathError("That file is too large to open here. Choose a smaller file.");
+    return Buffer.from(buffer.subarray(0, filled));
   } finally { await handle.close(); }
 }
 

@@ -5,10 +5,13 @@ import { db } from "@/db";
 import { gitConnections, people, sessions } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newPersonId } from "@/lib/id";
-import { createGitConnection, gitCredentialFor, GitConnectionError, listGitConnections, listGitConnectionsForAdmin, markGitConnectionFailing, revokeGitConnection } from "@/lib/gitConnections";
+import { revokeAllGitConnections, createGitConnection, gitCredentialFor, GitConnectionError, listGitConnections, listGitConnectionsForAdmin, markGitConnectionFailing, revokeGitConnection } from "@/lib/gitConnections";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { settingsRoutes } from "@/routes/settings";
 import { __setMissingCodingPieceForTests } from "@/lib/stackCodingPieces";
+import { invalidatePass } from "@/lib/filter/passCache";
+import { grants } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
 
@@ -132,4 +135,26 @@ test("POST validates the body and refuses a person without Coding access with a 
   expect(text).toContain("Coding"); expect(text).not.toContain(TOKEN);
   expect((await app.request("http://localhost/api/settings/git-connections", { method: "POST", headers: h, body: JSON.stringify({ kind: "svn", token: TOKEN }) })).status).toBe(400);
   expect(calls).toHaveLength(0);
+});
+
+test("the token is released only while the person is still admitted: disabled person, denied grant, Coding off or paused each end use", async () => {
+  const p = person("adult"); const made = await createGitConnection(p, { kind: "github", token: TOKEN }, deps());
+  expect(gitCredentialFor(p.id, made.id)?.token).toBe(TOKEN);
+  const at = new Date().toISOString();
+  db.insert(grants).values({ id: "grant-deny0001", person: p.id, action: "use:code", effect: "deny", grantedByPersonId: p.id, createdAt: at, updatedAt: at, hlc: nextHlc() }).run();
+  invalidatePass(p.id); expect(gitCredentialFor(p.id, made.id)).toBeNull();
+  db.delete(grants).where(eq(grants.id, "grant-deny0001")).run(); invalidatePass(p.id);
+  expect(gitCredentialFor(p.id, made.id)?.token).toBe(TOKEN);
+  setHouseholdSettingValue("coding.paused", true); expect(gitCredentialFor(p.id, made.id)).toBeNull(); setHouseholdSettingValue("coding.paused", false);
+  setHouseholdSettingValue("coding.enabled", false); expect(gitCredentialFor(p.id, made.id)).toBeNull(); setHouseholdSettingValue("coding.enabled", true);
+  db.update(people).set({ enabled: false }).where(eq(people.id, p.id)).run(); invalidatePass(p.id);
+  expect(gitCredentialFor(p.id, made.id)).toBeNull();
+});
+
+test("revoking blanks the host, account and provenance, also when a person's connections are all revoked (delete, memorialize)", async () => {
+  const p = person(); await createGitConnection(p, { kind: "gitea", host: "git.example.com", token: TOKEN }, deps(fakeHost("willow")));
+  expect(revokeAllGitConnections(p.id)).toBe(1);
+  const row = db.select().from(gitConnections).get()!;
+  expect(row.tokenEncrypted).toBe(""); expect(JSON.stringify(row)).not.toContain("git.example.com"); expect(JSON.stringify(row)).not.toContain("willow");
+  expect(row.provenance).not.toContain("token"); expect(row.lastCheckedAt).toBeNull();
 });

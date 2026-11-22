@@ -30,6 +30,7 @@ export const HLC_BEARING_TABLES = [
   "added_models",
   "loras",
   "api_keys",
+  "git_connections",
   "memory_records",
   "memory_embeddings",
   "episodes",
