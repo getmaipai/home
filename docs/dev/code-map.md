@@ -193,8 +193,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/code/NewSession.tsx` | CODE_TIERS_KEY, CODE_SESSIONS_KEY, tierOptions, NewSession |
 | `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, sessionItems, CodeSidebar |
 | `frontend/src/apps/code/SessionTabs.tsx` | ChangesTab, FilesTab, TerminalTab, PlanTab |
-| `frontend/src/apps/code/SessionView.tsx` | CODE_DENSITY, SessionView |
-| `frontend/src/apps/code/layout.tsx` | Stack |
+| `frontend/src/apps/code/SessionView.tsx` | SessionView |
+| `frontend/src/apps/code/layout.tsx` | Stack, codeDensity |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |
 | `frontend/src/apps/people/FaceEnrollmentBody.tsx` | canViewFaceEnrollment, FaceEnrollmentBody |
@@ -560,7 +560,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingRedact.ts` | REDACTED, redactCredentials, redactDeep |
 | `backend/src/lib/codingRuntime.ts` | mintSessionKeyFor, startCodingRuntime |
 | `backend/src/lib/codingSandbox.ts` | SandboxClientError, gatewayPortBody, sandboxIdOf, createStackSandbox |
-| `backend/src/lib/codingSandboxListener.ts` | sandboxBridgeAddress, sandboxBridgePort, inBridgeNetwork, guardSandboxRequest, configureSandboxListener, ensureSandboxListener |
+| `backend/src/lib/codingSandboxListener.ts` | sandboxBridgeAddress, sandboxBridgePort, inBridgeNetwork, guardSandboxRequest, sandboxListenerFailure, configureSandboxListener |
 | `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess, getSessionRow |
 | `backend/src/lib/codingShare.ts` | setSecretScanner, codingWorkspaceRoot, __setWorkspaceRootForTests, codingWorkspace, handWorkspaceToEngine, __setShareRemoteForTests |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
