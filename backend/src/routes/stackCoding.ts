@@ -10,7 +10,7 @@ import { CodingPieceError, installCodingPiece, listCodingPieces, removeCodingPie
 
 export const stackCodingRoutes = apiRouter();
 
-const PieceId = z.enum(["engine", "model", "draft", "heavy_model", "heavy_draft"]);
+const PieceId = z.enum(["engine", "model", "draft"]);
 const PieceSchema = z.object({
   id: PieceId, name: z.string().describe("What the Stack runs or stores: splash, llama-server or the model id."), label: z.string(), summary: z.string(),
   state: z.enum(["installed", "installing", "notInstalled", "failed", "unsupported"]),

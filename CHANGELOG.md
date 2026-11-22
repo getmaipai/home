@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Removed
+- The Ornith 1.5 122B heavy coding model and its draft are gone from Settings, Coding and the setup step; the Stack retired them and decides Max coding itself.
+
 ### Added
 - `generate_video` can target an owned Production shot, use its saved picture as the start frame, and record the finished Library clip on that shot.
 

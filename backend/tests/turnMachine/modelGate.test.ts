@@ -132,7 +132,7 @@ describe("runTurnNext: the model gate on the wire", () => {
     expect(thinking).toBe(false);
   });
 
-  test("a child's turn on the Home coding model keeps no tools and thinking off", async () => {
+  test("a child's turn on a retired saved model id (an old Ornith id) keeps no tools, thinking off and no error", async () => {
     (await import("@/lib/pictures/ready")).__setPictureStatusForTests(undefined);
     setHouseholdSettingValue("chat.model_id", "ornith-1-5-122b-mlx-4bit");
     const { toolCount, thinking } = await seen(people.child, "hi", { thinking: true });

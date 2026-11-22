@@ -1,3 +1,5 @@
+> History (2026-11-21): the Ornith 1.5 122B model described here was retired by the owner. This note records the original design, not current behaviour; see `docs/dev/coding-mode.md`.
+
 # Home mode: Normal and Optimized for coding (2026-10-22)
 
 > **Superseded in part (2026-10-27):** [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) replaces the household switch `coding.home_mode` with a Max chat lease (no mode switch); the readiness record, swap transaction and rollback here are reused. Retired in TIER-HOME-05, after TIER-EVAL-05.

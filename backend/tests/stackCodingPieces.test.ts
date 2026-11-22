@@ -39,7 +39,7 @@ const fake: CodingStack = {
   roles: async () => { if (world.down) throw new StackComponentError(503, "unreachable", "x"); return world.roles; },
   engines: async () => world.engines,
   models: async () => world.models,
-  catalog: async () => [{ id: MODEL, role: "coding", download: { approx_bytes: 16_464_440_224 } }, { id: DRAFT, role: "coding", component: "draft", download: { approx_bytes: 3_848_819_135 } }, { id: "ornith-1-5-122b-mlx-4bit", role: "coding", download: { approx_bytes: 69_600_000_000 } }, { id: "ornith-1-5-122b-dflash2-draft", role: "coding", component: "draft", download: { approx_bytes: 1_900_000_000 } }, { id: "chat-a", role: "chat" }],
+  catalog: async () => [{ id: MODEL, role: "coding", download: { approx_bytes: 16_464_440_224 } }, { id: DRAFT, role: "coding", component: "draft", download: { approx_bytes: 3_848_819_135 } }, { id: "chat-a", role: "chat" }],
   jobs: async () => world.jobs,
   components: async () => world.components,
   tier: async () => world.tier,
@@ -71,27 +71,14 @@ describe("the list", () => {
     expect(body.pieces[1]).toMatchObject({ size_bytes: 16_464_440_224, can_remove: true });
     expect(body.pieces[2]).toMatchObject({ size_bytes: 3_848_819_135, can_install: false, can_remove: false, remove_block: "It is removed with the coding model." });
   });
-  test("the heavy pair is visible only on p128, and each piece uses its Stack component state", async () => {
+  test("p128 shows the same three pieces as p64, and a retired heavy id is not a piece", async () => {
     const { client } = await owner();
-    world.tier = "p128";
-    const heavyModel = component({ id: "ornith-1-5-122b-mlx-4bit", label: "Ornith 122B", summary: "The heavy coding model.", state: "notInstalled", size_bytes: null, download_bytes: 69_600_000_000, can_install: true, install_block: null, can_uninstall: false, uninstall_block: "It is not installed." });
-    const heavyDraft = component({ id: "ornith-1-5-122b-dflash2-draft", label: "Ornith draft", summary: "The heavy draft.", state: "notInstalled", size_bytes: null, download_bytes: 1_900_000_000, can_install: true, install_block: null, can_uninstall: true, uninstall_block: null });
-    world.components.push(heavyModel, heavyDraft);
-    world.models.push({ id: heavyModel.id, state: "notInstalled", sizeBytes: null }, { id: heavyDraft.id, state: "notInstalled", sizeBytes: null });
-    const body = await list(client);
-    expect(body.pieces.map(piece => piece.id)).toEqual(["engine","model","draft","heavy_model","heavy_draft"]);
-    expect(body.pieces[3]).toMatchObject({ name: heavyModel.id, state: "notInstalled", size_bytes: 69_600_000_000, can_install: true });
-    expect(body.pieces[4]).toMatchObject({ name: heavyDraft.id, state: "notInstalled", size_bytes: 1_900_000_000, can_install: true });
-    expect((await client.request("/api/coding/pieces/heavy_model/install", {method:"POST"})).status).toBe(202);
-    expect((await client.request("/api/coding/pieces/heavy_draft", {method:"DELETE"})).status).toBe(200);
-    expect(calls).toContain(`install-component:${heavyModel.id}`);
-    expect(calls).toContain(`remove-component:${heavyDraft.id}`);
-  });
-  test("p64 never exposes heavy pieces", async () => {
-    const { client } = await owner();
-    world.tier = "p64";
-    expect((await list(client)).pieces.map(piece => piece.id)).toEqual(["engine","model","draft"]);
-    expect((await client.request("/api/coding/pieces/heavy_model/install", {method:"POST"})).status).toBe(404);
+    for (const tier of ["p64", "p128"] as const) {
+      world.tier = tier;
+      expect((await list(client)).pieces.map(piece => piece.id)).toEqual(["engine","model","draft"]);
+    }
+    expect((await client.request("/api/coding/pieces/heavy_model/install", {method:"POST"})).status).toBe(400);
+    expect((await client.request("/api/coding/pieces/heavy_draft", {method:"DELETE"})).status).toBe(400);
   });
   test("on a computer that cannot run Splash the engine is the shared llama-server and has no draft", async () => {
     const { client } = await owner();
@@ -275,12 +262,12 @@ describe("the key store's view", () => {
 
 describe("missingFrom in coding mode", () => {
   const piece = (id: string, state: string, name = id) => ({ id, name, state }) as never;
-  test("the large model alone is enough, the small one is not required", async () => {
+  test("a missing coding model is reported even when a chat lease is held, and an old heavy piece never satisfies it", async () => {
     const { missingFrom } = await import("@/lib/stackCodingPieces");
     const pieces = [piece("engine", "installed", "splash"), piece("model", "notInstalled"), piece("heavy_model", "installed")];
     expect(missingFrom(pieces)).toContain("not installed");
     const { registerActiveChatLease } = await import("@/lib/chatLease");
     registerActiveChatLease({ snapshot: () => ({ state: "held" }) } as never);
-    try { expect(missingFrom(pieces)).toBeNull(); } finally { registerActiveChatLease(null); }
+    try { expect(missingFrom(pieces)).toContain("not installed"); } finally { registerActiveChatLease(null); }
   });
 });

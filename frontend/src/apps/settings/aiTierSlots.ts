@@ -93,7 +93,7 @@ export const familyNote = (): string => i18n._({ id: "Models in one family keep 
 export interface PickOption { id: string; label: string; description: string; blockedReason: string | null }
 export interface PickGroup { family: string; /** Null when the job's own list is shown with no family to name. */ heading: string | null; options: PickOption[] }
 
-const FAMILY_TITLE: Record<string, string> = { muse: "Muse", qwen3: "Qwen3", "qwen3.8": "Qwen3.8", ornith: "Ornith", "minimax-h3-image": "MiniMax H3-Image", ernie: "ERNIE", klein: "FLUX.2 Klein", "z-image": "Z-Image", wan: "Wan", ltx: "LTX", "ace-step": "ACE-Step", chatterbox: "Chatterbox", pocket: "Pocket" };
+const FAMILY_TITLE: Record<string, string> = { muse: "Muse", qwen3: "Qwen3", "qwen3.8": "Qwen3.8", "minimax-h3-image": "MiniMax H3-Image", ernie: "ERNIE", klein: "FLUX.2 Klein", "z-image": "Z-Image", wan: "Wan", ltx: "LTX", "ace-step": "ACE-Step", chatterbox: "Chatterbox", pocket: "Pocket" };
 const titleOf = (family: string) => FAMILY_TITLE[family] ?? family.replace(/(^|[-_ ])(\w)/g, (_m, sep: string, ch: string) => (sep ? " " : "") + ch.toUpperCase());
 
 /** The Stack's candidates for one level, grouped by family in the order the Stack lists them. A candidate that does not fit says why in the Stack's own sentence; one that does fit says its memory and whether the figure is measured. */

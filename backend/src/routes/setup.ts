@@ -77,7 +77,7 @@ setupRoutes.openapi(setupCodingRoute, async c => {
   const [plan, listed, readiness] = await Promise.all([previewPlan(), listCodingPieces(), codingModeReadiness()]);
   const eligible = (plan.plan as {tier?:string|null} | null)?.tier === "p128";
   const byId = new Map(listed.pieces.map(piece => [piece.id, piece]));
-  const ids: CodingPieceId[] = ["engine","model","draft", ...(eligible ? ["heavy_model","heavy_draft"] as const : [])];
+  const ids: CodingPieceId[] = ["engine","model","draft"];
   const pieces = ids.flatMap(id => {
     const piece = byId.get(id);
     return piece ? [{id,label:piece.label,size_bytes:piece.size_bytes,state:piece.state}] : [];
@@ -102,7 +102,7 @@ setupRoutes.openapi(setupCodingChoiceRoute, async c => {
   setSetupCodingChoice("set_up");
   const eligible = (plan.plan as {tier?:string|null} | null)?.tier === "p128";
   const listed = await listCodingPieces();
-  const ids: CodingPieceId[] = ["engine","model","draft", ...(eligible ? ["heavy_model","heavy_draft"] as const : [])];
+  const ids: CodingPieceId[] = ["engine","model","draft"];
   const outcomes: Array<{id:CodingPieceId;state:string}> = [];
   const started = new Set<CodingPieceId>();
   for (const id of ids) {
