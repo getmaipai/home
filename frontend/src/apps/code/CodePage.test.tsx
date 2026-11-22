@@ -106,6 +106,15 @@ describe("the Code app page", () => {
     expect(document.querySelector('[data-slot="code-statusbar"]')!.textContent).toContain("Asks before changes");
     expect(document.querySelector('[data-slot="composer-input"], textarea.aui-composer-input')).toBeTruthy();
   });
+
+  test("the composer is the kit's compact density (one slim row with the level chip beside Add), not the large unified panel", async () => {
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
+    const shell = document.querySelector('[data-slot="aui_composer-shell"]')!;
+    expect(shell.getAttribute("data-density")).toBe("compact");
+    expect(shell.hasAttribute("data-unified")).toBe(false);
+    expect(shell.querySelector('.aui-composer-action-wrapper [data-slot="composer-quality"]')).toBeTruthy();
+  });
   test("adding a file goes through the composer's attachment adapter to the session's upload route", async () => {
     open("/apps/code/csess-abc123");
     const add = await waitFor(() => { const el = document.querySelector('button[aria-label="Add Attachment"]') as HTMLButtonElement | null; if (!el) throw new Error("no button"); return el; });
