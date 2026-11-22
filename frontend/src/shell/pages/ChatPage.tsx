@@ -1497,7 +1497,8 @@ export function ChatPage({ person }: { person: Roster }) {
   const threadListState = useChatThreadListState(runtime);
   const hasThreads = threadListState.threadIds.length > 0;
   const isLoadingThreads = threadListState.isLoading;
-  const onNewChatStarted = useCallback(() => setSheetOpen(false), [setSheetOpen]);
+  const [newChatTick, setNewChatTick] = useState(0);
+  const onNewChatStarted = useCallback(() => { setSheetOpen(false); setNewChatTick((tick) => tick + 1); }, [setSheetOpen]);
   const { projects, settingsDialog } = useChatProjects({ person, temporary: temporaryNext, onNewChatStarted, runtime });
   const threadSidebarBody = (
     <ThreadListRoot density="compact" tourId="chat.history">
@@ -1517,7 +1518,7 @@ export function ChatPage({ person }: { person: Roster }) {
     column.setSearch("");
     setSheetOpen(false);
   };
-  const newChatAction = { label: i18n._({ id: "New chat", message: "New chat" }), disabled: chatAvailability === "unavailable", onClick: () => { void runtime.threads.switchToNewThread(); setPendingChatFolder(null); setSheetOpen(false); } };
+  const newChatAction = { label: i18n._({ id: "New chat", message: "New chat" }), disabled: chatAvailability === "unavailable", onClick: () => { void runtime.threads.switchToNewThread(); setPendingChatFolder(null); setSheetOpen(false); setNewChatTick((tick) => tick + 1); } };
   const threadSidebar = (id: string, mobile = false) => (
     <SectionSidebar
       standalone
@@ -1856,7 +1857,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   originMessageRole={originMessageRole}
                   pageSlots={projectPage?.slots}
                   projectFolderId={projectPage?.folderId}
-                  focusKey={`${routeLocation.key}:${openingConversationId ?? ""}`}
+                  focusKey={`${routeLocation.key}:${openingConversationId ?? ""}:${newChatTick}`}
                 />
                 </CompanionSpeechContext.Provider>
                 </PageContext.Provider>

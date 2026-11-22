@@ -44,7 +44,8 @@ export function useComposerFocus(rootRef: RefObject<HTMLElement | null>, entryKe
     };
     // Arrival: the composer may mount a beat after the route does; the late retry only claims a focus nobody holds.
     focusComposer(false);
-    later(() => focusComposer(true), 120);
+    later(() => focusComposer(false), 120);
+    later(() => focusComposer(false), 350);
     // A menu or dialog closing hands focus back to its trigger a tick later; the composer wins from there.
     const observer = new MutationObserver((records) => {
       const closed = records.some((record) => Array.from(record.removedNodes).some((node) => node instanceof Element && (node.matches(OPEN_LAYERS) || node.querySelector(OPEN_LAYERS))));

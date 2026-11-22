@@ -88,7 +88,9 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const replyFace = useReplyFace();
-  useComposerFocus(rootRef, focusKey);
+  // A new or switched chat (also from a menu item, which closes after the click) is an arrival too.
+  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
+  useComposerFocus(rootRef, `${focusKey ?? ""}:${mainThreadId}`);
   // COLUMN-01: the history column owns these (ChatColumn.tsx); the page
   // provides them, and a ChatThread shown outside the chat page has none.
   const chatColumn = useContext(ChatColumnControlContext);

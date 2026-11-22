@@ -12,10 +12,12 @@ import HeaderSearch from "@maipai/ui/src/dashboard/layouts/full/vertical/header/
 const NOOP: ChatModelAdapter = { run: async function* () { /* nothing */ } };
 
 let setKey: (key: string) => void = () => {};
+let switchThread: () => void = () => {};
 function Harness({ children }: { children?: React.ReactNode }) {
   const [focusKey, setFocusKey] = useState("a");
   setKey = setFocusKey;
   const runtime = useLocalRuntime(NOOP, { initialMessages: [] });
+  switchThread = () => { void runtime.threads.switchToNewThread(); };
   return (
     <MemoryRouter><AssistantRuntimeProvider runtime={runtime}>
       <Button type="button" data-testid="rail-chat">Chat</Button>
@@ -65,6 +67,29 @@ describe("CHAT-FOCUS-01 composer focus", () => {
     (document.activeElement as HTMLElement | null)?.blur();
     await act(async () => { menu.remove(); await new Promise((resolve) => setTimeout(resolve, 150)); });
     expect(document.activeElement).toBe(composer(view.container));
+  });
+});
+
+describe("CHAT-FOCUS-02 new chat from a menu", () => {
+  test("a thread switch focuses the composer even when focus was left on a non-field container after a menu closed", async () => {
+    const view = renderWithQueryClient(<Harness />);
+    await waitFor(() => expect(document.activeElement).toBe(composer(view.container)));
+    const holder = document.createElement("div");
+    holder.tabIndex = -1;
+    document.body.appendChild(holder);
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    document.body.appendChild(menu);
+    holder.focus();
+    expect(document.activeElement).toBe(holder);
+    await act(async () => {
+      switchThread();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      menu.remove();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+    expect(document.activeElement).toBe(composer(view.container));
+    holder.remove();
   });
 });
 
