@@ -3536,6 +3536,11 @@ msgid "Ask anything"
 msgstr "Ask anything"
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:138
+msgid "Ask before changes"
+msgstr "Ask before changes"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1821
 msgid "setting.ui.home_layout.option_label.ask"
 msgstr "Ask first"
@@ -3599,11 +3604,6 @@ msgstr "Asked the robot to reach the hub over the tailnet for 10 minutes."
 #: src/shell/pages/ChatPage.tsx:1658
 msgid "Asking the bare model…"
 msgstr "Asking the bare model…"
-
-#. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:24
-msgid "Asks before changes"
-msgstr "Asks before changes"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:23
@@ -3698,6 +3698,11 @@ msgstr "Auto"
 #: src/lib/settingCopy.generated.ts:147
 msgid "setting.coding.engine.option_label.auto"
 msgstr "Auto"
+
+#. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:139
+msgid "Auto edit"
+msgstr "Auto edit"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:171
@@ -4876,7 +4881,7 @@ msgid "Changed"
 msgstr "Changed"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:74
+#: src/apps/code/CodeThread.tsx:73
 msgid "Changed {path}"
 msgstr "Changed {path}"
 
@@ -6210,7 +6215,6 @@ msgid "setting.robot.face.color.option_label.cloud"
 msgstr "Cloud"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:137
 #: src/apps/code/SessionList.tsx:35
 msgid "Code"
 msgstr "Code"
@@ -6879,6 +6883,11 @@ msgstr "Could not change {name}'s role. Check your connection and try again."
 #: src/apps/settings/FeatureAccess.tsx:34
 msgid "Could not change access. Try again."
 msgstr "Could not change access. Try again."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:118
+msgid "Could not change that. Try again."
+msgstr "Could not change that. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:176
@@ -7771,7 +7780,7 @@ msgid "Could not send that. Try again."
 msgstr "Could not send that. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:118
+#: src/apps/code/SessionView.tsx:119
 msgid "Could not send your answer. Try again."
 msgstr "Could not send your answer. Try again."
 
@@ -9329,11 +9338,6 @@ msgid "Edit profile"
 msgstr "Edit profile"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:24
-msgid "Edits without asking"
-msgstr "Edits without asking"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:168
 msgid "Effect"
 msgstr "Effect"
@@ -10163,7 +10167,7 @@ msgid "Files"
 msgstr "Files"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:131
+#: src/apps/code/CodeThread.tsx:130
 msgid "Files I added:"
 msgstr "Files I added:"
 
@@ -14648,7 +14652,7 @@ msgid "setting.coding.api.away.does"
 msgstr "Lets your key connect through your Tailscale when you are out."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:136
+#: src/apps/code/CodeThread.tsx:135
 #: src/apps/code/NewSession.tsx:75
 #: src/apps/code/SessionView.tsx:106
 #: src/shell/library/LibraryViewer.tsx:164
@@ -16559,7 +16563,7 @@ msgid "setting.chat.paused_message.label"
 msgstr "Message shown while chat is paused"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:137
+#: src/apps/code/CodeThread.tsx:136
 msgid "Message the agent. Type @ to point at a file."
 msgstr "Message the agent. Type @ to point at a file."
 
@@ -18631,7 +18635,7 @@ msgid "Nothing was idle, so nothing changed."
 msgstr "Nothing was idle, so nothing changed."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:92
+#: src/apps/code/CodeThread.tsx:91
 msgid "Nothing yet. Tell the agent what to do."
 msgstr "Nothing yet. Tell the agent what to do."
 
@@ -20691,18 +20695,14 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr "Plain-language health and medicine pages from the US National Library of Medicine."
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:140
 #: src/apps/code/SessionTabs.tsx:78
 #: src/apps/code/SessionView.tsx:91
 msgid "Plan"
 msgstr "Plan"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:24
-msgid "Plan first"
-msgstr "Plan first"
-
-#. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:76
+#: src/apps/code/CodeThread.tsx:75
 msgid "Plan updated: {done} of {total} steps done."
 msgstr "Plan updated: {done} of {total} steps done."
 
@@ -26754,7 +26754,7 @@ msgstr "That did not send. Try again."
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
-#: src/apps/code/CodeThread.tsx:103
+#: src/apps/code/CodeThread.tsx:102
 #: src/apps/code/NewSession.tsx:78
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
@@ -26960,7 +26960,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr "That message is no longer available. This chat is open at the end."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:119
+#: src/apps/code/SessionView.tsx:120
 msgid "That message is not waiting any more."
 msgstr "That message is not waiting any more."
 
@@ -27193,7 +27193,7 @@ msgid "The agent is asking first"
 msgstr "The agent is asking first"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:102
+#: src/apps/code/CodeThread.tsx:101
 #: src/apps/code/codeTranscript.ts:63
 msgid "The agent stopped"
 msgstr "The agent stopped"
@@ -32179,12 +32179,12 @@ msgid "You need Chrome or Edge on a computer, Home opened at its https address, 
 msgstr "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:81
+#: src/apps/code/CodeThread.tsx:80
 msgid "You said no"
 msgstr "You said no"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:81
+#: src/apps/code/CodeThread.tsx:80
 msgid "You said yes"
 msgstr "You said yes"
 

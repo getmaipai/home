@@ -4019,6 +4019,11 @@ msgid "Ask anything"
 msgstr "Pregunta lo que quieras"
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:138
+msgid "Ask before changes"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1821
 #, needs-review
 msgid "setting.ui.home_layout.option_label.ask"
@@ -4087,11 +4092,6 @@ msgstr ""
 #, needs-review
 msgid "Asking the bare model…"
 msgstr "Preguntando al modelo base…"
-
-#. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:24
-msgid "Asks before changes"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:23
@@ -4201,6 +4201,11 @@ msgstr "Auto"
 #, needs-review
 msgid "setting.coding.engine.option_label.auto"
 msgstr "Auto"
+
+#. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:139
+msgid "Auto edit"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:171
@@ -5532,7 +5537,7 @@ msgid "Changed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:74
+#: src/apps/code/CodeThread.tsx:73
 msgid "Changed {path}"
 msgstr ""
 
@@ -7043,7 +7048,6 @@ msgid "setting.robot.face.color.option_label.cloud"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:137
 #: src/apps/code/SessionList.tsx:35
 msgid "Code"
 msgstr ""
@@ -7788,6 +7792,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/FeatureAccess.tsx:34
 msgid "Could not change access. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:118
+msgid "Could not change that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -8816,7 +8825,7 @@ msgid "Could not send that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:118
+#: src/apps/code/SessionView.tsx:119
 msgid "Could not send your answer. Try again."
 msgstr ""
 
@@ -10593,11 +10602,6 @@ msgid "Edit profile"
 msgstr "Editar perfil"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:24
-msgid "Edits without asking"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:168
 msgid "Effect"
 msgstr ""
@@ -11541,7 +11545,7 @@ msgid "Files"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:131
+#: src/apps/code/CodeThread.tsx:130
 msgid "Files I added:"
 msgstr ""
 
@@ -16648,7 +16652,7 @@ msgid "setting.coding.api.away.does"
 msgstr "Permite que tu clave se conecte a través de tu Tailscale cuando estás fuera."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:136
+#: src/apps/code/CodeThread.tsx:135
 #: src/apps/code/NewSession.tsx:75
 #: src/apps/code/SessionView.tsx:106
 #: src/shell/library/LibraryViewer.tsx:164
@@ -18810,7 +18814,7 @@ msgid "setting.chat.paused_message.label"
 msgstr "Mensaje mostrado mientras el chat está pausado"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:137
+#: src/apps/code/CodeThread.tsx:136
 msgid "Message the agent. Type @ to point at a file."
 msgstr ""
 
@@ -21144,7 +21148,7 @@ msgid "Nothing was idle, so nothing changed."
 msgstr "Nada estaba inactivo, así que no cambió nada."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:92
+#: src/apps/code/CodeThread.tsx:91
 msgid "Nothing yet. Tell the agent what to do."
 msgstr ""
 
@@ -23476,18 +23480,14 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr "Páginas de salud y medicina en lenguaje claro de la Biblioteca Nacional de Medicina de EE. UU."
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:140
 #: src/apps/code/SessionTabs.tsx:78
 #: src/apps/code/SessionView.tsx:91
 msgid "Plan"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:24
-msgid "Plan first"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:76
+#: src/apps/code/CodeThread.tsx:75
 msgid "Plan updated: {done} of {total} steps done."
 msgstr ""
 
@@ -30316,7 +30316,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
-#: src/apps/code/CodeThread.tsx:103
+#: src/apps/code/CodeThread.tsx:102
 #: src/apps/code/NewSession.tsx:78
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
@@ -30540,7 +30540,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr "Ese mensaje ya no está disponible. Este chat se abre al final."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:119
+#: src/apps/code/SessionView.tsx:120
 msgid "That message is not waiting any more."
 msgstr ""
 
@@ -30802,7 +30802,7 @@ msgid "The agent is asking first"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:102
+#: src/apps/code/CodeThread.tsx:101
 #: src/apps/code/codeTranscript.ts:63
 msgid "The agent stopped"
 msgstr ""
@@ -36435,12 +36435,12 @@ msgid "You need Chrome or Edge on a computer, Home opened at its https address, 
 msgstr "Necesitas Chrome o Edge en una computadora, Home abierto en su dirección https, y el StackChan conectado a esta computadora con un cable de datos USB-C."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:81
+#: src/apps/code/CodeThread.tsx:80
 msgid "You said no"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:81
+#: src/apps/code/CodeThread.tsx:80
 msgid "You said yes"
 msgstr ""
 
