@@ -21,7 +21,7 @@ html[data-pro-look] .aui-root.aui-thread-root {
 }
 
 html[data-pro-look] [data-slot="chat-pane"] {
-  --shell-user-bubble: var(--surface-2);
+  --shell-user-bubble: color-mix(in oklab, var(--foreground) 8%, var(--background));
   --shell-composer-bg: var(--surface-1);
   --shell-composer-border: transparent;
   --shell-composer-border-focus: color-mix(in oklab, var(--foreground) 18%, transparent);
@@ -29,7 +29,11 @@ html[data-pro-look] [data-slot="chat-pane"] {
   --composer-compact-border: transparent;
   --composer-compact-border-focus: color-mix(in oklab, var(--foreground) 18%, transparent);
   --composer-compact-radius: var(--radius-pill);
-  --composer-compact-text-size: var(--font-size-body);
+  --composer-compact-text-size: 14px;
+}
+
+html.dark[data-pro-look] [data-slot="chat-pane"] {
+  --shell-user-bubble: color-mix(in oklab, var(--foreground) 13%, var(--background));
 }
 
 /* EmptyStateSuggestion's shipped `paper` surface reads --background. Scope
@@ -41,4 +45,12 @@ html[data-pro-look] [data-slot="empty-state-suggestion"] {
 
 html[data-pro-look] [data-slot="aui_user-message-root"] .aui-user-message-content {
   --composer-radius: var(--radius-card);
+}
+
+/* A text field under 16px makes iOS Safari zoom the page on focus: a touch
+   screen keeps the 16px composer text whatever the look says. */
+@media (pointer: coarse) {
+  html[data-pro-look] [data-slot="chat-pane"] {
+    --composer-compact-text-size: 16px;
+  }
 }

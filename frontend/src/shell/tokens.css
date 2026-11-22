@@ -181,9 +181,10 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
  * border), 30px controls, 32px Send, no vertical inset, tighter side insets;
  * three lines are about 140px and the 160px field cap about 210px. */
 [data-slot="chat-pane"] {
-  --composer-compact-row-height: 50px;
-  --composer-compact-control-size: 30px;
-  --composer-compact-send-size: 32px;
+  --composer-compact-row-height: 46px;
+  --composer-compact-control-size: 28px;
+  --composer-compact-send-size: 30px;
+  --composer-compact-text-size: 14px;
   --composer-compact-inset-y: 0px;
   --composer-compact-inset-start: 10px;
   --composer-compact-inset-end: 8px;
@@ -221,7 +222,7 @@ body {
   --shell-composer-bg: var(--background);
   --shell-composer-border: color-mix(in srgb, var(--background), var(--foreground) 14%);
   --shell-composer-border-focus: color-mix(in srgb, var(--background), var(--foreground) 26%);
-  --shell-user-bubble: color-mix(in srgb, var(--primary) 4%, color-mix(in srgb, var(--background), var(--foreground) 4%));
+  --shell-user-bubble: color-mix(in srgb, var(--primary) 4%, color-mix(in srgb, var(--background), var(--foreground) 7%));
   --app-rail-bg: var(--shell-rail);
 }
 html.dark body {
@@ -288,33 +289,54 @@ html:not(.light) body {
   --border: var(--shell-divider);
   --aui-thread-list-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
 }
+/* COMPACT-02 (owner, 2026-11-22, ChatGPT reference): a wider history column
+ * (280px; the kit default 232px), titles at 13.5px and tighter group
+ * headings. Only the chat's column: settings pages keep 232px. */
+[data-slot="section-sidebar"]:has([data-slot="chat-rail"]) {
+  --settings-column-width: 280px;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-item-trigger"] {
+  font-size: 0.84375rem;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-group-label"] {
+  padding-top: 0.625rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.71875rem;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-group-label"]:first-child {
+  padding-top: 0.25rem;
+}
+/* COMPACT-02: the row of reply actions sits closer to the reply. */
+[data-slot="chat-pane"] .aui-assistant-action-bar-root {
+  min-height: 1.75rem;
+}
 /* COLUMN-02 hover peek: the kit panel overlays the conversation without
  * moving it; the outer wrapper is positioned by ChatPage. */
 /* RAIL-01 conversation: assistant text sits on the surface at 15/24;
  * markdown headings at 22, 19 and 17; user messages are compact filled
  * bubbles at most 70% of the column. */
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] {
-  font-size: 0.9375rem;
-  line-height: 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
 }
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h1 {
-  font-size: 1.375rem;
-  line-height: 1.875rem;
+  font-size: 1.25rem;
+  line-height: 1.75rem;
 }
 [data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h2 {
-  font-size: 1.1875rem;
-  line-height: 1.625rem;
-}
-[data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h3 {
   font-size: 1.0625rem;
   line-height: 1.5rem;
+}
+[data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h3 {
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
 }
 [data-slot="chat-pane"] .aui-user-message-content {
   max-width: min(560px, 100%);
   padding: 8px 14px;
   border-radius: 18px;
-  font-size: 0.9375rem;
-  line-height: 1.5rem;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
   background: var(--shell-user-bubble);
 }
 

@@ -35,6 +35,7 @@ describe("composer in Home (ELT-COMPOSER-KIT-01)", () => {
       "--composer-compact-row-height",
       "--composer-compact-control-size",
       "--composer-compact-send-size",
+      "--composer-compact-text-size",
       "--composer-compact-inset-y",
       "--composer-compact-inset-start",
       "--composer-compact-inset-end",
@@ -45,11 +46,12 @@ describe("composer in Home (ELT-COMPOSER-KIT-01)", () => {
     expect(block).not.toMatch(/(^|\n)\s*(width|height|min-height|padding|display|border-radius|grid-template-areas)\s*:/);
   });
 
-  test("COMPOSER-SIZE-01: the empty row is 50px outer with a 48px field, 30px controls and a 32px Send", () => {
+  test("COMPACT-02: the empty row is 46px, with 28px controls, a 30px Send and 14px text", () => {
     const value = (name: string) => tokens.match(new RegExp(`${name}:\\s*(\\d+)px`))?.[1];
-    expect(value("--composer-compact-row-height")).toBe("50");
-    expect(value("--composer-compact-control-size")).toBe("30");
-    expect(value("--composer-compact-send-size")).toBe("32");
+    expect(value("--composer-compact-row-height")).toBe("46");
+    expect(value("--composer-compact-control-size")).toBe("28");
+    expect(value("--composer-compact-send-size")).toBe("30");
+    expect(value("--composer-compact-text-size")).toBe("14");
     expect(value("--composer-compact-inset-y")).toBe("0");
   });
 
