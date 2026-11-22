@@ -12,22 +12,22 @@ import { TierChip, TierSegment, type TierId } from "@maipai/ui/src/elements/tier
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { errorLine } from "@/lib/hubReachability";
 import { ApiError } from "@/lib/api";
 import { codeApi, type CodeTier } from "./codeApi";
 import { stopWords, activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWord, tierWord } from "./codeTranscript";
 import { CODE_SESSIONS_KEY, CODE_TIERS_KEY, tierOptions } from "./NewSession";
 import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
 import { Stack } from "./layout";
+import { codeErrorLine, pollDelay } from "./codeShared";
 import { CodeThread } from "./CodeThread";
 
 const TerminalIcon = getIcon("terminal");
 
-export function SessionView({ id }: { id: string }) {
+export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions?: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const phone = useBreakpoint().tier === "phone";
-  const view = useQuery({ queryKey: ["code-session", id], queryFn: () => codeApi.view(id), retry: false, refetchInterval: (q) => q.state.data && isBusy(q.state.data.session.state) ? 1000 : 6000 });
+  const view = useQuery({ queryKey: ["code-session", id], queryFn: () => codeApi.view(id), retry: false, refetchInterval: (q) => q.state.data && isBusy(q.state.data.session.state) ? 1000 : pollDelay({ hidden: typeof document !== "undefined" && document.hidden, failures: q.state.errorUpdateCount }, 6000), refetchIntervalInBackground: true });
   const messages = useQuery({ queryKey: ["code-messages", id], queryFn: () => codeApi.messages(id), retry: false, refetchInterval: view.data && isBusy(view.data.session.state) ? 1000 : false });
   const tiers = useQuery({ queryKey: CODE_TIERS_KEY, queryFn: codeApi.tiers, retry: false });
   const [problem, setProblem] = useState("");
@@ -58,12 +58,12 @@ export function SessionView({ id }: { id: string }) {
   const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["code-session", id] }), queryClient.invalidateQueries({ queryKey: ["code-messages", id] }), queryClient.invalidateQueries({ queryKey: CODE_SESSIONS_KEY })]); };
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setProblem(""); setBusy(true);
-    try { await action(); await refresh(); } catch (error) { setProblem(errorLine(error, fallback)); await refresh(); } finally { setBusy(false); }
+    try { await action(); await refresh(); } catch (error) { setProblem(codeErrorLine(error, fallback)); await refresh(); } finally { setBusy(false); }
   };
 
   if (view.isError) {
     const gone = view.error instanceof ApiError && view.error.status === 404;
-    return <EmptyState icon="terminal" text={gone ? i18n._({ id: "That session was not found. It may have been deleted.", message: "That session was not found. It may have been deleted." }) : errorLine(view.error, i18n._({ id: "Could not open this session. Try again.", message: "Could not open this session. Try again." }))} actionLabel={i18n._({ id: "Back to sessions", message: "Back to sessions" })} onAction={() => navigate("/apps/code")} />;
+    return <EmptyState icon="terminal" text={gone ? i18n._({ id: "That session was not found. It may have been deleted.", message: "That session was not found. It may have been deleted." }) : codeErrorLine(view.error, i18n._({ id: "Could not open this session. Try again.", message: "Could not open this session. Try again." }))} actionLabel={i18n._({ id: "Back to sessions", message: "Back to sessions" })} onAction={() => navigate("/apps/code")} />;
   }
   if (!session || !view.data) return null;
   const activity = activityOf(list);
@@ -97,7 +97,7 @@ export function SessionView({ id }: { id: string }) {
   return (
     <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1">
       <Stack gap="none" className="min-h-0 min-w-0 flex-1">
-        <ChatHeader name={session.title} media={<TerminalIcon aria-hidden className="size-6" />} {...(phone ? { onMenu: () => navigate("/apps/code") } : {})}
+        <ChatHeader name={session.title} media={<TerminalIcon aria-hidden className="size-6" />} {...(phone && onOpenSessions ? { onMenu: onOpenSessions, menuControls: "code-sessions-sheet" } : {})}
           actions={<>
             {working ? <Button size="sm" variant="outline" onClick={() => void run(() => codeApi.stop(id), i18n._({ id: "Could not stop. Try again.", message: "Could not stop. Try again." }))}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
             {!paneOpen || phone ? <Button size="sm" variant="ghost" onClick={() => setPaneOpen(true)}>{i18n._({ id: "Changes", message: "Changes" })}</Button> : null}
@@ -107,7 +107,7 @@ export function SessionView({ id }: { id: string }) {
             {maxNext ? <TierChip tier="max" label={i18n._({ id: "Max from the next message", message: "Max from the next message" })} /> : null}
           </div>} />
         <p className="truncate px-4 pb-1 text-body text-muted-foreground" data-slot="code-subtitle">{subtitle}</p>
-        <div className="flex min-h-0 flex-1 flex-col" data-slot="code-thread" style={phone ? { paddingBottom: "5.5rem" } : undefined}>
+        <div className="flex min-h-0 flex-1 flex-col pb-(--phone-nav-offset)" data-slot="code-thread">
           <CodeThread messages={list} tiers={tiers.data?.tiers ?? ["standard"]} tree={tree.data?.entries ?? []} onTier={(next) => void changeTier(next)}
             onSend={(message) => run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }))}
             onStop={() => void run(() => codeApi.stop(id), i18n._({ id: "Could not stop. Try again.", message: "Could not stop. Try again." }))}

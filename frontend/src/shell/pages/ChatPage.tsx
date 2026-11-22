@@ -90,7 +90,7 @@ import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assist
 import { useTabItem } from "@/shell/tabIdentity";
 import { useChatVoiceTurnState } from "@/apps/chat/useChatVoiceTurnState";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
-import { CHAT_COLUMN_ID, CHAT_SETTINGS_PATH, chatColumnShortcutLabel, searchableThreadsFor, useChatColumn, useChatThreadListState } from "@/shell/pages/ChatColumn";
+import { CHAT_COLUMN_ID, CHAT_SETTINGS_PATH, chatColumnSheetContent, chatColumnShortcutLabel, searchableThreadsFor, useChatColumn, useChatThreadListState } from "@/shell/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
@@ -1928,20 +1928,7 @@ export function ChatPage({ person }: { person: Roster }) {
           </div>
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- sheet width and responsive visibility are intentional layout for the mobile thread list; max-w-[calc(100vw-2rem)] has no scale-token equivalent since Sheet has no max-width prop of its own (commons/ui/docs/dashboard-upstream.md) */}
-          <SheetContent data-chat-column-mobile="" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden"
-            // While the search field has focus, Escape belongs to the field (it clears the text, then closes the field);
-            // only an Escape outside the field closes the sheet.
-            onEscapeKeyDown={(event) => {
-              if (event.target instanceof HTMLInputElement && event.target.type === "search") event.preventDefault();
-            }}
-            // The sheet takes focus itself rather than its first button,
-            // so opening it never pops that button's tooltip.
-            onOpenAutoFocus={(event) => {
-              event.preventDefault();
-              (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
-            }}
-          >
+          <SheetContent {...chatColumnSheetContent}>
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
               <SheetTitle>{i18n._({ id: "Conversations", message: "Conversations" })}</SheetTitle>

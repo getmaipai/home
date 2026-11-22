@@ -11,7 +11,8 @@ import { FileTree, type FileTreeNode } from "@maipai/ui/src/elements/file-tree";
 import { TerminalBlock } from "@maipai/ui/src/elements/terminal-block";
 import { Button } from "@maipai/ui/src/ui/button";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
-import { errorLine } from "@/lib/hubReachability";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
+import { codeErrorLine } from "./codeShared";
 import { codeApi, type CodeContext, type CodeSession } from "./codeApi";
 import { ContextRing } from "./ContextRing";
 import { Stack } from "./layout";
@@ -41,7 +42,7 @@ export function ChangesTab({ session, activity, context, onUndo, onPush, onPullR
     </Stack>
     <h3 className="text-body font-semibold">{i18n._({ id: "Changes", message: "Changes" })}</h3>
     <p className="text-body text-muted-foreground">{files === 0 && listed.length === 0 ? i18n._({ id: "No changes yet.", message: "No changes yet." }) : i18n._({ id: "{files} files changed, +{additions} -{deletions}", message: "{files} files changed, +{additions} -{deletions}", values: { files: files || listed.length, additions, deletions } })}</p>
-    {changes.isError ? <p role="alert" className="text-body text-muted-foreground">{errorLine(changes.error, i18n._({ id: "Could not read the changes. Try again.", message: "Could not read the changes. Try again." }))}</p> : null}
+    {changes.isError ? <ErrorState title={codeErrorLine(changes.error, i18n._({ id: "Could not read the changes. Check that the session is still running, then try again.", message: "Could not read the changes. Check that the session is still running, then try again." }))} retrying={changes.isFetching} onRetry={() => void changes.refetch()} layout="inline" /> : null}
     {listed.map((file) => byFile[file.path] && byFile[file.path]!.length > 0
       ? <div key={file.path}><CodeDiff filename={file.path} additions={file.additions} deletions={file.deletions} lines={byFile[file.path]!} compareLabel={i18n._({ id: "vs {branch}", message: "vs {branch}", values: { branch: session.repo.base_branch } })} /></div>
       : <p key={file.path} className="truncate font-mono text-body">{file.path}{file.binary ? ` (${i18n._({ id: "binary file", message: "binary file" })})` : ""}</p>)}
@@ -63,7 +64,7 @@ export function FilesTab({ session, activity }: { session: CodeSession; activity
   return <Stack data-slot="code-files">
     <FileTree nodes={nodes} live selectedPath={selected} onSelect={(path) => setSelected(nodes.find((n) => n.path === path)?.kind === "file" ? path : undefined)} totalAdditions={session.changes.additions} totalDeletions={session.changes.deletions} />
     {tree.data?.truncated ? <p className="text-body text-muted-foreground">{i18n._({ id: "Only the first files are listed.", message: "Only the first files are listed." })}</p> : null}
-    {file.isError ? <p role="alert" className="text-body text-muted-foreground">{errorLine(file.error, i18n._({ id: "Could not open that file. Try again.", message: "Could not open that file. Try again." }))}</p> : null}
+    {file.isError ? <ErrorState title={codeErrorLine(file.error, i18n._({ id: "Could not open that file. Pick it again, or open another file.", message: "Could not open that file. Pick it again, or open another file." }))} retrying={file.isFetching} onRetry={() => void file.refetch()} layout="inline" /> : null}
     {file.data && selected ? <div><CodeView code={file.data.content} language={languageOf(selected)} filename={selected} /></div> : null}
   </Stack>;
 }

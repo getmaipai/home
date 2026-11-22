@@ -3,7 +3,8 @@ import { useAui, useAuiState } from "@assistant-ui/react";
 import { ConnectionState } from "@maipai/ui/src/elements/connection-state";
 import { ConnectionStateContext } from "@/apps/chat/chatThreadContexts";
 
-export function ChatConnectionBanner() {
+/** `onRetry` is for a host with no assistant message to reload (Code, CODE-UI-03): its own retry replaces the reload. */
+export function ChatConnectionBanner({ onRetry }: { onRetry?: () => void } = {}) {
   const connection = useContext(ConnectionStateContext);
   const aui = useAui();
   const isRunning = useAuiState((state) => state.thread.isRunning);
@@ -38,5 +39,5 @@ export function ChatConnectionBanner() {
     };
   }, [isRunning, setConnection]);
 
-  return <ConnectionState className="pointer-events-auto" phase={connection.phase} attempt={connection.attempt} resumedTokens={connection.resumedTokens} onRetry={retry} />;
+  return <ConnectionState className="pointer-events-auto" phase={connection.phase} attempt={connection.attempt} resumedTokens={connection.resumedTokens} onRetry={onRetry ?? retry} />;
 }

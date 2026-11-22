@@ -2,7 +2,7 @@
 import { i18n } from "@lingui/core";
 import { ProgressRing } from "@maipai/ui/src/ui/progress-ring";
 import type { CodeContext } from "./codeApi";
-import { contextFraction, contextInk, tokenWords } from "./codeTranscript";
+import { contextFraction, contextInk, contextTone, tokenWords } from "./codeTranscript";
 
 export function ContextRing({ context }: { context: CodeContext | undefined }) {
   if (!context) return null;
@@ -11,8 +11,8 @@ export function ContextRing({ context }: { context: CodeContext | undefined }) {
     ? i18n._({ id: "{used} of {window} tokens used", message: "{used} of {window} tokens used", values: { used: tokenWords(context.used_tokens), window: tokenWords(context.window_tokens) } })
     : i18n._({ id: "{used} tokens used", message: "{used} tokens used", values: { used: tokenWords(context.used_tokens) } });
   return <span data-slot="code-context" title={words} className="inline-flex items-center gap-1 text-body text-muted-foreground">
-    <ProgressRing value={fraction ?? 0} size={18} strokeWidth={3} label={words} animated={false} style={{ ["--primary" as string]: contextInk(fraction) }} />
-    <span className="tabular-nums max-sm:sr-only">{fraction === null ? tokenWords(context.used_tokens) : `${Math.round(fraction * 100)}%`}</span>
+    <ProgressRing value={fraction ?? 0} size={18} strokeWidth={3} label={words} animated={false} tone={contextTone(fraction)} />
+    <span className="tabular-nums max-sm:sr-only" {...(contextTone(fraction) === "primary" ? { style: { color: contextInk(fraction) } } : {})}>{fraction === null ? tokenWords(context.used_tokens) : `${Math.round(fraction * 100)}%`}</span>
   </span>;
 }
 

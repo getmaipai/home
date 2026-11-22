@@ -578,7 +578,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           <Route path="apps/image/character-sheet" element={<LegacyImageCastRedirect page="character-sheet" />} />
           <Route path="apps/audio/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
-          <Route path="apps/code/*" element={<Suspense fallback={null}><CodePage person={person} /></Suspense>} />
+          <Route path="apps/code/*" element={<Suspense fallback={null}><CodePage /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />

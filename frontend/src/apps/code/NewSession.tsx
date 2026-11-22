@@ -9,15 +9,18 @@ import { AssistantRuntimeProvider, useAui, useExternalStoreRuntime, type AppendM
 import { type TierOptionDef } from "@maipai/ui/src/elements/tier-segment";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { EmptyState, EmptyStateGreeting, EmptyStateSuggestion, EmptyStateSuggestions } from "@maipai/ui/src/elements/empty-state";
+import { DraftRestore } from "@maipai/ui/src/elements/draft-restore";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
+import { useComposerDraftRestore } from "@/apps/chat/composerDraftRestore";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Select } from "@maipai/ui/src/primitives/Select";
-import { StatusCard } from "@maipai/ui/src/elements/status-card";
-import { errorLine } from "@/lib/hubReachability";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { Stack } from "./layout";
 import { codeApi, type CodeSession, type CodeTier } from "./codeApi";
 import { tierWord } from "./codeTranscript";
 import { codeComposerModes } from "./CodeThread";
+import { CodeComposerContexts, codeErrorLine } from "./codeShared";
+import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
 
 export const CODE_TIERS_KEY = ["code-tiers"];
 export const CODE_SESSIONS_KEY = ["code-sessions"];
@@ -28,8 +31,12 @@ export const tierOptions = (tiers: readonly CodeTier[]): TierOptionDef[] => tier
 const ProblemContext = createContext("");
 const NO_MESSAGES: ThreadMessageLike[] = [];
 
-/** Above the composer: why the start failed, in the kit's problem card. */
-const Problem = () => { const problem = useContext(ProblemContext); return <>{problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}</>; };
+/** Above the composer: the draft offer (Chat's), and why the start failed, in the kit's error line (the one Chat's error slot uses). */
+const Problem = () => {
+  const problem = useContext(ProblemContext);
+  const draft = useComposerDraftRestore();
+  return <>{draft ? <DraftRestore {...draft} /> : null}{problem ? <ErrorState title={problem} retrying={false} layout="inline" /> : null}</>;
+};
 /** CODE-UX-09 fills this line (a notice under the composer). It draws nothing until then. */
 const NoticeSlot = () => null;
 /** CODE-UX-02 puts the environment chip here, in the row of choices beneath the composer. */
@@ -80,7 +87,7 @@ export function NewSession() {
       navigate(`/apps/code/${session.id}`);
       return true;
     } catch (error) {
-      setProblem(errorLine(error, i18n._({ id: "Could not start the session. Try again.", message: "Could not start the session. Try again." })));
+      setProblem(codeErrorLine(error, i18n._({ id: "Could not start the session. Try again.", message: "Could not start the session. Try again." })));
       return false;
     }
   }
@@ -99,7 +106,7 @@ export function NewSession() {
   const choices = <Stack data-slot="code-choices" className="items-center">
     {active.length > 0 ? <Stack row className="flex-wrap items-center justify-center" data-slot="code-repo">
       <Select aria-label={i18n._({ id: "Repository", message: "Repository" })} value={connectionId} onValueChange={setConnectionId} options={["none", ...active.map((c) => c.id)]}
-        getLabel={(id) => { const c = active.find((x) => x.id === id); return c ? `${c.kind === "github" ? "GitHub" : "Gitea"}: ${c.account}` : i18n._({ id: "No repository", message: "No repository" }); }} />
+        getLabel={(id) => { const c = active.find((x) => x.id === id); return c ? i18n._({ id: "{kind}: {account}", message: "{kind}: {account}", values: { kind: c.kind === "github" ? i18n._({ id: "GitHub", message: "GitHub" }) : i18n._({ id: "Gitea", message: "Gitea" }), account: c.account } }) : i18n._({ id: "No repository", message: "No repository" }); }} />
       {chosen ? <>
         <Input value={fullName} onChange={(event) => { setFullName(event.target.value); setProblem(""); }} aria-label={i18n._({ id: "Repository name, for example owner/name", message: "Repository name, for example owner/name" })} placeholder={i18n._({ id: "owner/name", message: "owner/name" })} aria-invalid={fullName !== "" && !repoOk} />
         <Input value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} aria-label={i18n._({ id: "Starting branch", message: "Starting branch" })} placeholder={i18n._({ id: "main", message: "main" })} />
@@ -117,7 +124,10 @@ export function NewSession() {
   return <>
     <AssistantRuntimeProvider runtime={runtime} key={location.key}>
       <ProblemContext.Provider value={problem}>
+        <CodeComposerContexts draftId="code-new">
+        <ChatShortcutReference onNew={() => navigate("/apps/code")} newLabel={i18n._({ id: "New session", message: "New session" })} description={i18n._({ id: "Shortcuts for coding and navigation.", message: "Shortcuts for coding and navigation." })} />
         <Thread tourId="code.new" composerTourId="code.new-composer" components={{ composerDensity: THREAD_SLOTS.composerDensity, WelcomeContent: welcome, BelowComposerContent: choices, ComposerQueue: Problem, ComposerNotice: NoticeSlot, composerNoticeReserve: true, composerPlaceholder: i18n._({ id: "Describe the task, for example: fix the failing test in the thermostat code.", message: "Describe the task, for example: fix the failing test in the thermostat code." }), composerModes }} />
+        </CodeComposerContexts>
       </ProblemContext.Provider>
     </AssistantRuntimeProvider>
   </>;

@@ -160,6 +160,8 @@ export function contextInk(fraction: number | null): string {
   if (fraction === null || fraction < 0.6) return "var(--status-done-ink)";
   return fraction < 0.85 ? "var(--status-attention-ink)" : "var(--tint-problem-border)";
 }
+/** The kit ring has two tones: quiet while the window has room, the strong one once it is 60% full (the number beside it carries the warning and problem inks). */
+export const contextTone = (fraction: number | null): "muted" | "primary" => (fraction === null || fraction < 0.6 ? "muted" : "primary");
 export const tokenWords = (n: number): string => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 || n % 1000 === 0 ? 0 : 1)}K` : String(n);
 
 /** The sessions rail's two groups. */

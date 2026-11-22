@@ -1,20 +1,21 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type { Roster } from "@/lib/api";
 import { readFileSync } from "node:fs";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { CodePage, sessionIdOf } from "./CodePage";
+import { codeErrorLine, pollDelay } from "./codeShared";
+import { ApiError } from "@/lib/api";
+import { readDraft } from "@/apps/chat/draftStore";
 
 const realFetch = globalThis.fetch;
-const person = { id: "sage", role: "owner" } as Roster;
 const session = { id: "csess-abc123", title: "Fix the thermostat", repo: { kind: "none", base_branch: "main", work_branch: "code/x" }, mode: "ask", state: "idle", tier: "standard", changes: { files: 0, additions: 0, deletions: 0 }, last_activity_at: "2026-11-21T10:00:00.000Z" };
 let tiers = ["standard", "max"]; let calls: string[] = []; let conns: unknown[] = [];
 let sessionState = "idle"; let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
 
 beforeEach(() => {
-  window.innerWidth = 1400; // the details pane opens by default only on a wide screen
+  Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 1400 }); // the details pane opens by default only on a wide screen
   tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle";
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
@@ -35,7 +36,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
 
-const open = (at: string) => renderWithQueryClient(<MemoryRouter initialEntries={[at]}><CodePage person={person} /></MemoryRouter>);
+const open = (at: string) => renderWithQueryClient(<MemoryRouter initialEntries={[at]}><CodePage /></MemoryRouter>);
 
 describe("the Code app page", () => {
   test("the session id is read from the address", () => {
@@ -86,12 +87,12 @@ describe("the Code app page", () => {
   });
   test("a failed start says what went wrong and keeps the words", async () => {
     const base = globalThis.fetch;
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/code/sessions") && init?.method === "POST" ? Promise.resolve(Response.json({ error: "The coding engine is off. Ask an admin to turn it on." }, { status: 503 })) : base(input, init)) as unknown as typeof fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/code/sessions") && init?.method === "POST" ? Promise.resolve(Response.json({ error: "The coding engine is off. Ask an admin to turn it on." }, { status: 409 })) : base(input, init)) as unknown as typeof fetch;
     open("/apps/code");
     const box = await waitFor(() => { const el = document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement | null; if (!el) throw new Error("no box"); return el; });
     fireEvent.change(box, { target: { value: "Fix the thermostat" } });
     fireEvent.keyDown(box, { key: "Enter" });
-    expect(await within(document.body).findByText("That did not work")).toBeTruthy();
+    expect(await within(document.body).findByText("The coding engine is off. Ask an admin to turn it on.")).toBeTruthy();
     await waitFor(() => expect((document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement).value).toBe("Fix the thermostat"));
   });
   test("the repository picker appears only with an active git connection, and a chosen one asks for owner/name", async () => {
@@ -176,5 +177,132 @@ describe("the Code app page", () => {
     expect(document.querySelector('[data-slot="section-sidebar-search"]')).toBeTruthy();
     expect(document.querySelector('[data-slot="section-sidebar-toggle"]')?.getAttribute("aria-keyshortcuts")).toBe("Meta+B Control+B");
     expect(document.querySelector('[data-slot="code-rail"]')).toBeTruthy();
+  });
+
+  // CODE-UI-03: the phone, the shared pieces, errors, drafts, accessibility.
+  const phone = (run: () => Promise<void>) => async () => {
+    const was = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+    try { await run(); } finally { Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: was }); }
+  };
+  test("a phone draws no sessions list on the page and opens Chat's sheet from the header menu", phone(async () => {
+    open("/apps/code");
+    await within(document.body).findByText("What should we build?");
+    expect(document.querySelector('[data-slot="code-sessions-page"]')).toBeNull();
+    expect(document.querySelector('[data-slot="code-rail"]')).toBeNull();
+    fireEvent.click(await within(document.body).findByRole("button", { name: /menu/i }));
+    const sheet = await waitFor(() => { const el = document.querySelector('[data-chat-column-mobile][data-slot="sheet-content"], [data-slot="sheet-content"][data-chat-column-mobile]'); if (!el) throw new Error("no sheet"); return el as HTMLElement; });
+    expect(within(sheet).getByText("Fix the thermostat")).toBeTruthy();
+    expect(sheet.querySelector('[data-slot="code-rail"]')).toBeTruthy();
+  }));
+  test("inside a session on a phone the same sheet opens, and choosing a row closes it", phone(async () => {
+    open("/apps/code/csess-abc123");
+    fireEvent.click(await within(document.body).findByRole("button", { name: /menu/i }));
+    const sheet = await waitFor(() => { const el = document.querySelector('[data-slot="sheet-content"]'); if (!el) throw new Error("no sheet"); return el as HTMLElement; });
+    fireEvent.click(within(sheet).getByText("New session"));
+    expect(await within(document.body).findByText("What should we build?")).toBeTruthy();
+    await waitFor(() => expect(document.querySelector('[data-slot="sheet-content"]')).toBeNull());
+  }));
+  test("the session view reserves no magic bottom padding", () => {
+    const src = readFileSync(new URL("./SessionView.tsx", import.meta.url), "utf8");
+    expect(src).not.toMatch(/paddingBottom|5\.5rem/);
+    expect(src).toContain("pb-(--phone-nav-offset)"); // the kit's own token for the phone navigation's height
+  });
+  test("Code draws no phone list of its own: the page has no List and no code-sessions-page, and the sheet is Chat's", () => {
+    const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+    const page = read("./CodePage.tsx");
+    expect(page).not.toMatch(/primitives\/List|code-sessions-page|<List\b/);
+    expect(page).toContain("chatColumnSheetContent");
+    expect(read("../../shell/pages/ChatPage.tsx")).toContain("chatColumnSheetContent");
+    expect(read("./SessionList.tsx")).not.toMatch(/primitives\/List|<List\b/);
+  });
+  test("Code reuses Chat's shortcut reference, draft store, connection banner and error element", () => {
+    const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+    const all = ["./NewSession.tsx", "./CodeThread.tsx", "./codeShared.tsx", "./CodePage.tsx"].map(read).join("\n");
+    expect(all).toContain("ChatShortcutReference");
+    expect(all).toContain("useComposerDraftRestore");
+    expect(all).toContain("ChatConnectionBanner");
+    expect(all).toContain("elements/error-state");
+    expect(all).toContain("elements/draft-restore");
+    expect(read("./ContextRing.tsx")).not.toContain("--primary");
+  });
+  test("Ctrl+Shift+O in a session starts a new session and Ctrl+/ opens the shortcut reference", async () => {
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
+    fireEvent.keyDown(window, { key: "/", ctrlKey: true });
+    expect(await within(document.body).findByText("Keyboard shortcuts")).toBeTruthy();
+    expect(within(document.querySelector('[role="dialog"]') as HTMLElement).getByText("New session")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(window, { key: "o", ctrlKey: true, shiftKey: true });
+    expect(await within(document.body).findByText("What should we build?")).toBeTruthy();
+  });
+  test("the first message of New session is kept as a draft and offered again on return", async () => {
+    window.localStorage.clear();
+    const first = open("/apps/code");
+    const box = await waitFor(() => { const el = document.querySelector('[data-slot="code-new-session"] textarea') as HTMLTextAreaElement | null; if (!el) throw new Error("no box"); return el; });
+    fireEvent.change(box, { target: { value: "Fix the thermostat bug" } });
+    await waitFor(() => expect(readDraft("code-new")?.text).toBe("Fix the thermostat bug"));
+    first.unmount();
+    open("/apps/code");
+    expect(await within(document.body).findByText(/Fix the thermostat bug/)).toBeTruthy();
+    window.localStorage.clear();
+  });
+  test("a refused list (403) names the next step and offers Open Chat, not the raw message", async () => {
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/code/sessions") && (init?.method ?? "GET") === "GET" ? Promise.resolve(Response.json({ error: "forbidden" }, { status: 403 })) : base(input, init)) as unknown as typeof fetch;
+    open("/apps/code");
+    expect(await within(document.body).findByText(/Ask a household admin to turn Coding on/)).toBeTruthy();
+    expect(within(document.body).queryByText("forbidden")).toBeNull();
+    expect(within(document.body).getByRole("button", { name: "Open Chat" })).toBeTruthy();
+  });
+  test("a failed list on any other error shows a Retry that asks again", async () => {
+    let listCalls = 0;
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/code/sessions") && (init?.method ?? "GET") === "GET") { listCalls += 1; return Promise.resolve(Response.json({ error: "x" }, { status: 500 })); }
+      return base(input, init);
+    }) as unknown as typeof fetch;
+    open("/apps/code");
+    const retry = await within(document.body).findByRole("button", { name: /retry/i });
+    const before = listCalls;
+    fireEvent.click(retry);
+    await waitFor(() => expect(listCalls).toBeGreaterThan(before));
+  });
+  test("the changes error line has a Retry as its next step", async () => {
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/changes") ? Promise.resolve(Response.json({ error: "x" }, { status: 500 })) : base(input, init)) as unknown as typeof fetch;
+    open("/apps/code/csess-abc123");
+    expect((await within(document.body).findAllByRole("button", { name: /retry/i })).length).toBeGreaterThan(0);
+  });
+  test("an empty sessions column says where sessions will show up", async () => {
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/code/sessions") && (init?.method ?? "GET") === "GET" ? Promise.resolve(Response.json([])) : base(input, init)) as unknown as typeof fetch;
+    open("/apps/code");
+    expect(await within(document.body).findByText(/Your sessions will show up here/)).toBeTruthy();
+  });
+  test("the composer and the session list are reachable by their names", async () => {
+    open("/apps/code/csess-abc123");
+    await within(document.body).findAllByText("Fix the thermostat");
+    expect(document.querySelector('[data-slot="code-rail"]')?.getAttribute("aria-label")).toBe("Sessions");
+    expect(document.querySelector('[data-slot="code-rail"]')?.getAttribute("role")).toBe("region");
+    expect(document.querySelector('[aria-label="Search sessions"], input[type="search"]')).toBeTruthy();
+    const box = await waitFor(() => { const el = document.querySelector('[data-slot="code-thread"] textarea') as HTMLTextAreaElement | null; if (!el) throw new Error("no box"); return el; });
+    expect(box.getAttribute("aria-label") ?? box.getAttribute("placeholder")).toBeTruthy();
+    for (const button of Array.from(document.querySelectorAll('[data-slot="aui_composer-shell"] button'))) {
+      expect((button.getAttribute("aria-label") ?? button.textContent ?? "").trim().length).toBeGreaterThan(0);
+    }
+  });
+  test("the session meta line, the repository labels and server errors are translated strings", () => {
+    expect(codeErrorLine(new ApiError("forbidden", 403), "x")).toMatch(/Ask a household admin/);
+    expect(codeErrorLine(new ApiError("The hub said no.", 500), "x")).toBe("The hub said no.");
+    const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+    expect(read("./SessionList.tsx")).not.toMatch(/`\+\$\{/);
+    expect(read("./NewSession.tsx")).not.toMatch(/"GitHub" : "Gitea"\}`/);
+  });
+  test("polling backs off: 5 s in view, a minute when hidden, doubling after failures up to a minute", () => {
+    expect(pollDelay({ hidden: false, failures: 0 })).toBe(5000);
+    expect(pollDelay({ hidden: true, failures: 0 })).toBe(60_000);
+    expect(pollDelay({ hidden: false, failures: 2 })).toBe(20_000);
+    expect(pollDelay({ hidden: false, failures: 9 })).toBe(60_000);
   });
 });

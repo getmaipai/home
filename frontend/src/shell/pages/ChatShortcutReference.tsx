@@ -6,7 +6,8 @@ import { CHAT_SHORTCUTS, registerChatShortcuts } from "@/shell/pages/chatShortcu
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 
-export function ChatShortcutReference() {
+/** The one keyboard reference. Chat mounts it bare; Code (CODE-UI-03) passes its own "new" action and the words for it, so the keys and the dialog are the same. */
+export function ChatShortcutReference({ onNew, newLabel, description }: { onNew?: () => void; newLabel?: string; description?: string } = {}) {
   const aui = useAui();
   const isRunning = useAuiState((state) => state.thread.isRunning);
   const availability = useContext(ChatAvailabilityContext);
@@ -14,20 +15,20 @@ export function ChatShortcutReference() {
   const chatColumn = useContext(ChatColumnControlContext);
 
   useEffect(() => {
-    return registerChatShortcuts({ aui, isRunning, unavailable: availability === "unavailable", setReferenceOpen: setOpen, toggleSidebar: chatColumn?.toggle });
-  }, [aui, availability, isRunning, chatColumn]);
+    return registerChatShortcuts({ aui, isRunning, unavailable: availability === "unavailable", setReferenceOpen: setOpen, toggleSidebar: chatColumn?.toggle, onNew });
+  }, [aui, availability, isRunning, chatColumn, onNew]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{i18n._({ id: "Keyboard shortcuts", message: "Keyboard shortcuts" })}</DialogTitle>
-          <DialogDescription>{i18n._({ id: "Shortcuts for chat and navigation.", message: "Shortcuts for chat and navigation." })}</DialogDescription>
+          <DialogDescription>{description ?? i18n._({ id: "Shortcuts for chat and navigation.", message: "Shortcuts for chat and navigation." })}</DialogDescription>
         </DialogHeader>
         <dl className="flex flex-col gap-3 text-sm">
           {CHAT_SHORTCUTS.map(([label, shortcut]) => (
             <div className="flex items-center justify-between gap-6" key={label}>
-              <dt>{label}</dt>
+              <dt>{newLabel && label === "New chat" ? newLabel : label}</dt>
               <dd className="font-mono text-muted-foreground">{shortcut}</dd>
             </div>
           ))}

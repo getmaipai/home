@@ -21,6 +21,7 @@ export function registerChatShortcuts({
   unavailable,
   setReferenceOpen,
   toggleSidebar,
+  onNew,
 }: {
   aui: AssistantClient;
   isRunning: boolean;
@@ -28,6 +29,8 @@ export function registerChatShortcuts({
   setReferenceOpen: (open: boolean) => void;
   /** COLUMN-01: the history column's own toggle (ChatColumnControl). */
   toggleSidebar?: () => void;
+  /** CODE-UI-03: another app's own "new" (Code starts a new session); Chat leaves it out and gets a new thread. */
+  onNew?: () => void;
 }): () => void {
   const unregisterSidebarShortcut = registerSidebarToggleShortcut(toggleSidebar);
   function onKeyDown(event: KeyboardEvent) {
@@ -49,7 +52,8 @@ export function registerChatShortcuts({
       setReferenceOpen(true);
     } else if (matches("new-chat")) {
       event.preventDefault();
-      if (!unavailable) void aui.threads.switchToNewThread();
+      if (unavailable) return;
+      if (onNew) onNew(); else void aui.threads.switchToNewThread();
     } else if (matches("focus-composer")) {
       event.preventDefault();
       document.querySelector<HTMLElement>('[aria-label="Message input"]')?.focus();

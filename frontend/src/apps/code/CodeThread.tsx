@@ -4,12 +4,17 @@
 // (the context ring) and ToolFallback (commands, file changes, approvals). Nothing is wrapped or restyled.
 import { i18n } from "@lingui/core";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { AssistantRuntimeProvider, ComposerPrimitive, unstable_defaultDirectiveFormatter, useExternalStoreRuntime, type AppendMessage, type AttachmentAdapter, type ThreadMessageLike, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComposerModes } from "@maipai/ui/src/elements/thread.aui";
 import { ComposerMentions } from "@maipai/ui/src/elements/composer-mentions.aui";
 import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { PendingActions, type PendingAction } from "@maipai/ui/src/elements/pending-actions";
+import { DraftRestore } from "@maipai/ui/src/elements/draft-restore";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
+import { useComposerDraftRestore } from "@/apps/chat/composerDraftRestore";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { TerminalBlock } from "@maipai/ui/src/elements/terminal-block";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
@@ -19,6 +24,8 @@ import { codeApi, type CodeContext, type CodeMessage, type CodeSession, type Cod
 import { approvalWords, outputLines, stopWords, tierWord } from "./codeTranscript";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { ContextRing } from "./ContextRing";
+import { CodeComposerContexts } from "./codeShared";
+import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
 
 const ShieldIcon = getIcon("shield-check");
 
@@ -94,13 +101,15 @@ const Welcome = () => <p className="p-6 text-center text-body text-muted-foregro
 /** Above the composer: what the agent is doing, held requests, the waiting messages, a failure, a problem. */
 const Queue = () => {
   const s = useState_();
+  const draft = useComposerDraftRestore();
   return <>
     {s.notices.map((n, i) => <p key={i} role="status" className="text-center text-body text-muted-foreground">{n}</p>)}
     {s.stage ? <ThinkingIndicator label={s.stage.label} elapsed={s.stage.elapsed} /> : null}
     {s.held.length > 0 ? <PendingActions actions={[...s.held]} /> : null}
     {s.queued.length > 0 ? <MessageQueue running={s.statusLine} queued={s.queued} onCancel={s.onCancelQueued} /> : null}
     {s.failure ? <StatusCard kind="problem" title={i18n._({ id: "The agent stopped", message: "The agent stopped" })} line={s.failure} /> : null}
-    {s.problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={s.problem} /> : null}
+    {s.problem ? <ErrorState title={s.problem} retrying={false} layout="inline" /> : null}
+    {draft ? <DraftRestore {...draft} /> : null}
   </>;
 };
 const Notice = () => { const s = useState_(); return <span data-slot="code-status">{s.statusLine}</span>; };
@@ -128,6 +137,8 @@ export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tre
 }) {
   const { session } = state;
   const sessionId = session.id;
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const attachments = useMemo<AttachmentAdapter>(() => ({
     accept: ".txt,.md,.json,.csv,.log,.yml,.yaml,.toml,.xml,.html,.css,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.kt,.swift,.c,.h,.cpp,.cs,.php,.sh,.sql,.png,.jpg,.jpeg,.gif,.webp,.pdf",
     add: async ({ file }) => { const done = await codeApi.upload(sessionId, file); return { id: done.path, type: file.type.startsWith("image/") ? "image" : "document", name: file.name, contentType: file.type || "text/plain", file, status: { type: "requires-action", reason: "composer-send" } }; },
@@ -151,10 +162,13 @@ export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tre
   const mentions = tree.filter((e) => e.kind === "file").slice(0, 400).map((e) => ({ id: e.path, type: "file", label: e.path }));
   return <AssistantRuntimeProvider runtime={runtime}>
     <StateContext.Provider value={state}>
+      <CodeComposerContexts draftId={`code-${sessionId}`} onRetry={() => { void queryClient.invalidateQueries({ queryKey: ["code-session", sessionId] }); void queryClient.invalidateQueries({ queryKey: ["code-messages", sessionId] }); }}>
+      <ChatShortcutReference onNew={() => navigate("/apps/code")} newLabel={i18n._({ id: "New session", message: "New session" })} description={i18n._({ id: "Shortcuts for coding and navigation.", message: "Shortcuts for coding and navigation." })} />
       <ComposerPrimitive.Unstable_TriggerPopoverRoot>
         <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes }} />
         {mentions.length > 0 ? <ComposerMentions items={mentions} formatter={unstable_defaultDirectiveFormatter} /> : null}
       </ComposerPrimitive.Unstable_TriggerPopoverRoot>
+      </CodeComposerContexts>
     </StateContext.Provider>
   </AssistantRuntimeProvider>;
 }

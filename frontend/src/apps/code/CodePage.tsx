@@ -1,49 +1,67 @@
 // CODE-APP-01: the Code app at /apps/code. The shell's rail entry comes from the bundled `code` package (hidden by the hub when Coding is off, paused or
 // not allowed for the person); the page is drawn here because a live transcript, a composer and a right pane are not schema nodes. A wide screen has the
-// sessions column beside the page; a phone shows the list as its own page and the session as another, with a back arrow in the header.
+// sessions column beside the page; a phone has the same column in Chat's left sheet (CODE-UI-03), opened from the header's menu button on the new session
+// page and inside a session. Code draws no phone list of its own.
 import { i18n } from "@lingui/core";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
-import { List } from "@maipai/ui/src/primitives/List";
+import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
-import { ApiError, type Roster } from "@/lib/api";
-import { errorLine } from "@/lib/hubReachability";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { getIcon } from "@maipai/ui/src/icons";
+import { ApiError } from "@/lib/api";
 import { NewSession } from "./NewSession";
-import { CodeSidebar, sessionMeta, useCodeSessions } from "./SessionList";
+import { CodeSidebar, useCodeSessions } from "./SessionList";
 import { SessionView } from "./SessionView";
-import { useChatColumn } from "@/shell/pages/ChatColumn";
+import { codeErrorLine } from "./codeShared";
+import { chatColumnSheetContent, useChatColumn } from "@/shell/pages/ChatColumn";
 import { registerSidebarToggleShortcut } from "@/shell/pages/chatShortcuts";
+
+const TerminalIcon = getIcon("terminal");
 
 /** The session id in /apps/code/<id>, or undefined on the index. */
 export const sessionIdOf = (pathname: string): string | undefined => /^\/apps\/code\/(csess-[a-z0-9]+)\/?$/.exec(pathname)?.[1];
 
-export function CodePage({ person: _person }: { person: Roster }) {
+export function CodePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const breakpoint = useBreakpoint();
   const phone = breakpoint.width < 1024;
   const column = useChatColumn({ isDesktop: !phone, railSlot: "code-rail" });
-  // Cmd/Ctrl+B hides and shows the column, the one binding Chat and Settings use.
+  // Cmd/Ctrl+B hides and shows the column (or opens the phone sheet): the one binding Chat and Settings use. The composer's shortcut reference does not
+  // register it again here, so it never toggles twice.
   useEffect(() => registerSidebarToggleShortcut(column.control.toggle), [column.control]);
   const id = sessionIdOf(location.pathname);
   const sessions = useCodeSessions();
-  if (sessions.isError) {
-    const refused = sessions.error instanceof ApiError && sessions.error.status === 403;
-    return <EmptyState icon="terminal" text={refused ? (sessions.error as Error).message : errorLine(sessions.error, i18n._({ id: "Could not load your sessions. Try again.", message: "Could not load your sessions. Try again." }))} />;
-  }
   const rows = sessions.data ?? [];
-  if (phone) {
-    if (id) return <div className="flex min-h-0 flex-1 flex-col" data-workspace-fill=""><SessionView id={id} /></div>;
-    return <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-workspace-fill="" data-slot="code-sessions-page">
-      <div className="flex min-h-[28rem] flex-1 flex-col" data-slot="code-new-session"><NewSession /></div>
-      {rows.length > 0 ? <List label={i18n._({ id: "Sessions", message: "Sessions" })} items={rows} getKey={(s) => s.id} onSelect={(s) => navigate(`/apps/code/${s.id}`)} getLabel={(s) => s.title}
-        renderItem={(s) => <span className="flex min-w-0 flex-col"><span className="truncate text-body font-medium">{s.title}</span><span className="truncate text-body text-muted-foreground">{sessionMeta(s)}</span></span>} /> : null}
+  const failed = sessions.isError;
+  const refused = failed && sessions.error instanceof ApiError && sessions.error.status === 403;
+  const line = failed ? codeErrorLine(sessions.error, i18n._({ id: "Could not load your sessions. Try again.", message: "Could not load your sessions. Try again." })) : "";
+  const openSessions = () => column.setSheetOpen(true);
+  const page = id
+    ? <SessionView key={id} id={id} {...(phone ? { onOpenSessions: openSessions } : {})} />
+    : <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-slot="code-new-session">
+      {phone ? <ChatHeader name={i18n._({ id: "New session", message: "New session" })} media={<TerminalIcon aria-hidden className="size-6" />} onMenu={openSessions} menuExpanded={column.sheetOpen} menuControls="code-sessions-sheet" /> : null}
+      <NewSession />
     </div>;
-  }
-  return <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="code-frame">
-    <CodeSidebar sessions={rows} currentId={id} column={column} />
-    {id ? <SessionView key={id} id={id} /> : <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-slot="code-new-session"><NewSession /></div>}
-  </div>;
+  const body = refused
+    ? <EmptyState icon="terminal" text={line} actionLabel={i18n._({ id: "Open Chat", message: "Open Chat" })} onAction={() => navigate("/chat")} />
+    : failed ? <ErrorState title={line} retrying={sessions.isFetching} onRetry={() => void sessions.refetch()} /> : page;
+  return <>
+    <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="code-frame">
+      {phone ? null : <CodeSidebar sessions={rows} currentId={id} column={column} />}
+      {body}
+    </div>
+    {phone ? <Sheet open={column.sheetOpen} onOpenChange={column.setSheetOpen}>
+      <SheetContent {...chatColumnSheetContent}>
+        <SheetHeader className="sr-only">
+          <SheetTitle>{i18n._({ id: "Sessions", message: "Sessions" })}</SheetTitle>
+          <SheetDescription>{i18n._({ id: "Your coding sessions", message: "Your coding sessions" })}</SheetDescription>
+        </SheetHeader>
+        <CodeSidebar sessions={rows} currentId={id} column={column} mobile />
+      </SheetContent>
+    </Sheet> : null}
+  </>;
 }
-

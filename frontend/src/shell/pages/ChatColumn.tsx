@@ -110,3 +110,20 @@ export function useChatColumn({ isDesktop, railSlot = CHAT_COLUMN_SLOT }: { isDe
   };
 }
 
+
+/** The phone and tablet history column's sheet: Chat and Code both render `<SheetContent {...chatColumnSheetContent}>` (CODE-UI-03), so the left sheet's width, focus
+ *  and Escape behaviour are defined once; each page puts its own sidebar inside. */
+export const chatColumnSheetContent = {
+  "data-chat-column-mobile": "",
+  side: "left" as const,
+  className: "w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden",
+  // While the search field has focus, Escape belongs to the field (it clears the text, then closes the field); only an Escape outside the field closes the sheet.
+  onEscapeKeyDown: (event: KeyboardEvent) => {
+    if (event.target instanceof HTMLInputElement && event.target.type === "search") event.preventDefault();
+  },
+  // The sheet takes focus itself rather than its first button, so opening it never pops that button's tooltip.
+  onOpenAutoFocus: (event: Event) => {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
+  },
+};
