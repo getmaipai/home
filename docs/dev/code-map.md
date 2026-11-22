@@ -1330,6 +1330,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/templateCovers.ts` | TEMPLATE_COVER_IDS, templateCoverUrl |
 | `backend/src/lib/text.ts` | wordsOf, collapseSpaces, ownWordsQuery, tokenize, isBarePronoun |
 | `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
+| `backend/src/lib/tierLease/policy.ts` | ENGAGED_PROTECTION_MS, LEASE_REGISTRY, isLeaseKey, leaseKeyForCategory, NO_QUEUE_SIGNALS, graceMsFor |
 | `backend/src/lib/tierSlotMigration.ts` | QUICK_MODEL_KEY, DETAILED_ENABLED_KEY, MODEL_OF_CHOICE, copyLegacyIntoSlot, migrateTierSlots |
 | `backend/src/lib/tiers.ts` | TIER_GRANT, tierGrantFor, isTier, slotKey, readSlot, writeSlotModel |
 | `backend/src/lib/timerStatus.ts` | timerStatusReply |
