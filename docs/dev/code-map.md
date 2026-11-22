@@ -544,7 +544,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, previewInspiredVoice, renameClonedVoice |
 | `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, fromSandboxNetwork, transportRefusal, requestsPerMinute |
-| `backend/src/lib/codeReady.ts` | codeReady |
+| `backend/src/lib/codeReady.ts` | probeRoute, codeReady |
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
@@ -560,6 +560,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingOpencode.ts` | MAX_ARG_CHARS, GATEWAY_MODEL, SANDBOX_PROMPT, openCodeConfig, mapOpenCodeEvent, MAX_ROUNDS |
 | `backend/src/lib/codingPause.ts` | codingPausedByAdmin |
 | `backend/src/lib/codingPullRequest.ts` | __setPullRequestDepsForTests, createCodingPullRequest |
+| `backend/src/lib/codingReadiness.ts` | readinessFrom, codingReadiness, readinessLineFor, __setCodingReadinessForTests, __READY_FOR_TESTS |
 | `backend/src/lib/codingRedact.ts` | REDACTED, redactCredentials, redactDeep |
 | `backend/src/lib/codingRuntime.ts` | mintSessionKeyFor, startCodingRuntime |
 | `backend/src/lib/codingSandbox.ts` | SandboxClientError, gatewayPortBody, sandboxIdOf, createStackSandbox |

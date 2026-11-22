@@ -34929,6 +34929,7 @@
                             "model",
                             "folder",
                             "sandbox",
+                            "exec",
                             "gateway"
                           ]
                         },
@@ -34964,6 +34965,7 @@
                               "model",
                               "folder",
                               "sandbox",
+                              "exec",
                               "gateway"
                             ]
                           },
@@ -55358,6 +55360,70 @@
         }
       }
     },
+    "/api/code/readiness": {
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Can a Code message run right now, and if not, why and what to do",
+        "responses": {
+          "200": {
+            "description": "Read-only; shared for a few seconds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "One reason code, `ready` when a message can run; for logs and tests, never shown to a person."
+                    },
+                    "line": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The plain sentence with the next step; null when ready."
+                    },
+                    "can_fix": {
+                      "type": "boolean",
+                      "description": "True for an owner or admin: the line names the fix and the app shows a Repairs link."
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "reason",
+                    "line",
+                    "can_fix"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Coding is not available to this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/sessions": {
       "post": {
         "tags": [
@@ -55845,7 +55911,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -56729,7 +56795,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -56819,7 +56885,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -57223,7 +57289,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -57627,7 +57693,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -58044,7 +58110,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -58461,7 +58527,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -58878,7 +58944,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59277,7 +59343,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59375,7 +59441,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59495,7 +59561,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59616,7 +59682,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59708,7 +59774,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59848,7 +59914,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -59972,7 +60038,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60092,7 +60158,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60195,7 +60261,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60297,7 +60363,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60404,7 +60470,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60496,7 +60562,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60597,7 +60663,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60720,7 +60786,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60821,7 +60887,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -60931,7 +60997,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -61041,7 +61107,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
@@ -61164,7 +61230,7 @@
             }
           },
           "409": {
-            "description": "The session is busy",
+            "description": "The session is busy, or Code is not ready to run a message (the error says why and what to do)",
             "content": {
               "application/json": {
                 "schema": {
