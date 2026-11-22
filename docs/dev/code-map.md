@@ -550,7 +550,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
 | `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
 | `backend/src/lib/codingRedact.ts` | REDACTED, redactCredentials, redactDeep |
-| `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, getSessionRow, createCodingSession |
+| `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess, getSessionRow |
 | `backend/src/lib/codingShare.ts` | setSecretScanner, __setWorkspaceRootForTests, codingWorkspace, __setShareRemoteForTests, checkSecretsBeforeShare, pushCodingSession |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
 | `backend/src/lib/codingTurns.ts` | setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, DEFAULT_MAX_SESSIONS, __setSessionCapForTests, householdSessionCap |
