@@ -522,6 +522,10 @@ export function listOverrideValues(actor: PersonRow, personId: string): Settings
 const householdWriteListeners: Array<(key: string, value: unknown) => void> = [];
 /** Runs after every household-scope write has been stored (a listener that throws never fails the write). Used by the Coding kill switch (lib/codingTurns.ts). */
 export function onHouseholdSettingWrite(listener: (key: string, value: unknown) => void): void { if (!householdWriteListeners.includes(listener)) householdWriteListeners.push(listener); }
+function notifyHouseholdWrite(scope: string, key: string, value: unknown): void {
+  if (scope !== "household") return;
+  for (const listener of householdWriteListeners) { try { listener(key, value); } catch { /* a listener never fails the write */ } }
+}
 function writeValue(
   scope: string,
   keyDef: SettingsKey,
@@ -575,7 +579,7 @@ function writeValue(
 
   settingsCache.delete(settingsCacheKey(scope, key));
   invalidatePassForSetting(scope, key);
-  if (scope === "household") for (const listener of householdWriteListeners) { try { listener(key, value); } catch { /* a listener never fails the write */ } }
+  notifyHouseholdWrite(scope, key, value);
   const descriptionContext = opts.viewer
     ? { viewer: opts.viewer, subject: opts.subject, adminName: opts.adminName }
     : undefined;
@@ -1188,6 +1192,7 @@ function resetValueGated(actor: PersonRow, scope: string, key: string): Settings
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
   invalidatePassForSetting(scope, key);
+  notifyHouseholdWrite(scope, key, keyDef.default); // a reset to the default is a write too (resetting Coding to off must trip the kill switch)
   const restored = isLayeredScalar(keyDef) && parsed.kind === "person" && parsed.id
     ? resolveLayeredScalar(keyDef, parsed.id, speakerAgeBand(responseSubject(actor, parsed), new Date()))
     : { value: keyDef.default, layer: "default" as const };

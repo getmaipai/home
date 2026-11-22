@@ -140,8 +140,7 @@ async function startTurn(turn: Turn): Promise<void> {
   if (codingSessionRefusal(person)) {
     turn.stopReason ??= "denied";
     updateSession(session.id, { state: "idle" });
-    appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "denied" }] });
-    recordCodingEvent({ sessionId: turn.sessionId, personId: turn.personId, kind: "stopped", detail: { reason: "denied" } });
+    noteDenied(turn);
     log("turn_refused_at_start", turn);
     settle(turn, "cancelled"); clearQueue(turn.sessionId); refreshHouseholdQueue();
     return;
@@ -167,6 +166,12 @@ async function recordChanges(rt: CodingRuntime, sessionId: string): Promise<void
   const exec = (rt.sandbox as { exec?: Parameters<typeof readChangeCounts>[0] }).exec?.bind(rt.sandbox);
   const counts = await readChangeCounts(exec, sessionId);
   if (counts) updateSession(sessionId, { changes: counts });
+}
+
+/** The stopped-run card and trail line for a turn ended because the person's access, or Coding itself, ended. */
+function noteDenied(turn: Pick<Turn, "id" | "sessionId" | "personId">): void {
+  appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "denied" }] });
+  recordCodingEvent({ sessionId: turn.sessionId, personId: turn.personId, kind: "stopped", detail: { reason: "denied" } });
 }
 
 async function runTurn(turn: Turn, environmentId: string): Promise<void> {
@@ -208,7 +213,11 @@ const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown 
     updateSession(turn.sessionId, { state: turn.abort.signal.aborted ? "idle" : "failed", lastActivityAt: new Date().toISOString() });
     if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn, `reason=${why}`); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error" }] }); }
     settle(turn, turn.abort.signal.aborted ? "cancelled" : "failed");
-  } finally { if (timer) clearTimeout(timer); }
+  } finally {
+    if (timer) clearTimeout(timer);
+    // The kill switch may have stopped the sandbox while this turn was still starting it: stop it again so nothing is left running.
+    if (turn.stopReason === "denied") void rt.sandbox.stop(turn.sessionId).catch(() => undefined);
+  }
   if (turn.state === "done") {
     // CODE-NOTIFY-01: "finished its work" means nothing is left in the message queue; a person who typed ahead is not pinged between messages.
     if (!(messageQueues.get(turn.sessionId)?.length)) void trigger("coding.session_done", {}, { personId: turn.personId });
@@ -343,7 +352,7 @@ export async function enforceCodingKillSwitch(): Promise<number> {
   for (const turn of [...turns.values()]) {
     if (turn.state !== "queued" && turn.state !== "running") continue;
     turn.stopReason ??= "denied"; turn.abort.abort();
-    if (turn.state === "queued") settle(turn, "cancelled");
+    if (turn.state === "queued") { noteDenied(turn); settle(turn, "cancelled"); }
     log("turn_killed", turn);
   }
   messageQueues.clear();
