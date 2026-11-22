@@ -191,7 +191,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/code/CodeThread.tsx` | toThreadMessages, codeComposerModes, CodeThread |
 | `frontend/src/apps/code/ContextRing.tsx` | ContextRing |
 | `frontend/src/apps/code/NewSession.tsx` | CODE_TIERS_KEY, CODE_SESSIONS_KEY, tierOptions, NewSession |
-| `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, sessionItems, CodeSidebar |
+| `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, CodeSidebar |
+| `frontend/src/apps/code/SessionRow.tsx` | SessionRow |
 | `frontend/src/apps/code/SessionTabs.tsx` | ChangesTab, FilesTab, TerminalTab, PlanTab |
 | `frontend/src/apps/code/SessionView.tsx` | SessionView |
 | `frontend/src/apps/code/codeShared.tsx` | codeErrorLine, pollDelay, CodeComposerContexts |
@@ -562,7 +563,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingRuntime.ts` | mintSessionKeyFor, startCodingRuntime |
 | `backend/src/lib/codingSandbox.ts` | SandboxClientError, gatewayPortBody, sandboxIdOf, createStackSandbox |
 | `backend/src/lib/codingSandboxListener.ts` | sandboxBridgeAddress, sandboxBridgePort, inBridgeNetwork, guardSandboxRequest, sandboxListenerFailure, configureSandboxListener |
-| `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess, getSessionRow |
+| `backend/src/lib/codingSessions.ts` | CodingSessionListed, TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess |
 | `backend/src/lib/codingShare.ts` | setSecretScanner, codingWorkspaceRoot, __setWorkspaceRootForTests, codingWorkspace, handWorkspaceToEngine, __setShareRemoteForTests |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
 | `backend/src/lib/codingTurns.ts` | CodingTurnError, setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, messageBudgetMs, DEFAULT_MAX_SESSIONS |
@@ -1365,6 +1366,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/translate/markdown.ts` | splitMarkdown, joinMarkdown |
 | `backend/src/lib/translate/stack.ts` | stackOnlyFetch, chatReady, StackNotReadyError, stackCompleter |
 | `backend/src/lib/translate/validate.ts` | validateTranslation, isProtected |
+| `backend/src/lib/trash/codingSessions.ts` | restoreCodingSession |
 | `backend/src/lib/trash/podcastCopies.ts` | isPodcastCopyTrash, mayManagePodcastCopy, trashPodcastCopy |
 | `backend/src/lib/trash/registry.ts` | registerTrashProvider, trashProvider, listTrash, purgeExpired |
 | `backend/src/lib/trash/sweep.ts` | TRASH_SWEEP_MS, startTrashSweeper, stopTrashSweeper |

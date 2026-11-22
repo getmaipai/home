@@ -55863,7 +55863,7 @@
         "summary": "My Code sessions, newest activity first",
         "responses": {
           "200": {
-            "description": "Only the signed-in person's sessions.",
+            "description": "Only the signed-in person's sessions, with pinned_at, archived_at and unread (CODE-UX-01).",
             "content": {
               "application/json": {
                 "schema": {
@@ -56150,6 +56150,17 @@
                         "type": "string",
                         "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                         "description": "Hybrid logical clock: wall_ms:counter:node."
+                      },
+                      "pinned_at": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "archived_at": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "unread": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -56166,10 +56177,12 @@
                       "created_at",
                       "last_activity_at",
                       "provenance",
-                      "hlc"
+                      "hlc",
+                      "pinned_at",
+                      "archived_at",
+                      "unread"
                     ],
-                    "additionalProperties": false,
-                    "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                    "additionalProperties": false
                   }
                 }
               }
@@ -56570,6 +56583,17 @@
                           "type": "string",
                           "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                           "description": "Hybrid logical clock: wall_ms:counter:node."
+                        },
+                        "pinned_at": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "archived_at": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "unread": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -56586,10 +56610,12 @@
                         "created_at",
                         "last_activity_at",
                         "provenance",
-                        "hlc"
+                        "hlc",
+                        "pinned_at",
+                        "archived_at",
+                        "unread"
                       ],
-                      "additionalProperties": false,
-                      "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                      "additionalProperties": false
                     },
                     "coding_notice": {
                       "type": "string",
@@ -56708,7 +56734,7 @@
         "tags": [
           "Code"
         ],
-        "summary": "Delete a session (it stays in the trash for a while)",
+        "summary": "Delete a session: it moves to the household Trash for 30 days and POST /api/trash/coding_session/{id}/restore brings it back",
         "parameters": [
           {
             "schema": {
@@ -57546,6 +57572,1636 @@
                   ],
                   "additionalProperties": false,
                   "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/title": {
+      "put": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Rename a session",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session with its new name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^csess-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "repo": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea",
+                            "hub_folder",
+                            "none"
+                          ]
+                        },
+                        "connection_id": {
+                          "type": "string",
+                          "pattern": "^gitc-[a-z0-9]{6,}$",
+                          "description": "The git-connection used for github and gitea repositories."
+                        },
+                        "full_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "owner/name on the git host."
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "description": "Relative path inside the household folder, for hub_folder."
+                        },
+                        "base_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "work_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "base_branch",
+                        "work_branch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "environment_id": {
+                      "type": "string",
+                      "pattern": "^cenv-[a-z0-9]{6,}$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "ask",
+                        "auto_edit"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "starting",
+                        "working",
+                        "needs_you",
+                        "idle",
+                        "paused",
+                        "done",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "default": "standard",
+                      "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                    },
+                    "network": {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "hosts"
+                          ],
+                          "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                        },
+                        "hosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 253,
+                            "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "hosts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "mounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$"
+                      },
+                      "description": "Household storage file ids mounted read only."
+                    },
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "object",
+                      "properties": {
+                        "files": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "additions",
+                        "deletions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pull_request": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "number",
+                            "draft"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "checkpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "at",
+                          "label",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    },
+                    "pinned_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "archived_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "title",
+                    "repo",
+                    "environment_id",
+                    "mode",
+                    "state",
+                    "network",
+                    "usage",
+                    "changes",
+                    "created_at",
+                    "last_activity_at",
+                    "provenance",
+                    "hlc",
+                    "pinned_at",
+                    "archived_at",
+                    "unread"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/pin": {
+      "put": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Pin or unpin a session; pinned sessions lead the list",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pinned": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pinned"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session with its pin state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^csess-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "repo": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea",
+                            "hub_folder",
+                            "none"
+                          ]
+                        },
+                        "connection_id": {
+                          "type": "string",
+                          "pattern": "^gitc-[a-z0-9]{6,}$",
+                          "description": "The git-connection used for github and gitea repositories."
+                        },
+                        "full_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "owner/name on the git host."
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "description": "Relative path inside the household folder, for hub_folder."
+                        },
+                        "base_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "work_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "base_branch",
+                        "work_branch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "environment_id": {
+                      "type": "string",
+                      "pattern": "^cenv-[a-z0-9]{6,}$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "ask",
+                        "auto_edit"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "starting",
+                        "working",
+                        "needs_you",
+                        "idle",
+                        "paused",
+                        "done",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "default": "standard",
+                      "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                    },
+                    "network": {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "hosts"
+                          ],
+                          "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                        },
+                        "hosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 253,
+                            "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "hosts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "mounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$"
+                      },
+                      "description": "Household storage file ids mounted read only."
+                    },
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "object",
+                      "properties": {
+                        "files": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "additions",
+                        "deletions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pull_request": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "number",
+                            "draft"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "checkpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "at",
+                          "label",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    },
+                    "pinned_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "archived_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "title",
+                    "repo",
+                    "environment_id",
+                    "mode",
+                    "state",
+                    "network",
+                    "usage",
+                    "changes",
+                    "created_at",
+                    "last_activity_at",
+                    "provenance",
+                    "hlc",
+                    "pinned_at",
+                    "archived_at",
+                    "unread"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/archive": {
+      "put": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Archive or unarchive a session (a working session is refused)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archived": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "archived"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session with its archive state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^csess-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "repo": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea",
+                            "hub_folder",
+                            "none"
+                          ]
+                        },
+                        "connection_id": {
+                          "type": "string",
+                          "pattern": "^gitc-[a-z0-9]{6,}$",
+                          "description": "The git-connection used for github and gitea repositories."
+                        },
+                        "full_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "owner/name on the git host."
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "description": "Relative path inside the household folder, for hub_folder."
+                        },
+                        "base_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "work_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "base_branch",
+                        "work_branch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "environment_id": {
+                      "type": "string",
+                      "pattern": "^cenv-[a-z0-9]{6,}$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "ask",
+                        "auto_edit"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "starting",
+                        "working",
+                        "needs_you",
+                        "idle",
+                        "paused",
+                        "done",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "default": "standard",
+                      "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                    },
+                    "network": {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "hosts"
+                          ],
+                          "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                        },
+                        "hosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 253,
+                            "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "hosts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "mounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$"
+                      },
+                      "description": "Household storage file ids mounted read only."
+                    },
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "object",
+                      "properties": {
+                        "files": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "additions",
+                        "deletions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pull_request": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "number",
+                            "draft"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "checkpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "at",
+                          "label",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    },
+                    "pinned_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "archived_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "title",
+                    "repo",
+                    "environment_id",
+                    "mode",
+                    "state",
+                    "network",
+                    "usage",
+                    "changes",
+                    "created_at",
+                    "last_activity_at",
+                    "provenance",
+                    "hlc",
+                    "pinned_at",
+                    "archived_at",
+                    "unread"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/opened": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "The owner has seen the session as it is now (clears its unread dot)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session, no longer unread.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^csess-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "repo": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea",
+                            "hub_folder",
+                            "none"
+                          ]
+                        },
+                        "connection_id": {
+                          "type": "string",
+                          "pattern": "^gitc-[a-z0-9]{6,}$",
+                          "description": "The git-connection used for github and gitea repositories."
+                        },
+                        "full_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "owner/name on the git host."
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "description": "Relative path inside the household folder, for hub_folder."
+                        },
+                        "base_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "work_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "base_branch",
+                        "work_branch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "environment_id": {
+                      "type": "string",
+                      "pattern": "^cenv-[a-z0-9]{6,}$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "ask",
+                        "auto_edit"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "starting",
+                        "working",
+                        "needs_you",
+                        "idle",
+                        "paused",
+                        "done",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "default": "standard",
+                      "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                    },
+                    "network": {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "hosts"
+                          ],
+                          "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                        },
+                        "hosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 253,
+                            "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "hosts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "mounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$"
+                      },
+                      "description": "Household storage file ids mounted read only."
+                    },
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "object",
+                      "properties": {
+                        "files": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "additions",
+                        "deletions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pull_request": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "number",
+                            "draft"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "checkpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "at",
+                          "label",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    },
+                    "pinned_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "archived_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "title",
+                    "repo",
+                    "environment_id",
+                    "mode",
+                    "state",
+                    "network",
+                    "usage",
+                    "changes",
+                    "created_at",
+                    "last_activity_at",
+                    "provenance",
+                    "hlc",
+                    "pinned_at",
+                    "archived_at",
+                    "unread"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
