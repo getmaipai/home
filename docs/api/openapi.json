@@ -32715,1137 +32715,32 @@
         }
       }
     },
-    "/api/ai/feature-models": {
+    "/api/ai/stack/choices": {
       "get": {
         "tags": [
           "AI"
         ],
-        "summary": "The models behind each feature, in order, as the Stack names them",
+        "summary": "Everything the AI and models page shows (the Stack's GET /stack/v1/choices)",
         "responses": {
           "200": {
-            "description": "Names, descriptions, sizes, states and the order, all from the Stack's parts list and jobs catalog; the household's own order only reorders them. A child or teen's list is the Stack's minor list.",
+            "description": "The Stack's answer, unchanged.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "audience": {
-                      "type": "string",
-                      "enum": [
-                        "adult",
-                        "minor"
-                      ]
-                    },
-                    "features": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "enum": [
-                              "pictures",
-                              "videos",
-                              "music"
-                            ]
-                          },
-                          "ordered": {
-                            "type": "boolean",
-                            "enum": [
-                              true
-                            ]
-                          },
-                          "order": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "models": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "label": {
-                                  "type": "string"
-                                },
-                                "description": {
-                                  "type": "string"
-                                },
-                                "rank": {
-                                  "type": "number"
-                                },
-                                "state": {
-                                  "type": "string",
-                                  "enum": [
-                                    "ready",
-                                    "missing",
-                                    "installing",
-                                    "updating",
-                                    "failed",
-                                    "unsupported"
-                                  ]
-                                },
-                                "size_bytes": {
-                                  "type": "number"
-                                },
-                                "download_bytes": {
-                                  "type": "number"
-                                },
-                                "percent": {
-                                  "type": "number",
-                                  "nullable": true
-                                },
-                                "running": {
-                                  "type": "boolean"
-                                },
-                                "failure": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "install_block": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "for_minors": {
-                                  "type": "boolean",
-                                  "enum": [
-                                    true
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "label",
-                                "description",
-                                "rank",
-                                "state",
-                                "size_bytes",
-                                "download_bytes",
-                                "percent",
-                                "running",
-                                "failure",
-                                "install_block"
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "ordered",
-                          "order",
-                          "models"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "audience",
-                    "features"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The AI engine did not answer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/feature-models/{feature}/order": {
-      "put": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Move models to the top of a feature (empty list = the Stack's own order)",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "feature",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "order": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 120
-                    },
-                    "maxItems": 40
+                  "additionalProperties": {
+                    "nullable": true
                   }
-                },
-                "required": [
-                  "order"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Saved and sent to the AI engine.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  },
-                  "required": [
-                    "ok"
-                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Not a feature with an order, or a bad list",
+            "description": "The Stack refused the value (its sentence says why)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Saved, but the AI engine did not answer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/overview": {
-      "get": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "A household view of AI features, their model levels and any attention needed",
-        "responses": {
-          "200": {
-            "description": "The feature overview assembled from current Stack candidates, installed components, saved slots and current health.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "features": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "used_by": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "levels": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "tier": {
-                                  "type": "string",
-                                  "enum": [
-                                    "reduced",
-                                    "standard",
-                                    "boost",
-                                    "max"
-                                  ]
-                                },
-                                "state": {
-                                  "type": "string",
-                                  "enum": [
-                                    "ready",
-                                    "missing",
-                                    "problem",
-                                    "off",
-                                    "unset",
-                                    "waits",
-                                    "same"
-                                  ]
-                                },
-                                "word": {
-                                  "type": "string"
-                                },
-                                "model_label": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "automatic": {
-                                  "type": "boolean"
-                                },
-                                "model_id": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "can_choose": {
-                                  "type": "boolean"
-                                },
-                                "options": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "id": {
-                                        "type": "string"
-                                      },
-                                      "label": {
-                                        "type": "string"
-                                      },
-                                      "installed": {
-                                        "type": "boolean"
-                                      },
-                                      "size_bytes": {
-                                        "type": "number",
-                                        "nullable": true
-                                      },
-                                      "good_at": {
-                                        "type": "string",
-                                        "nullable": true
-                                      },
-                                      "suggested": {
-                                        "type": "boolean"
-                                      }
-                                    },
-                                    "required": [
-                                      "id",
-                                      "label",
-                                      "installed",
-                                      "size_bytes",
-                                      "good_at",
-                                      "suggested"
-                                    ]
-                                  }
-                                },
-                                "size_bytes_missing": {
-                                  "type": "number",
-                                  "nullable": true
-                                },
-                                "detail": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "action": {
-                                  "type": "object",
-                                  "nullable": true,
-                                  "properties": {
-                                    "kind": {
-                                      "type": "string",
-                                      "enum": [
-                                        "download",
-                                        "fix",
-                                        "open"
-                                      ]
-                                    },
-                                    "label": {
-                                      "type": "string"
-                                    },
-                                    "job": {
-                                      "type": "string"
-                                    },
-                                    "level": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "required": [
-                                    "kind",
-                                    "label"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "tier",
-                                "state",
-                                "word",
-                                "model_label",
-                                "automatic",
-                                "model_id",
-                                "can_choose",
-                                "options",
-                                "size_bytes_missing",
-                                "detail",
-                                "action"
-                              ]
-                            }
-                          },
-                          "ready_count": {
-                            "type": "number"
-                          },
-                          "level_count": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "used_by",
-                          "levels",
-                          "ready_count",
-                          "level_count"
-                        ]
-                      }
-                    },
-                    "helpers": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "parent": {
-                            "type": "string"
-                          },
-                          "component_id": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "size_bytes_missing": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "model_label": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "used_by": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "ready",
-                              "missing",
-                              "problem",
-                              "off",
-                              "waits",
-                              "same"
-                            ]
-                          },
-                          "action": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "kind": {
-                                "type": "string",
-                                "enum": [
-                                  "download",
-                                  "fix",
-                                  "open"
-                                ]
-                              },
-                              "label": {
-                                "type": "string"
-                              },
-                              "job": {
-                                "type": "string"
-                              },
-                              "level": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "kind",
-                              "label"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "parent",
-                          "component_id",
-                          "size_bytes_missing",
-                          "model_label",
-                          "used_by",
-                          "state",
-                          "action"
-                        ]
-                      }
-                    },
-                    "attention": {
-                      "type": "object",
-                      "properties": {
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "kind": {
-                                "type": "string",
-                                "enum": [
-                                  "problem",
-                                  "missing"
-                                ]
-                              },
-                              "title": {
-                                "type": "string"
-                              },
-                              "line": {
-                                "type": "string"
-                              },
-                              "action": {
-                                "type": "object",
-                                "nullable": true,
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": [
-                                      "download",
-                                      "fix",
-                                      "open"
-                                    ]
-                                  },
-                                  "label": {
-                                    "type": "string"
-                                  },
-                                  "job": {
-                                    "type": "string"
-                                  },
-                                  "level": {
-                                    "type": "string"
-                                  }
-                                },
-                                "required": [
-                                  "kind",
-                                  "label"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "kind",
-                              "title",
-                              "line",
-                              "action"
-                            ]
-                          }
-                        },
-                        "download_all": {
-                          "type": "object",
-                          "nullable": true,
-                          "properties": {
-                            "bytes": {
-                              "type": "number"
-                            },
-                            "count": {
-                              "type": "number"
-                            }
-                          },
-                          "required": [
-                            "bytes",
-                            "count"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "items",
-                        "download_all"
-                      ]
-                    },
-                    "right_now": {
-                      "type": "object",
-                      "properties": {
-                        "engine": {
-                          "type": "string",
-                          "enum": [
-                            "ready",
-                            "problem"
-                          ]
-                        },
-                        "waiting": {
-                          "type": "number"
-                        },
-                        "memory_free_bytes": {
-                          "type": "number"
-                        },
-                        "models_bytes": {
-                          "type": "number"
-                        },
-                        "disk_free_bytes": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "engine",
-                        "waiting",
-                        "memory_free_bytes",
-                        "models_bytes",
-                        "disk_free_bytes"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "features",
-                    "helpers",
-                    "attention",
-                    "right_now"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/choices": {
-      "get": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "The seven job cards: every choice, which one is the household's now, which is recommended",
-        "responses": {
-          "200": {
-            "description": "The cards, the Always on line, the set-to-recommended plan and how much Free up space can find. With the engine down the cards are empty and the message says what to do.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "stack": {
-                      "type": "string",
-                      "enum": [
-                        "ok",
-                        "unreachable"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "tier": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "free_disk_bytes": {
-                      "type": "number",
-                      "nullable": true
-                    },
-                    "installed_bytes": {
-                      "type": "number"
-                    },
-                    "cards": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "enum": [
-                              "chat",
-                              "pictures",
-                              "picturesdetailed",
-                              "videos",
-                              "music",
-                              "sounds",
-                              "stems",
-                              "voice",
-                              "wakeword",
-                              "vision",
-                              "coding",
-                              "faces",
-                              "ingredients"
-                            ]
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "summary": {
-                            "type": "string"
-                          },
-                          "chip": {
-                            "type": "string"
-                          },
-                          "choices": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "job": {
-                                  "type": "string",
-                                  "enum": [
-                                    "chat",
-                                    "pictures",
-                                    "picturesdetailed",
-                                    "videos",
-                                    "music",
-                                    "sounds",
-                                    "stems",
-                                    "voice",
-                                    "wakeword",
-                                    "vision",
-                                    "coding",
-                                    "faces",
-                                    "ingredients"
-                                  ]
-                                },
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "radio",
-                                    "switch",
-                                    "fixed"
-                                  ]
-                                },
-                                "label": {
-                                  "type": "string"
-                                },
-                                "description": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "rowIds": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                "recommended": {
-                                  "type": "boolean"
-                                },
-                                "current": {
-                                  "type": "boolean"
-                                },
-                                "state": {
-                                  "type": "string",
-                                  "enum": [
-                                    "installed",
-                                    "installing",
-                                    "notInstalled",
-                                    "failed"
-                                  ]
-                                },
-                                "percent": {
-                                  "type": "number",
-                                  "nullable": true
-                                },
-                                "failure": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "downloadBytes": {
-                                  "type": "number"
-                                },
-                                "installedBytes": {
-                                  "type": "number"
-                                },
-                                "ramBytes": {
-                                  "type": "number"
-                                },
-                                "ramBasis": {
-                                  "type": "string",
-                                  "enum": [
-                                    "estimate",
-                                    "measured"
-                                  ]
-                                },
-                                "stateText": {
-                                  "type": "string"
-                                },
-                                "blockedReason": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "action": {
-                                  "type": "string",
-                                  "enum": [
-                                    "none",
-                                    "use",
-                                    "get",
-                                    "remove"
-                                  ]
-                                },
-                                "setting": {
-                                  "type": "object",
-                                  "nullable": true,
-                                  "properties": {
-                                    "key": {
-                                      "type": "string"
-                                    },
-                                    "value": {
-                                      "nullable": true
-                                    }
-                                  },
-                                  "required": [
-                                    "key"
-                                  ]
-                                },
-                                "chosenNotReady": {
-                                  "type": "boolean"
-                                },
-                                "details": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "name": {
-                                        "type": "string"
-                                      },
-                                      "sizeBytes": {
-                                        "type": "number"
-                                      }
-                                    },
-                                    "required": [
-                                      "name",
-                                      "sizeBytes"
-                                    ]
-                                  }
-                                },
-                                "licence": {
-                                  "type": "object",
-                                  "nullable": true,
-                                  "properties": {
-                                    "id": {
-                                      "type": "string"
-                                    },
-                                    "name": {
-                                      "type": "string"
-                                    },
-                                    "url": {
-                                      "type": "string"
-                                    },
-                                    "summary": {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "string"
-                                      }
-                                    },
-                                    "accepted_at": {
-                                      "type": "string",
-                                      "nullable": true
-                                    },
-                                    "covered": {
-                                      "type": "boolean"
-                                    }
-                                  },
-                                  "required": [
-                                    "id",
-                                    "name",
-                                    "url",
-                                    "summary",
-                                    "accepted_at"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "job",
-                                "kind",
-                                "label",
-                                "description",
-                                "name",
-                                "rowIds",
-                                "recommended",
-                                "current",
-                                "state",
-                                "percent",
-                                "failure",
-                                "downloadBytes",
-                                "installedBytes",
-                                "ramBytes",
-                                "ramBasis",
-                                "stateText",
-                                "blockedReason",
-                                "action",
-                                "setting",
-                                "chosenNotReady",
-                                "details",
-                                "licence"
-                              ]
-                            }
-                          },
-                          "notReady": {
-                            "type": "boolean"
-                          },
-                          "unavailable": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "title",
-                          "summary",
-                          "chip",
-                          "choices",
-                          "notReady",
-                          "unavailable"
-                        ]
-                      }
-                    },
-                    "alwaysOn": {
-                      "type": "object",
-                      "properties": {
-                        "bytes": {
-                          "type": "number"
-                        },
-                        "rowIds": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
-                      },
-                      "required": [
-                        "bytes",
-                        "rowIds"
-                      ]
-                    },
-                    "recommended": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "changes": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "job": {
-                                "type": "string",
-                                "enum": [
-                                  "chat",
-                                  "pictures",
-                                  "picturesdetailed",
-                                  "videos",
-                                  "music",
-                                  "sounds",
-                                  "stems",
-                                  "voice",
-                                  "wakeword",
-                                  "vision",
-                                  "coding",
-                                  "faces",
-                                  "ingredients"
-                                ]
-                              },
-                              "from": {
-                                "type": "string"
-                              },
-                              "to": {
-                                "type": "string"
-                              },
-                              "setting": {
-                                "type": "object",
-                                "nullable": true,
-                                "properties": {
-                                  "key": {
-                                    "type": "string"
-                                  },
-                                  "value": {
-                                    "nullable": true
-                                  }
-                                },
-                                "required": [
-                                  "key"
-                                ]
-                              }
-                            },
-                            "required": [
-                              "job",
-                              "from",
-                              "to",
-                              "setting"
-                            ]
-                          }
-                        },
-                        "installRowIds": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "installComponentIds": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "skipped": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "rowId": {
-                                "type": "string"
-                              },
-                              "label": {
-                                "type": "string"
-                              },
-                              "reason": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "rowId",
-                              "label",
-                              "reason"
-                            ]
-                          }
-                        },
-                        "downloadBytes": {
-                          "type": "number"
-                        },
-                        "fits": {
-                          "type": "string",
-                          "enum": [
-                            "all",
-                            "some",
-                            "none"
-                          ]
-                        },
-                        "nothingToDo": {
-                          "type": "boolean"
-                        },
-                        "text": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "changes",
-                        "installRowIds",
-                        "installComponentIds",
-                        "skipped",
-                        "downloadBytes",
-                        "fits",
-                        "nothingToDo",
-                        "text"
-                      ]
-                    },
-                    "unused_bytes": {
-                      "type": "number"
-                    },
-                    "memory_available_bytes": {
-                      "type": "number",
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "stack",
-                    "message",
-                    "tier",
-                    "free_disk_bytes",
-                    "installed_bytes",
-                    "cards",
-                    "alwaysOn",
-                    "recommended",
-                    "unused_bytes",
-                    "memory_available_bytes"
-                  ]
                 }
               }
             }
@@ -33871,7 +32766,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -33881,7 +32776,1061 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/choices/unused": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Installed models nothing uses (the Stack's GET /stack/v1/choices/unused)",
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/choices/unused/remove": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Remove the chosen unused models (the Stack's POST /stack/v1/choices/unused/remove)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/choices/recommended": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Preview or apply the recommended setup (the Stack's POST /stack/v1/choices/recommended)",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/choices/add-model": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Add a chat model from a Hugging Face link (the Stack's POST /stack/v1/choices/add-model)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/choices/{category}/order": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "A category's model order and off list (the Stack's PUT /stack/v1/choices/{category}/order)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "category",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/choices/{category}/{tier}": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The model for a category and level (the Stack's PUT /stack/v1/choices/{category}/{tier})",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "required": true,
+            "name": "category",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "required": true,
+            "name": "tier",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/settings": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Switch a feature on or off, or set its priority (the Stack's PUT /stack/v1/settings, role keys only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/parts/{id}/install": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Download a model (the Stack's POST /stack/v1/parts/{id}/install)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Already installed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Started or joined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/parts/{id}": {
+      "delete": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Remove a model (the Stack's DELETE /stack/v1/parts/{id})",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Stack's answer, unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/migration": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Whether Home's old model values reached the Stack, and the ones the Stack refused",
+        "responses": {
+          "200": {
+            "description": "The recorded result of the one-time move.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/migration/dismiss": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The admin has read the notice about refused values (they stay in Home)",
+        "responses": {
+          "200": {
+            "description": "The recorded result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -33971,7 +33920,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -33981,7 +33930,7 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "It cannot be done right now (the message says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -34049,7 +33998,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -34059,7 +34008,7 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "It cannot be done right now (the message says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -34159,7 +34108,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -34169,7 +34118,7 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "It cannot be done right now (the message says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -34276,7 +34225,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -34286,7 +34235,7 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "It cannot be done right now (the message says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -34406,7 +34355,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -34416,7 +34365,7 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "It cannot be done right now (the message says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -34521,7 +34470,7 @@
             }
           },
           "404": {
-            "description": "No such job or choice",
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -34531,7 +34480,7 @@
             }
           },
           "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
+            "description": "It cannot be done right now (the message says why)",
             "content": {
               "application/json": {
                 "schema": {
@@ -34542,1109 +34491,6 @@
           },
           "503": {
             "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/tiers/{job}": {
-      "get": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "The models each level of a job may use on this computer, by family, with what fits each level's cap (TIER-HOME-04)",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "chat",
-                "pictures",
-                "videos",
-                "music",
-                "voice"
-              ]
-            },
-            "required": true,
-            "name": "job",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Every catalog candidate under Standard, Boost and Max, the family it belongs to, and the plain refusal when it does not fit that level.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "profile": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "room_bytes": {
-                      "type": "number"
-                    },
-                    "levels": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "tier": {
-                            "type": "string",
-                            "enum": [
-                              "standard",
-                              "boost",
-                              "max"
-                            ]
-                          },
-                          "cap_bytes": {
-                            "type": "number"
-                          },
-                          "recommended": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "candidates": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "label": {
-                                  "type": "string"
-                                },
-                                "family": {
-                                  "type": "string"
-                                },
-                                "peak_bytes": {
-                                  "type": "number"
-                                },
-                                "verified": {
-                                  "type": "boolean"
-                                },
-                                "fits": {
-                                  "type": "boolean"
-                                },
-                                "refusal": {
-                                  "type": "string",
-                                  "nullable": true
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "label",
-                                "family",
-                                "peak_bytes",
-                                "verified",
-                                "fits",
-                                "refusal"
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "tier",
-                          "cap_bytes",
-                          "recommended",
-                          "candidates"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "profile",
-                    "room_bytes",
-                    "levels"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such job or choice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/level/{job}/{tier}/install": {
-      "post": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Install the selected model for one level and save that level only after install starts",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "chat",
-                "pictures",
-                "videos",
-                "music",
-                "voice"
-              ]
-            },
-            "required": true,
-            "name": "job",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "reduced",
-                "standard",
-                "boost",
-                "max"
-              ]
-            },
-            "required": true,
-            "name": "tier",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "model": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
-                  }
-                },
-                "required": [
-                  "model"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The selected model's install job and saved level.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "job": {
-                      "type": "string",
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "job"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such job or choice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/unused": {
-      "get": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "The installed parts nothing uses, the space they free and the plain reason",
-        "responses": {
-          "200": {
-            "description": "The Free up space list, largest first. A saved style is never listed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "bytes": {
-                            "type": "number"
-                          },
-                          "reason": {
-                            "type": "string"
-                          },
-                          "lastUsedAt": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "bytes",
-                          "reason",
-                          "lastUsedAt"
-                        ]
-                      }
-                    },
-                    "total_bytes": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "items",
-                    "total_bytes"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such job or choice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/choices/{job}": {
-      "post": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Make one choice the household's: download it first when it is missing, then write the setting",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 20
-            },
-            "required": true,
-            "name": "job",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "choice": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
-                  }
-                },
-                "required": [
-                  "choice"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "What started downloading (a job or a part), or what was removed. The setting is written only after the install can start.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "started": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "removed": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "started",
-                    "removed"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such job or choice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/recommended": {
-      "post": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Set everything to recommended: write the choices and start the missing downloads, never remove",
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {}
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The choice changes made, the downloads started, the parts already installed or downloading, the skipped ones and the parts that wait for a licence click. Safe to press twice; it never removes anything.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "changed": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "started": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "already": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "skipped": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "rowId": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "reason": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "rowId",
-                          "label",
-                          "reason"
-                        ]
-                      }
-                    },
-                    "needs_licence": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "label"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "changed",
-                    "started",
-                    "already",
-                    "skipped",
-                    "needs_licence"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such job or choice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/cleanup": {
-      "post": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Remove the chosen unused parts and free their space; one failure never stops the rest",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 200
-                    },
-                    "minItems": 1,
-                    "maxItems": 20
-                  }
-                },
-                "required": [
-                  "ids"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "One line per id, in the order sent: removed with its bytes, kept with the plain reason, failed with the engine's sentence.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "results": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "removed",
-                              "kept",
-                              "failed"
-                            ]
-                          },
-                          "freed_bytes": {
-                            "type": "number"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "status",
-                          "freed_bytes",
-                          "message"
-                        ]
-                      }
-                    },
-                    "freed_bytes": {
-                      "type": "number"
-                    },
-                    "kept": {
-                      "type": "number"
-                    },
-                    "failed": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "results",
-                    "freed_bytes",
-                    "kept",
-                    "failed"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such job or choice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be installed or removed right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The engine is not answering",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/models/inspect": {
-      "post": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Read a pasted Hugging Face model link: size, checksum, licence and architecture, without downloading it",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "source": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 500
-                  },
-                  "file": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 300
-                  }
-                },
-                "required": [
-                  "source"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "What the repository states about the file.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "repo": {
-                      "type": "string"
-                    },
-                    "file": {
-                      "type": "string"
-                    },
-                    "sizeBytes": {
-                      "type": "number"
-                    },
-                    "sha256": {
-                      "type": "string"
-                    },
-                    "licence": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "architecture": {
-                      "type": "string"
-                    },
-                    "verifiedArchitecture": {
-                      "type": "boolean"
-                    },
-                    "ramBytes": {
-                      "type": "number"
-                    },
-                    "fits": {
-                      "type": "string",
-                      "enum": [
-                        "fits",
-                        "estimate"
-                      ],
-                      "description": "fits: the architecture is one MaiPai has verified; estimate: the dry run decides before load"
-                    }
-                  },
-                  "required": [
-                    "repo",
-                    "file",
-                    "sizeBytes",
-                    "sha256",
-                    "licence",
-                    "architecture",
-                    "verifiedArchitecture",
-                    "ramBytes",
-                    "fits"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The link or file cannot be added (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be added right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The engine did not answer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/ai/models/add": {
-      "post": {
-        "tags": [
-          "AI"
-        ],
-        "summary": "Add the chat model a pasted link names: store its record, download it (hash checked) and use it",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "source": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 500
-                  },
-                  "file": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 300
-                  }
-                },
-                "required": [
-                  "source"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The model is stored and its download (or load) has started.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "id": {
-                      "type": "string"
-                    },
-                    "label": {
-                      "type": "string"
-                    },
-                    "jobs": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "id",
-                    "label",
-                    "jobs"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The link or file cannot be added (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "It cannot be added right now (the message says why)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The engine did not answer",
             "content": {
               "application/json": {
                 "schema": {

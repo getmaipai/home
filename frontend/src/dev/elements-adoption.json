@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T05:20:15.960Z",
+  "generatedAt": "2026-11-22T05:28:54.696Z",
   "kitTag": "ui-v0.5.729",
   "items": [
     {
@@ -814,7 +814,7 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "composer-attachments.aui.tsx",
@@ -1720,7 +1720,7 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "regenerate-menu.tsx",
