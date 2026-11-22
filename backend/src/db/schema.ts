@@ -145,6 +145,26 @@ export const apiKeys = sqliteTable("api_keys", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// CODE-GIT-01: a person's link to a git host (spec git-connection). The token is a write-only secret: encrypted with the household
+// keystore (lib/secrets), never returned by any route, wiped on revoke. `status` stores active, revoked or failing; "expired" is derived
+// from `expires_at` at read time (lib/gitConnections.ts).
+export const gitConnections = sqliteTable("git_connections", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  kind: text("kind", { enum: ["github", "gitea"] }).notNull(),
+  host: text("host").notNull(),
+  account: text("account").notNull(),
+  status: text("status", { enum: ["active", "expired", "revoked", "failing"] }).notNull(),
+  expiresAt: text("expires_at"),
+  tokenEncrypted: text("token_encrypted").notNull(),
+  createdAt: text("created_at").notNull(),
+  revokedAt: text("revoked_at"),
+  lastCheckedAt: text("last_checked_at"),
+  provenance: text("provenance").notNull(),
+  hlc: text("hlc").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => [index("git_connections_person_idx").on(t.personId)]);
+
 // Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for
 // memory/entity/episode records: one monotonic counter per record_kind.
 // See lib/id.ts.

@@ -31,6 +31,7 @@ import {
   sessions,
   personApiTokens,
   apiKeys,
+  gitConnections,
   codingTokenUsage,
   memoryRecords,
   memoryEmbeddings,
@@ -340,6 +341,7 @@ export function resetDb(): void {
   db.delete(alarms).run();
   db.delete(worldPlaces).run();
   db.delete(quickTimers).run();
+  db.delete(gitConnections).run();
   db.delete(apiKeys).run();
   db.delete(personApiTokens).run();
   db.delete(codingTokenUsage).run();

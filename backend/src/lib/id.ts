@@ -16,6 +16,11 @@ export function newApiKeyId(): string {
   return `key_${randomBytes(12).toString("hex")}`;
 }
 
+/** Matches spec/schemas/git-connection.schema.json's `^gitc-[a-z0-9]{6,}$`. */
+export function newGitConnectionId(): string {
+  return `gitc-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/biometric-print.schema.json's `^print-[a-z0-9]{6,}$`. */
 export function newBiometricPrintId(): string {
   return `print-${randomSuffix(10)}`;

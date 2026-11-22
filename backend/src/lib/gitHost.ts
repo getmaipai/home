@@ -1,0 +1,186 @@
+// CODE-GIT-01 and CODE-GIT-02: host-side git for Code sessions. The sandbox never holds a git credential and the hub never runs git inside a
+// session's folder as the agent left it (its hooks, fsmonitor, filters and config are the agent's to write). So:
+//   clone: the hub clones into the workspace before the agent starts;
+//   push: the hub copies the committed branch into a fresh repository of its own (clean copy), scans it, and pushes from there.
+// Every git child runs with hooks off, no file monitor, no filters or LFS smudge, no system or global config, a scrubbed environment and
+// the token supplied by a credential helper that reads it from the CHILD'S ENVIRONMENT, never from a command line (CREDENTIALS.md).
+import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { markGitConnectionFailing, type GitCredential } from "@/lib/gitConnections";
+
+export class GitHostError extends Error {}
+
+const SAFE_PATH = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin";
+const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const BRANCH_PATTERN = /^maipai\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}(\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0,3}$/;
+const LOCAL_MS = 60_000;
+const NETWORK_MS = 300_000;
+const OUTPUT_CAP = 1_048_576;
+
+let allowFileForTests = false;
+/** Tests only: lets the clone and push steps use a local bare repository (a path) instead of https. Production never calls it. */
+export function __allowFileRemotesForTests(on: boolean): void { allowFileForTests = on; }
+
+let observer: ((args: string[], env: Record<string, string>) => void) | null = null;
+/** Tests only: sees every git child's arguments and environment, to prove a token never reaches a command line. */
+export function __observeGitForTests(fn: ((args: string[], env: Record<string, string>) => void) | null): void { observer = fn; }
+
+export interface GitRun { code: number; stdout: string; stderr: string }
+interface RunOptions { cwd?: string; token?: string; credentialUser?: string; timeoutMs?: number; allowFile?: boolean; extraConfig?: [string, string][]; }
+
+/** The fixed protections every git child gets. Exported so a test can assert exactly what runs. */
+export function gitChildConfig(options: { token?: boolean; allowFile?: boolean; extraConfig?: [string, string][] } = {}): [string, string][] {
+  const config: [string, string][] = [
+    ["core.hooksPath", "/dev/null"],
+    ["core.fsmonitor", "false"],
+    ["core.attributesFile", "/dev/null"],
+    ["core.pager", "cat"],
+    ["core.sshCommand", "/usr/bin/false"],
+    ["protocol.allow", "never"],
+    ["protocol.https.allow", "always"],
+    ["protocol.file.allow", options.allowFile ? "always" : "never"],
+    ["filter.lfs.smudge", ""], ["filter.lfs.process", ""], ["filter.lfs.clean", ""], ["filter.lfs.required", "false"],
+    ["transfer.fsckObjects", "true"],
+    ["submodule.recurse", "false"],
+    ["credential.helper", ""], // resets any inherited helper
+  ];
+  if (options.token) config.push(["credential.helper", `!f() { test "$1" = get || exit 0; echo "username=$MAIPAI_GIT_USER"; echo "password=$MAIPAI_GIT_TOKEN"; }; f`]);
+  return [...config, ...(options.extraConfig ?? [])];
+}
+
+/** The scrubbed child environment. Nothing of the hub's own environment is passed on; the token appears only as MAIPAI_GIT_TOKEN for the helper. */
+export function gitChildEnv(home: string, config: [string, string][], secret?: { user: string; token: string }, allowFile = false): Record<string, string> {
+  const env: Record<string, string> = {
+    PATH: SAFE_PATH, HOME: home, XDG_CONFIG_HOME: home, LANG: "C", LC_ALL: "C",
+    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_ATTR_NOSYSTEM: "1",
+    GIT_TERMINAL_PROMPT: "0", GIT_ASKPASS: "/usr/bin/false", SSH_ASKPASS: "/usr/bin/false", GIT_LFS_SKIP_SMUDGE: "1",
+    GIT_OPTIONAL_LOCKS: "0", GIT_ALLOW_PROTOCOL: allowFile ? "https:file" : "https", GIT_EXTERNAL_DIFF: "/usr/bin/false",
+    GIT_CONFIG_COUNT: String(config.length),
+  };
+  config.forEach(([key, value], i) => { env[`GIT_CONFIG_KEY_${i}`] = key; env[`GIT_CONFIG_VALUE_${i}`] = value; });
+  if (secret) { env.MAIPAI_GIT_USER = secret.user; env.MAIPAI_GIT_TOKEN = secret.token; }
+  return env;
+}
+
+function scrub(text: string, token?: string): string {
+  return token ? text.split(token).join("***") : text;
+}
+
+async function runGit(args: string[], options: RunOptions = {}): Promise<GitRun> {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "maipai-git-home-"));
+  const config = gitChildConfig({ token: Boolean(options.token), allowFile: options.allowFile ?? false, extraConfig: options.extraConfig ?? [] });
+  const env = gitChildEnv(home, config, options.token ? { user: options.credentialUser ?? "x-access-token", token: options.token } : undefined, options.allowFile ?? false);
+  observer?.(args, env);
+  try {
+    return await new Promise<GitRun>((resolve, reject) => {
+      const child = spawn("git", args, { cwd: options.cwd ?? home, env, stdio: ["ignore", "pipe", "pipe"], timeout: options.timeoutMs ?? LOCAL_MS, killSignal: "SIGKILL" });
+      let stdout = ""; let stderr = "";
+      child.stdout.on("data", (d: Buffer) => { if (stdout.length < OUTPUT_CAP) stdout += d.toString("utf8"); });
+      child.stderr.on("data", (d: Buffer) => { if (stderr.length < OUTPUT_CAP) stderr += d.toString("utf8"); });
+      child.on("error", () => reject(new GitHostError("Git could not start on this computer. Check that git is installed, then try again.")));
+      child.on("close", (code, signal) => resolve({ code: signal ? 124 : code ?? 1, stdout: scrub(stdout, options.token), stderr: scrub(stderr, options.token) }));
+    });
+  } finally { await fs.rm(home, { recursive: true, force: true }); }
+}
+
+function validName(value: string, what: string): string {
+  if (!NAME_PATTERN.test(value) || value === "." || value === ".." || value.endsWith(".lock")) throw new GitHostError(`The ${what} name is not valid. Use letters, numbers, dots, dashes and underscores, then try again.`);
+  return value;
+}
+/** The https address of a repository on the connection's own host; the token only ever goes there. */
+export function remoteUrlFor(credential: Pick<GitCredential, "host">, owner: string, repo: string): string {
+  return `https://${credential.host}/${validName(owner, "owner")}/${validName(repo.replace(/\.git$/, ""), "repository")}.git`;
+}
+function resolveRemote(credential: GitCredential, remote: { owner: string; repo: string } | { url: string }): string {
+  if ("url" in remote) {
+    if (!allowFileForTests) throw new GitHostError("Home only pushes to the connected host's own https address. Choose the repository from the list and try again.");
+    return remote.url;
+  }
+  return remoteUrlFor(credential, remote.owner, remote.repo);
+}
+function userFor(credential: GitCredential): string { return credential.kind === "github" ? "x-access-token" : credential.account; }
+
+export const SUBMODULE_REFUSAL = "This repository uses submodules, which Code sessions do not support yet. Remove the submodules or use a repository without them.";
+export const LFS_REFUSAL = "This repository uses Git LFS (large file storage), which Code sessions do not support yet. Use a repository that stores its files directly.";
+
+/** Reads the tree of `ref` in a repository the hub owns and refuses submodules and LFS attributes. */
+export async function scanTree(repoDir: string, ref: string): Promise<void> {
+  const listed = await runGit(["ls-tree", "-r", "-z", "--full-tree", ref], { cwd: repoDir });
+  if (listed.code !== 0) throw new GitHostError("Home could not read the committed files. Make a commit on the session's branch and try again.");
+  for (const entry of listed.stdout.split("\0")) {
+    if (!entry) continue;
+    const tab = entry.indexOf("\t");
+    const [mode, , sha] = entry.slice(0, tab).split(" ");
+    const name = path.posix.basename(entry.slice(tab + 1));
+    if (mode === "160000" || name === ".gitmodules") throw new GitHostError(SUBMODULE_REFUSAL);
+    if (name === ".gitattributes" && sha) {
+      const blob = await runGit(["cat-file", "blob", sha], { cwd: repoDir });
+      if (blob.code === 0 && /(^|\s)filter\s*=\s*lfs(\s|$)/m.test(blob.stdout)) throw new GitHostError(LFS_REFUSAL);
+    }
+  }
+}
+
+export interface CloneInput { personId: string; credential: GitCredential; owner: string; repo: string; destination: string; sessionBranch: string; remote?: { url: string } }
+/** Clones into `destination` (which must not exist) with no checkout, scans the tree, checks it out and starts the session's own branch. Returns the base branch's name. */
+export async function cloneIntoWorkspace(input: CloneInput): Promise<{ baseBranch: string }> {
+  if (!BRANCH_PATTERN.test(input.sessionBranch) || input.sessionBranch.includes("..") || input.sessionBranch.endsWith(".lock")) throw new GitHostError("The session's branch name is not valid. It must start with maipai/ and use letters, numbers, dots, dashes and underscores.");
+  const url = resolveRemote(input.credential, input.remote ?? { owner: input.owner, repo: input.repo });
+  const file = allowFileForTests;
+  if (await fs.lstat(input.destination).then(() => true, () => false)) throw new GitHostError("The session's workspace folder already exists. Start a new session instead.");
+  await fs.mkdir(path.dirname(input.destination), { recursive: true });
+  const common = { token: input.credential.token, credentialUser: userFor(input.credential), allowFile: file };
+  const cloned = await runGit(["clone", "--no-checkout", "--no-tags", "--no-recurse-submodules", "--template=", "--", url, input.destination], { ...common, timeoutMs: NETWORK_MS });
+  try {
+    if (cloned.code !== 0) throw failure(input.personId, input.credential, cloned.stderr, "clone");
+    await scanTree(input.destination, "HEAD");
+    const head = await runGit(["symbolic-ref", "--short", "HEAD"], { cwd: input.destination });
+    const baseBranch = head.stdout.trim();
+    if (head.code !== 0 || !baseBranch) throw new GitHostError("That repository has no branch to start from. Make a first commit on the host and try again.");
+    const checkout = await runGit(["checkout", "-q", "-b", input.sessionBranch], { cwd: input.destination });
+    if (checkout.code !== 0) throw new GitHostError("Home could not open the repository's files. Try again.");
+    return { baseBranch };
+  } catch (e) {
+    await fs.rm(input.destination, { recursive: true, force: true });
+    throw e;
+  }
+}
+
+function failure(personId: string, credential: GitCredential, stderr: string, what: "clone" | "push"): GitHostError {
+  if (/authentication failed|invalid credentials|401|403|denied|permission|could not read username|not authorized/i.test(stderr)) {
+    markGitConnectionFailing(personId, credential.id);
+    return new GitHostError(`The host refused the ${what}. The token may have expired or may not cover this repository: replace the connection in Settings, Coding, then try again.`);
+  }
+  if (/non-fast-forward|\[rejected\]|fetch first|stale info/i.test(stderr)) return new GitHostError("The host already has newer changes on that branch, so Home did not overwrite them. Pull the branch, resolve the difference and try again.");
+  if (/not found|does not exist|repository .* not found/i.test(stderr)) return new GitHostError("The host does not have that repository. Check the name and that your token covers it, then try again.");
+  return new GitHostError(`The ${what} did not finish. Check your connection to the host and try again.`);
+}
+
+export interface PushInput { personId: string; credential: GitCredential; owner: string; repo: string; workspace: string; branch: string; baseBranch: string; remote?: { url: string } }
+
+/** Pushes the session's own `maipai/...` branch, from a clean copy the hub makes of the committed branch. No force, no delete, no tag, never the base branch. */
+export async function pushSessionBranch(input: PushInput): Promise<void> {
+  const { branch, baseBranch } = input;
+  if ((input as unknown as { force?: unknown }).force) throw new GitHostError("Home never force-pushes. Push normally, or ask the host owner to change the branch.");
+  if (!BRANCH_PATTERN.test(branch) || branch.includes("..") || branch.endsWith(".lock") || branch.endsWith(".")) throw new GitHostError("Home only pushes the session's own branch, which starts with maipai/. Choose that branch and try again.");
+  if (branch === baseBranch || branch.toLowerCase() === `refs/heads/${baseBranch}`.toLowerCase()) throw new GitHostError("Home never pushes to the repository's main branch. Push the session's own maipai/ branch and open a pull request.");
+  const url = resolveRemote(input.credential, input.remote ?? { owner: input.owner, repo: input.repo });
+  const git = path.join(input.workspace, ".git");
+  const info = await fs.lstat(git).catch(() => null);
+  if (!info || !info.isDirectory()) throw new GitHostError("This workspace has no repository Home can push from. Start a new session from a repository and try again.");
+  const file = allowFileForTests;
+  const copy = await fs.mkdtemp(path.join(os.tmpdir(), "maipai-push-"));
+  try {
+    const init = await runGit(["init", "--quiet", "--template=", copy]);
+    if (init.code !== 0) throw new GitHostError("Home could not prepare the push. Try again.");
+    // The only step that reads the workspace's repository: objects of one branch, over the local transport, with the clean repository's own settings.
+    const fetched = await runGit(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", git, `refs/heads/${branch}:refs/heads/${branch}`],
+      { cwd: copy, allowFile: true, extraConfig: [["safe.directory", "*"]] });
+    if (fetched.code !== 0) throw new GitHostError("The session's branch has no commits to push. Commit your changes on the session's branch and try again.");
+    await scanTree(copy, `refs/heads/${branch}`);
+    const pushed = await runGit(["push", "--porcelain", "--no-verify", url, `refs/heads/${branch}:refs/heads/${branch}`],
+      { cwd: copy, token: input.credential.token, credentialUser: userFor(input.credential), allowFile: file, timeoutMs: NETWORK_MS });
+    if (pushed.code !== 0) throw failure(input.personId, input.credential, `${pushed.stderr}\n${pushed.stdout}`, "push");
+  } finally { await fs.rm(copy, { recursive: true, force: true }); }
+}

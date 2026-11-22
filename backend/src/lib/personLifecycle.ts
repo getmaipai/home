@@ -23,6 +23,7 @@
 //    silently undo itself on the next sync. A tombstone transfers.
 import { emitScheduleRecheck } from "@/lib/house/connectHooks";
 import { revokeAllApiKeys } from "@/lib/apiKeys";
+import { revokeAllGitConnections } from "@/lib/gitConnections";
 import { and, eq, isNull, ne, lt } from "drizzle-orm";
 import { existsSync, unlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -642,6 +643,7 @@ function revokeAllCredentialsAndSessions(personId: string): { sessions: number }
   const sessionRows = sqlite.query("DELETE FROM sessions WHERE person_id = ?").run(personId).changes;
   db.delete(totpSecrets).where(eq(totpSecrets.personId, personId)).run();
   revokeAllApiKeys(personId);
+  revokeAllGitConnections(personId); // CODE-GIT-01: the stored git tokens go with the person
   invalidateSessionCacheForPerson(personId);
   return { sessions: sessionRows };
 }

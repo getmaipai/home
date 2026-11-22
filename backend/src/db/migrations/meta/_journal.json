@@ -1422,6 +1422,13 @@
       "when": 1795192645963,
       "tag": "0203_retire_talk_over",
       "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "6",
+      "when": 1795193645963,
+      "tag": "0204_git_connections",
+      "breakpoints": true
     }
   ]
 }

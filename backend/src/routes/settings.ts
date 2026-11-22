@@ -12,6 +12,7 @@ import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
 import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
 import { syncStackDiskConfig } from "@/lib/storage";
 import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, codeAdmission, CreateApiKeyInput } from "@/lib/apiKeys";
+import { createGitConnection, listGitConnections, listGitConnectionsForAdmin, revokeGitConnection, CreateGitConnectionInput, GitConnectionError } from "@/lib/gitConnections";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingsChange } from "@maipai/spec/gen/ts/settings-change.js";
 import { listSettingsChanges } from "@/lib/settingsAudit";
@@ -602,6 +603,69 @@ settingsRoutes.openapi(createRoute({
   const ids = listApiKeys(target).filter((key) => key.scopes.includes("code") && key.status !== "revoked").map((key) => key.id);
   for (const id of ids) revokeApiKey(personId, id);
   return c.json({ revoked: ids.length }, 200);
+});
+
+// CODE-GIT-01: git host connections. The token goes in on create and never comes back out of any route.
+const GitConnectionSchema = z.object({
+  id: z.string(), person_id: z.string(), kind: z.enum(["github", "gitea"]), host: z.string(), account: z.string(),
+  status: z.enum(["active", "expired", "revoked", "failing"]), expires_at: z.string().nullable(), created_at: z.string(), provenance: z.string(), hlc: z.string(),
+});
+const AdminGitConnectionSchema = GitConnectionSchema.pick({ id: true, person_id: true, kind: true, status: true, created_at: true, expires_at: true });
+const gitIdParam = z.object({ id: z.string().regex(/^gitc-[a-z0-9]{6,}$/) });
+const AdminGitParam = z.object({ personId: z.string(), id: z.string().regex(/^gitc-[a-z0-9]{6,}$/) });
+
+settingsRoutes.openapi(createRoute({
+  method: "get", path: "/git-connections", tags: ["Settings"],
+  summary: "List the signed-in person's git connections (never a token)",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ connections: z.array(GitConnectionSchema) }) } }, description: "The person's git connections." }, ...errorResponses({ 401: "Not signed in" }) },
+}), (c) => c.json({ connections: listGitConnections(c.get("person")) }, 200));
+
+settingsRoutes.openapi(createRoute({
+  method: "post", path: "/git-connections", tags: ["Settings"],
+  summary: "Connect GitHub or Gitea with an access token. The token is checked once, stored encrypted and never returned.",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: CreateGitConnectionInput } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ connection: GitConnectionSchema }) } }, description: "The new connection." },
+    ...errorResponses({ 400: "The details, the token or the person's access do not allow this connection", 401: "Not signed in" }) },
+}), async (c) => {
+  try { return c.json({ connection: await createGitConnection(c.get("person"), c.req.valid("json")) }, 200); }
+  catch (e) { return c.json({ error: e instanceof GitConnectionError ? e.message : "The connection could not be made. Check the details and try again." }, 400); }
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "delete", path: "/git-connections/{id}", tags: ["Settings"],
+  summary: "Revoke one of the signed-in person's git connections and wipe its token",
+  middleware: [requireAuth] as const,
+  request: { params: gitIdParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Revoked." }, ...errorResponses({ 401: "Not signed in", 404: "No such connection" }) },
+}), (c) => revokeGitConnection(c.get("person").id, c.req.valid("param").id)
+  ? c.json({ success: true as const }, 200)
+  : c.json({ error: "No such git connection. Reload the list and try again." }, 404));
+
+settingsRoutes.openapi(createRoute({
+  method: "get", path: "/git-connections/people/{personId}", tags: ["Settings"],
+  summary: "Admin read of a person's git connections: kind, status and dates only (no host, account or repository names)",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ personId: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ connections: z.array(AdminGitConnectionSchema) }) } }, description: "The person's connections, without names." }, ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person" }) },
+}), (c) => {
+  const target = db.select().from(people).where(eq(people.id, c.req.valid("param").personId)).get() as PersonRow | undefined;
+  if (!target || target.deletedAt) return c.json(apiError("setting_person_gone"), 404);
+  return c.json({ connections: listGitConnectionsForAdmin(target) }, 200);
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "delete", path: "/git-connections/people/{personId}/{id}", tags: ["Settings"],
+  summary: "Admin revoke of one git connection for a person",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: AdminGitParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Revoked." }, ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person or connection" }) },
+}), (c) => {
+  const { personId, id } = c.req.valid("param");
+  const target = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
+  if (!target || target.deletedAt || !revokeGitConnection(personId, id)) return c.json({ error: "No such git connection. Reload the list and try again." }, 404);
+  return c.json({ success: true as const }, 200);
 });
 
 function isOwnerOrAdminActor(actor: { role: string }): boolean {
