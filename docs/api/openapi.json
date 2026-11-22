@@ -56552,6 +56552,2795 @@
         }
       }
     },
+    "/api/code/sessions": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Start a Code session (the tier is the person's stored choice)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "repo": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "github",
+                          "gitea",
+                          "hub_folder",
+                          "none"
+                        ]
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "pattern": "^gitc-[a-z0-9]{6,}$",
+                        "description": "The git-connection used for github and gitea repositories."
+                      },
+                      "full_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "owner/name on the git host."
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "description": "Relative path inside the household folder, for hub_folder."
+                      },
+                      "base_branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "work_branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "base_branch",
+                      "work_branch"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "environment_id": {
+                    "type": "string",
+                    "pattern": "^cenv-[a-z0-9]{6,}$"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "plan",
+                      "ask",
+                      "auto_edit"
+                    ],
+                    "default": "ask"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ]
+                  },
+                  "network": {
+                    "type": "object",
+                    "properties": {
+                      "policy": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "hosts"
+                        ],
+                        "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                      },
+                      "hosts": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253,
+                          "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                        }
+                      }
+                    },
+                    "default": {
+                      "policy": "none",
+                      "hosts": []
+                    },
+                    "required": [
+                      "policy",
+                      "hosts"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "mounts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^file-[a-z0-9]{6,}$"
+                    },
+                    "description": "Household storage file ids mounted read only."
+                  }
+                },
+                "required": [
+                  "title",
+                  "repo",
+                  "environment_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^csess-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "repo": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea",
+                            "hub_folder",
+                            "none"
+                          ]
+                        },
+                        "connection_id": {
+                          "type": "string",
+                          "pattern": "^gitc-[a-z0-9]{6,}$",
+                          "description": "The git-connection used for github and gitea repositories."
+                        },
+                        "full_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "owner/name on the git host."
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "description": "Relative path inside the household folder, for hub_folder."
+                        },
+                        "base_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "work_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "base_branch",
+                        "work_branch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "environment_id": {
+                      "type": "string",
+                      "pattern": "^cenv-[a-z0-9]{6,}$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "ask",
+                        "auto_edit"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "starting",
+                        "working",
+                        "needs_you",
+                        "idle",
+                        "paused",
+                        "done",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "default": "standard",
+                      "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                    },
+                    "network": {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "hosts"
+                          ],
+                          "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                        },
+                        "hosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 253,
+                            "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "hosts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "mounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$"
+                      },
+                      "description": "Household storage file ids mounted read only."
+                    },
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "object",
+                      "properties": {
+                        "files": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "additions",
+                        "deletions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pull_request": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "number",
+                            "draft"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "checkpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "at",
+                          "label",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "title",
+                    "repo",
+                    "environment_id",
+                    "mode",
+                    "state",
+                    "network",
+                    "usage",
+                    "changes",
+                    "created_at",
+                    "last_activity_at",
+                    "provenance",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "My Code sessions, newest activity first",
+        "responses": {
+          "200": {
+            "description": "Only the signed-in person's sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^csess-[a-z0-9]{6,}$"
+                      },
+                      "person_id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "repo": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "github",
+                              "gitea",
+                              "hub_folder",
+                              "none"
+                            ]
+                          },
+                          "connection_id": {
+                            "type": "string",
+                            "pattern": "^gitc-[a-z0-9]{6,}$",
+                            "description": "The git-connection used for github and gitea repositories."
+                          },
+                          "full_name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "owner/name on the git host."
+                          },
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500,
+                            "description": "Relative path inside the household folder, for hub_folder."
+                          },
+                          "base_branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "work_branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "base_branch",
+                          "work_branch"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "environment_id": {
+                        "type": "string",
+                        "pattern": "^cenv-[a-z0-9]{6,}$"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "plan",
+                          "ask",
+                          "auto_edit"
+                        ]
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "starting",
+                          "working",
+                          "needs_you",
+                          "idle",
+                          "paused",
+                          "done",
+                          "failed",
+                          "archived"
+                        ]
+                      },
+                      "tier": {
+                        "type": "string",
+                        "enum": [
+                          "standard",
+                          "boost",
+                          "max"
+                        ],
+                        "default": "standard",
+                        "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                      },
+                      "network": {
+                        "type": "object",
+                        "properties": {
+                          "policy": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "hosts"
+                            ],
+                            "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                          },
+                          "hosts": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253,
+                              "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                            }
+                          }
+                        },
+                        "required": [
+                          "policy",
+                          "hosts"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "mounts": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^file-[a-z0-9]{6,}$"
+                        },
+                        "description": "Household storage file ids mounted read only."
+                      },
+                      "model_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                        "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                      },
+                      "usage": {
+                        "type": "object",
+                        "properties": {
+                          "input_tokens": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "output_tokens": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "input_tokens",
+                          "output_tokens"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "changes": {
+                        "type": "object",
+                        "properties": {
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "additions": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "deletions": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "files",
+                          "additions",
+                          "deletions"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "pull_request": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "number": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "draft": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "number",
+                              "draft"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ]
+                      },
+                      "checkpoints": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "label": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "files": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "at",
+                            "label",
+                            "files"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "last_activity_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ]
+                      },
+                      "trash_until": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ]
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person_id",
+                      "title",
+                      "repo",
+                      "environment_id",
+                      "mode",
+                      "state",
+                      "network",
+                      "usage",
+                      "changes",
+                      "created_at",
+                      "last_activity_at",
+                      "provenance",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Coding is not available to you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "One session with its queue line, held requests and message queue",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^csess-[a-z0-9]{6,}$"
+                        },
+                        "person_id": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "repo": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "github",
+                                "gitea",
+                                "hub_folder",
+                                "none"
+                              ]
+                            },
+                            "connection_id": {
+                              "type": "string",
+                              "pattern": "^gitc-[a-z0-9]{6,}$",
+                              "description": "The git-connection used for github and gitea repositories."
+                            },
+                            "full_name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200,
+                              "description": "owner/name on the git host."
+                            },
+                            "path": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 500,
+                              "description": "Relative path inside the household folder, for hub_folder."
+                            },
+                            "base_branch": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            },
+                            "work_branch": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "base_branch",
+                            "work_branch"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "environment_id": {
+                          "type": "string",
+                          "pattern": "^cenv-[a-z0-9]{6,}$"
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "plan",
+                            "ask",
+                            "auto_edit"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "starting",
+                            "working",
+                            "needs_you",
+                            "idle",
+                            "paused",
+                            "done",
+                            "failed",
+                            "archived"
+                          ]
+                        },
+                        "tier": {
+                          "type": "string",
+                          "enum": [
+                            "standard",
+                            "boost",
+                            "max"
+                          ],
+                          "default": "standard",
+                          "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                        },
+                        "network": {
+                          "type": "object",
+                          "properties": {
+                            "policy": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "hosts"
+                              ],
+                              "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                            },
+                            "hosts": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 253,
+                                "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                              }
+                            }
+                          },
+                          "required": [
+                            "policy",
+                            "hosts"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "mounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^file-[a-z0-9]{6,}$"
+                          },
+                          "description": "Household storage file ids mounted read only."
+                        },
+                        "model_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                          "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                        },
+                        "usage": {
+                          "type": "object",
+                          "properties": {
+                            "input_tokens": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "output_tokens": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "input_tokens",
+                            "output_tokens"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "changes": {
+                          "type": "object",
+                          "properties": {
+                            "files": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "additions": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "deletions": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "files",
+                            "additions",
+                            "deletions"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "pull_request": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                "number": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "draft": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "url",
+                                "number",
+                                "draft"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        },
+                        "checkpoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "files": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "at",
+                              "label",
+                              "files"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "last_activity_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        },
+                        "trash_until": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        },
+                        "provenance": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "hlc": {
+                          "type": "string",
+                          "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                          "description": "Hybrid logical clock: wall_ms:counter:node."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "person_id",
+                        "title",
+                        "repo",
+                        "environment_id",
+                        "mode",
+                        "state",
+                        "network",
+                        "usage",
+                        "changes",
+                        "created_at",
+                        "last_activity_at",
+                        "provenance",
+                        "hlc"
+                      ],
+                      "additionalProperties": false,
+                      "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                    },
+                    "waiting": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "turn_id": {
+                          "type": "string"
+                        },
+                        "line": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "offers_standard": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "turn_id",
+                        "line",
+                        "offers_standard"
+                      ]
+                    },
+                    "requests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "request_id": {
+                            "type": "string"
+                          },
+                          "effect": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "request_id",
+                          "effect"
+                        ]
+                      }
+                    },
+                    "queued_messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "waiting",
+                    "requests",
+                    "queued_messages"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Delete a session (it stays in the trash for a while)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/tier": {
+      "put": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Switch the session's stored tier; it applies at the next message",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ]
+                  }
+                },
+                "required": [
+                  "tier"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session with its new tier.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^csess-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "repo": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea",
+                            "hub_folder",
+                            "none"
+                          ]
+                        },
+                        "connection_id": {
+                          "type": "string",
+                          "pattern": "^gitc-[a-z0-9]{6,}$",
+                          "description": "The git-connection used for github and gitea repositories."
+                        },
+                        "full_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "owner/name on the git host."
+                        },
+                        "path": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500,
+                          "description": "Relative path inside the household folder, for hub_folder."
+                        },
+                        "base_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "work_branch": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "base_branch",
+                        "work_branch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "environment_id": {
+                      "type": "string",
+                      "pattern": "^cenv-[a-z0-9]{6,}$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "ask",
+                        "auto_edit"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "starting",
+                        "working",
+                        "needs_you",
+                        "idle",
+                        "paused",
+                        "done",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ],
+                      "default": "standard",
+                      "description": "The person's stored choice. Switching writes it at once and takes effect at the next turn, never in the middle of one. Reduced is applied by the system only and is never stored here."
+                    },
+                    "network": {
+                      "type": "object",
+                      "properties": {
+                        "policy": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "hosts"
+                          ],
+                          "description": "none: the sandbox reaches only the gateway. hosts: it also reaches the listed hosts through the egress proxy."
+                        },
+                        "hosts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 253,
+                            "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "policy",
+                        "hosts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "mounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^file-[a-z0-9]{6,}$"
+                      },
+                      "description": "Household storage file ids mounted read only."
+                    },
+                    "model_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+                      "description": "Provenance written by Home from the Stack's reply: the catalog id of the model that answered the last turn. Absent before the first turn. Never a choice and never read to pick a model."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "input_tokens",
+                        "output_tokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "object",
+                      "properties": {
+                        "files": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "additions": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deletions": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "files",
+                        "additions",
+                        "deletions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "pull_request": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "draft": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "number",
+                            "draft"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "checkpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "files": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "at",
+                          "label",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "title",
+                    "repo",
+                    "environment_id",
+                    "mode",
+                    "state",
+                    "network",
+                    "usage",
+                    "changes",
+                    "created_at",
+                    "last_activity_at",
+                    "provenance",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/messages": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Send a message: it starts a turn, or joins the message queue while the agent works",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200000
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "A turn started or queued, or the message waits in the session's queue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "turn_id": {
+                      "type": "string"
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ]
+                    },
+                    "queued_message_id": {
+                      "type": "string"
+                    },
+                    "position": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "The transcript (credentials already removed)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "session_id": {
+                        "type": "string"
+                      },
+                      "seq": {
+                        "type": "number"
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "agent",
+                          "system"
+                        ]
+                      },
+                      "parts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "created_at": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "session_id",
+                      "seq",
+                      "role",
+                      "parts",
+                      "created_at"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/events": {
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "The person's audit trail for the session",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Oldest first. Owner only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^cevt-[a-z0-9]{6,}$"
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "pattern": "^csess-[a-z0-9]{6,}$"
+                      },
+                      "at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "command",
+                          "file_write",
+                          "host_allowed",
+                          "host_blocked",
+                          "approval",
+                          "push",
+                          "pull_request",
+                          "secret_found",
+                          "checkpoint_restored",
+                          "stopped"
+                        ]
+                      },
+                      "detail": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        },
+                        "description": "The fields for the kind. command: command, exit_code, duration_ms. file_write: path. host_allowed and host_blocked: host. approval: what, answer. push: branch. pull_request: url. secret_found: path, line. checkpoint_restored: checkpoint_id. stopped: reason."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "session_id",
+                      "at",
+                      "kind",
+                      "detail",
+                      "provenance",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "CODE-SPEC-01 (Home docs/design/local-coding-2026-10-17.md section 4.2). One line of a Code session's audit trail: what the agent did. Person scope, owner only, exportable with the session. `secret_found` carries the path and line, never the value. Household logs never carry this record; they hold typed events with no person, text, path or id."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/stop": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Stop: cancels a queued turn, aborts a running one, clears the message queue",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stopped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/turns/{turn}/use-standard": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Use Standard for this message (the stored tier stays)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^ctrn-[a-z0-9]+$"
+            },
+            "required": true,
+            "name": "turn",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The turn runs at Standard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/requests/{request}": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Answer a held request from the agent (allow or deny)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^creq-[a-z0-9]+$"
+            },
+            "required": true,
+            "name": "request",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "deny"
+                    ]
+                  }
+                },
+                "required": [
+                  "answer"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/queue/{message}": {
+      "delete": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Take back a queued message",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^cqm-[a-z0-9]+$"
+            },
+            "required": true,
+            "name": "message",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Taken back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/push": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Push the session's own branch after the secret check (the person's confirmation)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "confirm"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pushed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/undo": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Undo on a receipt: restore a checkpoint",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "checkpoint_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "checkpoint_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search/web-results": {
       "get": {
         "tags": [
