@@ -282,6 +282,9 @@ html:not(.light) body {
 [data-slot="chat-rail"],
 [data-chat-column-mobile] {
   --sidebar: var(--shell-history);
+  /* COMPACT-01: the chat history keeps the compact 36px row on a mouse; the
+   * kit's 48px default only leaks in because this rail is not its compact variant. */
+  --aui-thread-list-item-min-height: 36px;
   --border: var(--shell-divider);
   --aui-thread-list-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
 }

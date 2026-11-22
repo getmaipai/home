@@ -769,8 +769,26 @@ export function FailedTurnErrorDetailsAction() {
 }
 
 /** Compose both controls in the kit's single action-bar append point. */
+/** COMPACT-01: the answer-style tag (Instant, Thinking, Max) sits at the end of the reply's action icons, not on a row of its own. */
 export function FailedTurnActionBarExtras() {
-  return <FailedTurnErrorDetailsAction />;
+  const message = useAuiState((s) => s.message);
+  const adult = useContext(ChatAgeBandContext) === "adult";
+  const answerStyle = answerStyleOf(message.metadata?.custom?.stats as TurnStats | undefined);
+  return (
+    <>
+      <FailedTurnErrorDetailsAction />
+      {adult && message.role === "assistant" && answerStyle ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" data-slot="answer-style-label" data-answer={answerStyle} aria-label={`Answered with ${ANSWER_STYLE_WORDS[answerStyle]}. ${ANSWER_STYLE_LINES[answerStyle]}`}>{ANSWER_STYLE_WORDS[answerStyle]}</Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top">{ANSWER_STYLE_LINES[answerStyle]}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
+    </>
+  );
 }
 
 export function buildTimingStats(stats: TurnStats): TimingStat[] {
@@ -842,8 +860,6 @@ export function BareModelBadge() {
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
   const message = useAuiState((s) => s.message);
-  const adult = useContext(ChatAgeBandContext) === "adult";
-  const answerStyle = answerStyleOf(message.metadata?.custom?.stats as TurnStats | undefined);
   const turnId = message.metadata?.custom?.turnId as string | undefined;
   const sources = sourcesFromMessage(message);
   const sourceOpen = useContext(SourcesOpenContext);
@@ -858,16 +874,6 @@ export function MessageFooterExtra() {
   return (
     <>
       <BareModelBadge />
-      {adult && message.role === "assistant" && answerStyle ? (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline" data-slot="answer-style-label" data-answer={answerStyle} aria-label={`Answered with ${ANSWER_STYLE_WORDS[answerStyle]}. ${ANSWER_STYLE_LINES[answerStyle]}`}>{ANSWER_STYLE_WORDS[answerStyle]}</Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top">{ANSWER_STYLE_LINES[answerStyle]}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      ) : null}
       {turnId && sources.length ? (
         // SEARCH-ANSWER-04 (rule 9): the kit's own sources trigger as it ships
         // ("Sources", the count, a chevron), not a hand-made button that drew

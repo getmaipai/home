@@ -1324,7 +1324,9 @@ export function ChatPage({ person }: { person: Roster }) {
   // On a phone the conversation's title and actions sit in the shell's top bar, not in a second row under it.
   const phone = useIsPhoneLayout();
   const barOnPhone = phone && !companionShells;
-  useHeaderExtra(barOnPhone ? ChatHeaderBar : PageHeaderTitle, barOnPhone ? undefined : ChatHeaderActions);
+  // COMPACT-01: beyond a phone the shell draws no "Chat" title bar; the conversation's own header below is the only top bar.
+  const onPhoneTier = chatColumnBreakpoint.tier === "phone";
+  useHeaderExtra(barOnPhone ? ChatHeaderBar : onPhoneTier ? PageHeaderTitle : undefined, barOnPhone || !onPhoneTier ? undefined : ChatHeaderActions);
   const callReady = useVoiceCallReady(false, chatAvailability === "ready" ? undefined : "Chat is unavailable");
   const openVoiceFromHeader = useCallback(() => closeAwareSetVoiceOpen(true), [closeAwareSetVoiceOpen]);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
@@ -1814,9 +1816,10 @@ export function ChatPage({ person }: { person: Roster }) {
                   way Claude's is (owner, 2026-10-06): the controls just
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
-              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex">
+              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 ps-5 pe-28 lg:flex">
                 {column.collapsed ? <SectionSidebarShowButton label={i18n._({ id: "Show conversations", message: "Show conversations" })} controls={CHAT_COLUMN_ID} onClick={() => column.setCollapsedPreference(false)} /> : null}
                 <ChatHeaderBar />
+                <ChatHeaderActions />
               </header>}
           {bareMode ? (
             // COORDINATOR, 2026-09-22: "while it is on, it is obvious...
