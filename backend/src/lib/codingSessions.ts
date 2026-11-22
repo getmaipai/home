@@ -121,7 +121,7 @@ export function getCodingSession(person: Pick<PersonRow, "id">, id: string): Cod
 }
 
 /** The one writer of a session's state and counters; every change stamps the clock. */
-export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "modelId" | "usage" | "lastActivityAt">>): void {
+export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "modelId" | "usage" | "lastActivityAt" | "changes">>): void {
   const at = new Date().toISOString();
   db.update(codingSessions).set({ ...patch, updatedAt: at, hlc: nextHlc() }).where(eq(codingSessions.id, id)).run();
 }

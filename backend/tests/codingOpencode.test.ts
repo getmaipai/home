@@ -22,7 +22,8 @@ function execSandbox(script: (i: ExecInput) => AsyncIterable<ExecChunk>) {
     start: async ({ sessionId }) => { events.push(`start:${sessionId}`); }, stop: async () => undefined, destroy: async () => undefined,
     snapshot: async ({ label }) => { events.push(`snapshot:${label}`); return { id: `snap-${events.length}`, files: 2 }; },
     restoreCheckpoint: async ({ checkpointId }) => { events.push(`restore:${checkpointId}`); },
-    exec: (i) => { execs.push(i); return script(i); },
+    // The Changes read after a turn (codingChanges.ts) is not an agent run: it runs `sh`, so it is not recorded here.
+    exec: (i) => { if (i.argv[0] === "sh") return (async function* () { yield { exit: 1 }; })(); execs.push(i); return script(i); },
   };
   return { sandbox, execs, events };
 }

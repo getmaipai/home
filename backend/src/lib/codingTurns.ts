@@ -19,6 +19,7 @@ import type { Tier } from "@/lib/tiers";
 import { revokeSessionKeys } from "@/lib/apiKeys";
 import { addCheckpoint, CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
+import { readChangeCounts } from "@/lib/codingChanges";
 import { appendCodingMessage } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
 import type { PersonRow } from "@/types";
@@ -150,6 +151,13 @@ async function startTurn(turn: Turn): Promise<void> {
   void runTurn(turn, session.environmentId);
 }
 
+/** The Changes count after a turn that ran: read inside the sandbox; when it cannot be read the old number stays. */
+async function recordChanges(rt: CodingRuntime, sessionId: string): Promise<void> {
+  const exec = (rt.sandbox as { exec?: Parameters<typeof readChangeCounts>[0] }).exec?.bind(rt.sandbox);
+  const counts = await readChangeCounts(exec, sessionId);
+  if (counts) updateSession(sessionId, { changes: counts });
+}
+
 async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   const rt = runtime!;
   log("turn_started", turn, `tier=${turn.tier}`);
@@ -180,6 +188,7 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
       updateSession(row.id, { state: "idle", lastActivityAt: new Date().toISOString(), ...(modelId ? { modelId } : {}),
         usage: { input_tokens: row.usage.input_tokens + (result.usage?.input_tokens ?? 0), output_tokens: row.usage.output_tokens + (result.usage?.output_tokens ?? 0) } });
     }
+    await recordChanges(rt, turn.sessionId);
     log("turn_done", turn, `in=${result.usage?.input_tokens ?? 0} out=${result.usage?.output_tokens ?? 0}`);
     settle(turn, "done");
   } catch (e) {
