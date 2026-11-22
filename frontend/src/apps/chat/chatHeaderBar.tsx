@@ -69,6 +69,7 @@ import { i18n } from "@lingui/core";
 // this comment a second time, see git history for the original.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import {
@@ -173,6 +174,7 @@ function CompanionPickerFooter() {
 
 export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
   const ambient = useAmbientHeader();
+  const onPhone = useIsPhoneLayout();
   const data = useChatHeaderData();
   const stills = useCompanionStills(data?.companions.map(({ id }) => id) ?? []);
   const [renaming, setRenaming] = useState(false);
@@ -205,6 +207,9 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   // On a phone the conversation's header sits in the shell's top bar (one bar, not a second row): the bar then draws as the phone row
   // does and starts with the history toggle.
   const inBar = data.inShellBar === true;
+  // HEADER-BAND-01: past a phone the shell floats the bell and avatar over the top right of the page. The tablet row and the
+  // companion-shells bar run edge to edge, so they leave room for it; the desktop header already reserves it (pe-28).
+  const reserveEnd = !onPhone && !inBar && (shells || phoneRow);
   if (inBar) phoneRow = true;
 
   const actions = (
@@ -245,7 +250,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={selectedName} portrait={data.companions.find(({ id }) => id === companionId)?.portrait}>{(name, media) => <ChatHeader name={name} media={media} end={ambient} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={selectedName} portrait={data.companions.find(({ id }) => id === companionId)?.portrait}>{(name, media) => <ChatHeader reserveEnd={reserveEnd} name={name} media={media} end={ambient} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>{i18n._({ id: "Rename", message: "Rename" })}</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>

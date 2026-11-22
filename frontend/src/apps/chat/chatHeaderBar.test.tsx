@@ -417,3 +417,17 @@ describe("ChatHeaderBar", () => {
     });
   });
 });
+
+describe("HEADER-BAND-01: the bar keeps clear of the bell and avatar the shell floats at the top right", () => {
+  const data = () => baseData({ companionId: "sprout", companions: [{ id: "sprout", name: "Sprout" }] });
+  test("the tablet row (phoneRow) leaves room at its end, so the actions menu is not under the avatar", async () => {
+    const view = renderBar(data(), true);
+    await view.findByRole("button", { name: "Conversation actions" });
+    expect(view.container.querySelector("header")?.className).toContain("pe-28");
+  });
+  test("the bar inside the desktop header, which already reserves the band, adds no second reserve", async () => {
+    const view = renderBar(data(), false);
+    await view.findByRole("button", { name: "Conversation actions" });
+    expect(view.container.querySelector("header")?.className).not.toContain("pe-28");
+  });
+});
