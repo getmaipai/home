@@ -367,13 +367,14 @@ export async function enforceCodingKillSwitch(): Promise<number> {
   await Promise.allSettled(rows.map((row) => sandbox.stop(row.id)));
   return rows.length;
 }
-let watching = false;
+let unwatch: (() => void) | null = null;
 /** Wires the kill switch to the settings: any write of `coding.enabled` or `coding.paused` enforces it. Safe to call twice. */
 export function watchCodingKillSwitch(): void {
-  if (watching) return;
-  watching = true;
-  onHouseholdSettingWrite((key) => { if (key === "coding.enabled" || key === "coding.paused") void enforceCodingKillSwitch().catch(() => undefined); });
+  if (unwatch) return;
+  unwatch = onHouseholdSettingWrite((key) => { if (key === "coding.enabled" || key === "coding.paused") void enforceCodingKillSwitch().catch(() => undefined); });
 }
+/** Tests only: a test file that wired the kill switch takes it off again so the next file's settings writes are plain writes. */
+export function __unwatchCodingKillSwitchForTests(): void { unwatch?.(); unwatch = null; }
 
 /** Undo on a receipt: restores the checkpoint through the sandbox and records it in the person's trail. The person's own click; the brake lets undo through always. */
 export async function undoToCheckpoint(person: PersonRow, sessionId: string, checkpointId: string): Promise<void> {

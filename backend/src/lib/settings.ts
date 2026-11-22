@@ -521,7 +521,10 @@ export function listOverrideValues(actor: PersonRow, personId: string): Settings
  * validates the value against the key's selector and persists it. */
 const householdWriteListeners: Array<(key: string, value: unknown) => void> = [];
 /** Runs after every household-scope write has been stored (a listener that throws never fails the write). Used by the Coding kill switch (lib/codingTurns.ts). */
-export function onHouseholdSettingWrite(listener: (key: string, value: unknown) => void): void { if (!householdWriteListeners.includes(listener)) householdWriteListeners.push(listener); }
+export function onHouseholdSettingWrite(listener: (key: string, value: unknown) => void): () => void {
+  if (!householdWriteListeners.includes(listener)) householdWriteListeners.push(listener);
+  return () => { const at = householdWriteListeners.indexOf(listener); if (at >= 0) householdWriteListeners.splice(at, 1); };
+}
 function notifyHouseholdWrite(scope: string, key: string, value: unknown): void {
   if (scope !== "household") return;
   for (const listener of householdWriteListeners) { try { listener(key, value); } catch { /* a listener never fails the write */ } }

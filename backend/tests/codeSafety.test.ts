@@ -21,7 +21,7 @@ import { createApiKey, createSessionKey, resolveApiKeyOutcome } from "@/lib/apiK
 import { resetValue, setHouseholdSettingValue } from "@/lib/settings";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { createCodingSession, CodingSessionError, getCodingSession } from "@/lib/codingSessions";
-import { codingKilled, enforceCodingKillSwitch, sendMessage, setCodingRuntime, stopCodingSession, submitTurn, turnFinished, turnState, watchCodingKillSwitch, __setSessionCapForTests } from "@/lib/codingTurns";
+import { codingKilled, enforceCodingKillSwitch, sendMessage, setCodingRuntime, stopCodingSession, submitTurn, turnFinished, turnState, watchCodingKillSwitch, __setSessionCapForTests, __unwatchCodingKillSwitchForTests } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
@@ -58,6 +58,7 @@ const fakeToken = () => ["gh", "o_"].join("") + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 describe("the kill switch", () => {
   beforeEach(() => { watchCodingKillSwitch(); });
+  afterEach(() => { __unwatchCodingKillSwitchForTests(); });
 
   async function busyHome() {
     // Two people, two sessions: one holds a request for the person, one has a message waiting behind a running turn.
