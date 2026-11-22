@@ -14,7 +14,7 @@ import { appendLogLine } from "@/lib/log";
 import { newCodingRequestId } from "@/lib/id";
 import { appendCodingMessage, replaceCodingMessageParts, type CodingPart } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
-import { CodingSessionError, getSessionRow, requireCodingAccess, updateSession } from "@/lib/codingSessions";
+import { addCheckpoint, CodingSessionError, getSessionRow, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import type { PersonRow } from "@/types";
 
 /** What the agent reports while it works. The OpenCode adapter (later) maps its own event stream onto these. */
@@ -112,7 +112,8 @@ export function createTurnHost(input: { sessionId: string; personId: string; sig
           tainted.add(sessionId);
           return;
         case "checkpoint":
-          // The checkpoint store is a later slice; the transcript shows a notice with the label.
+          // Recorded on the session (spec `checkpoints`) so Undo can go back to it; the transcript shows a notice with the label.
+          addCheckpoint(sessionId, { id: event.id, label: event.label, files: event.files });
           write({ type: "notice", text: `Checkpoint: ${event.label}` });
           return;
       }

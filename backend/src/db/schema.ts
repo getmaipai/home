@@ -179,6 +179,8 @@ export const codingSessions = sqliteTable("coding_sessions", {
   network: text("network", { mode: "json" }).$type<{ policy: "none" | "hosts"; hosts: string[] }>().notNull(),
   mounts: text("mounts", { mode: "json" }).$type<string[]>(),
   modelId: text("model_id"),
+  /** CODE-AGENT-01: the sandbox snapshots a session can go back to (spec coding-session.checkpoints), newest last. */
+  checkpoints: text("checkpoints", { mode: "json" }).$type<{ id: string; at: string; label: string; files: number }[]>(),
   usage: text("usage", { mode: "json" }).$type<{ input_tokens: number; output_tokens: number }>().notNull(),
   changes: text("changes", { mode: "json" }).$type<{ files: number; additions: number; deletions: number }>().notNull(),
   createdAt: text("created_at").notNull(),

@@ -16,7 +16,7 @@ import { jobQueueCopy, type JobQueueReason } from "@/lib/jobQueueCopy";
 import { chatLeaseHeldBy, type ChatLease, type LeaseRefusal } from "@/lib/chatLease";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import type { Tier } from "@/lib/tiers";
-import { CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
+import { addCheckpoint, CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
 import { appendCodingMessage } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
@@ -26,6 +26,8 @@ import type { PersonRow } from "@/types";
 export interface CodingTurnResult { modelId?: string; usage?: { input_tokens: number; output_tokens: number } }
 /** The agent bridge (CODE-AGENT-01, later: OpenCode events to message parts). It runs at the tier it is given; Home maps no tier to a model. */
 export interface CodingAgent {
+  /** A plain sentence when the agent cannot run now (no gateway key, no driver), else null. Checked before a turn is queued, so nothing starts that cannot finish. */
+  ready?(): string | null;
   /** `host` is how the agent reports events and asks to act (lib/codingBridge.ts); an agent that needs nothing from it may ignore it. */
   runTurn(input: { sessionId: string; turnId: string; tier: Tier; message: string; signal: AbortSignal; host: CodingHost }): Promise<CodingTurnResult>;
 }
@@ -36,6 +38,8 @@ export interface CodingSandbox {
   destroy(sessionId: string): Promise<void>;
   /** CODE-BRAKE-01: Undo on a receipt restores the checkpoint the action started from (the checkpoint store is a later slice). */
   restoreCheckpoint?(input: { sessionId: string; checkpointId: string }): Promise<void>;
+  /** CODE-AGENT-01: a snapshot of the workspace, taken before each turn so Undo has something to go back to. */
+  snapshot?(input: { sessionId: string; label: string }): Promise<{ id: string; files: number }>;
 }
 export interface CodingRuntime { agent: CodingAgent; sandbox: CodingSandbox; lease: () => ChatLease }
 
@@ -156,6 +160,11 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   };
   try {
     await rt.sandbox.start({ sessionId: turn.sessionId, environmentId });
+    if (rt.sandbox.snapshot && !turn.abort.signal.aborted) {
+      // The checkpoint Undo goes back to. A failed snapshot never fails the turn; the person just has no checkpoint for this message (reason code in the log).
+      try { const snap = await rt.sandbox.snapshot({ sessionId: turn.sessionId, label: "Before your message" }); addCheckpoint(turn.sessionId, { id: snap.id, label: "Before your message", files: snap.files }); log("checkpoint_taken", turn); }
+      catch (e) { log("checkpoint_failed", turn, `reason=${(e as { reason?: string }).reason ?? "error"}`); }
+    }
     if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle" }); stopped(); settle(turn, "cancelled"); clearQueue(turn.sessionId); refreshHouseholdQueue(); return; }
     updateSession(turn.sessionId, { state: "working" });
     const host = createTurnHost({ sessionId: turn.sessionId, personId: turn.personId, signal: turn.abort.signal });
@@ -184,6 +193,8 @@ export function submitTurn(person: PersonRow, sessionId: string, message: string
   const refusal = codingSessionRefusal(person);
   if (refusal) throw new CodingSessionError("not_allowed", refusal);
   if (!runtime) throw new CodingSessionError("not_allowed", "Code sessions are not available on this home yet. Try again after the next update.");
+  const notReady = runtime.agent.ready?.();
+  if (notReady) throw new CodingSessionError("not_allowed", notReady);
   const session = getSessionRow(person.id, sessionId);
   if (!session) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
   if (!message.trim() || message.length > 200_000) throw new CodingSessionError("bad_input", "Write a message first, and keep it under 200,000 characters.");
@@ -293,7 +304,8 @@ export async function undoToCheckpoint(person: PersonRow, sessionId: string, che
   requireCodingAccess(person);
   if (!getSessionRow(person.id, sessionId)) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
   if (!runtime?.sandbox.restoreCheckpoint) throw new CodingSessionError("not_allowed", "Undo is not available for this session yet.");
-  if (!/^[A-Za-z0-9_.-]{1,80}$/.test(checkpointId)) throw new CodingSessionError("bad_input", "That checkpoint is not valid. Pick one from the session's history.");
+  const known = (getSessionRow(person.id, sessionId)?.checkpoints ?? []).some((c) => c.id === checkpointId);
+  if (!/^[A-Za-z0-9_.-]{1,80}$/.test(checkpointId) || !known) throw new CodingSessionError("bad_input", "That checkpoint is not valid. Pick one from the session's history.");
   await runtime.sandbox.restoreCheckpoint({ sessionId, checkpointId });
   recordCodingEvent({ sessionId, personId: person.id, kind: "checkpoint_restored", detail: { checkpoint_id: checkpointId } });
   appendLogLine(`coding checkpoint_restored session=${sessionId} person=${person.id}`);

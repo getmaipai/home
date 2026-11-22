@@ -1,7 +1,7 @@
 // CODE-AGENT-01 slice two and CODE-BRAKE-01: agent events become redacted message parts and audit lines, every action passes the tool brake, a held request is
 // the brake's own ask, Stop and the wall-clock budget end the turn with a stopped-run, and messages typed meanwhile wait in the session's queue.
 import { afterEach, describe, expect, test } from "bun:test";
-import { createCodingSession, getCodingSession } from "@/lib/codingSessions";
+import { addCheckpoint, createCodingSession, getCodingSession } from "@/lib/codingSessions";
 import { __setBudgetMsForTests, cancelQueuedMessage, queuedMessageIds, sendMessage, stopCodingSession, submitTurn, turnFinished, turnState, undoToCheckpoint } from "@/lib/codingTurns";
 import { answerHostRequest, isSessionTainted, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
@@ -156,9 +156,11 @@ describe("Stop, the wall-clock budget and the message queue", () => {
   });
   test("Undo on a receipt restores the checkpoint and records it", async () => {
     rig = startRig(); const a = owner(); const s = createCodingSession(a, input());
+    addCheckpoint(s.id, { id: "ckpt-1", label: "Before your message", files: 3 });
     await undoToCheckpoint(a, s.id, "ckpt-1");
     expect(rig.sandbox.events).toContain(`restore:${s.id}:ckpt-1`);
     expect(listCodingEvents(a.id, s.id).at(-1)).toMatchObject({ kind: "checkpoint_restored", detail: { checkpoint_id: "ckpt-1" } });
     await expect(undoToCheckpoint(a, s.id, "../etc")).rejects.toThrow();
+    await expect(undoToCheckpoint(a, s.id, "ckpt-unknown")).rejects.toThrow(); // only the session's own checkpoints
   });
 });

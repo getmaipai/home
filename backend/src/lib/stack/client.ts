@@ -156,6 +156,8 @@ export interface StackClient {
   setMediaRoots(roots: { read: string[]; write: string[] }, opts?: { signal?: AbortSignal }): Promise<{ read: string[]; write: string[] }>;
   /** CODE-API-01: POST a coding wire request and hand back the engine's reply as the Stack sent it (status, headers, body stream), including a 4xx or 5xx, which the caller maps. Only a Stack that cannot be reached throws. Optional: an older client has no coding wires. */
   codingWire?(path: CodingWirePath, body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ status: number; headers: Headers; body: ReadableStream<Uint8Array> | null }>;
+  /** CODE-SANDBOX-01: one call to /stack/v1/sandboxes[/...] with Home's token and caller header; hands back the Stack's reply as sent (status, headers, body stream), a 4xx or 5xx included, which lib/codingSandbox.ts maps. Only a Stack that serves the sandbox routes needs it. */
+  sandboxCall?(method: "GET" | "POST" | "DELETE", path: string, body?: unknown, opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<{ status: number; headers: Headers; body: ReadableStream<Uint8Array> | null }>;
   /** CODE-API-01: GET /v1/models?role=coding (the one served model, with its context length and thinking ceiling). */
   codingModels?(opts?: { signal?: AbortSignal }): Promise<StackCodingModels>;
   /** POST /v1/chat/completions. For `stream: true` the Response body reader
@@ -456,6 +458,17 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       try {
         // A cold coding engine takes tens of seconds to load, so the wait for the first byte is longer than the other roles'.
         res = await withTimeout(doFetch(base + path, { ...jsonInit(body), signal: opts?.signal }), Math.max(timeoutMs, CODING_FIRST_BYTE_MS), timeoutError);
+      } catch (err) {
+        wrapError(err);
+      }
+      return { status: res.status, headers: res.headers, body: res.body };
+    },
+    async sandboxCall(method, path, body, opts) {
+      if (path !== "/stack/v1/sandboxes" && !path.startsWith("/stack/v1/sandboxes/")) throw new StackError("unknown", "a sandbox call must go to /stack/v1/sandboxes");
+      let res: Response;
+      try {
+        // A machine start waits for its network lock, so the wait is longer than the default; an exec stream is bounded by its caller's signal, not by this timer once headers arrive.
+        res = await withTimeout(doFetch(base + path, { method, ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), signal: opts?.signal }), opts?.timeoutMs ?? 150_000, timeoutError);
       } catch (err) {
         wrapError(err);
       }

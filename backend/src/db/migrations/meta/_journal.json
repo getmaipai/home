@@ -1443,6 +1443,13 @@
       "when": 1795309264093,
       "tag": "0206_coding_transcript",
       "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "6",
+      "when": 1795312570250,
+      "tag": "0207_coding_checkpoints",
+      "breakpoints": true
     }
   ]
 }

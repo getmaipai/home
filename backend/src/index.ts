@@ -14,6 +14,7 @@ import { startMediaScanner } from "@/lib/media/scan";
 import { setProfileSource } from "@/lib/jobs/admissionFit";
 import { startStackHardwareRefresh } from "@/lib/jobs/stackHardware";
 import { startChatLease } from "@/lib/chatLeaseRuntime";
+import { startCodingRuntime } from "@/lib/codingRuntime";
 import { setQuietConfigSource } from "@/lib/jobs/householdQueue";
 import { wireQueuePolicy } from "@/lib/jobs/queuePolicy";
 import { profileSourceFromSettings } from "@/lib/jobs/profileSource";
@@ -420,6 +421,7 @@ startMediaScanner();
 setProfileSource(() => profileSourceFromSettings(getHouseholdSettingValue));
 startStackHardwareRefresh();
 startChatLease();
+startCodingRuntime();
 wireQueuePolicy();
 setQuietConfigSource(() => {
   const number = (key: string, fallback: number) => { const value = getHouseholdSettingValue(key); return typeof value === "number" && Number.isFinite(value) ? value : fallback; };

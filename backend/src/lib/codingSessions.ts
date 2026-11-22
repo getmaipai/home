@@ -57,7 +57,7 @@ export function requireCodingAccess(person: PersonRow): void {
 function wire(row: Row): CodingSessionWire {
   return CodingSession.parse({
     id: row.id, person_id: row.personId, title: row.title, repo: row.repo, environment_id: row.environmentId, mode: row.mode, state: row.state, tier: row.tier,
-    network: row.network, ...(row.mounts ? { mounts: row.mounts } : {}), ...(row.modelId ? { model_id: row.modelId } : {}), usage: row.usage, changes: row.changes,
+    network: row.network, ...(row.mounts ? { mounts: row.mounts } : {}), ...(row.modelId ? { model_id: row.modelId } : {}), ...(row.checkpoints ? { checkpoints: row.checkpoints } : {}), usage: row.usage, changes: row.changes,
     created_at: row.createdAt, last_activity_at: row.lastActivityAt, ...(row.deletedAt ? { deleted_at: row.deletedAt, trash_until: row.trashUntil } : {}),
     provenance: row.provenance, hlc: row.hlc,
   });
@@ -117,6 +117,17 @@ export function getCodingSession(person: Pick<PersonRow, "id">, id: string): Cod
 export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "modelId" | "usage" | "lastActivityAt">>): void {
   const at = new Date().toISOString();
   db.update(codingSessions).set({ ...patch, updatedAt: at, hlc: nextHlc() }).where(eq(codingSessions.id, id)).run();
+}
+
+/** Checkpoints kept per session; the oldest drop off first. */
+export const MAX_CHECKPOINTS = 50;
+/** Records a sandbox snapshot on the session (spec `checkpoints`). Returns false for a bad id or a missing session. */
+export function addCheckpoint(sessionId: string, checkpoint: { id: string; label: string; files: number }): boolean {
+  const row = db.select().from(codingSessions).where(eq(codingSessions.id, sessionId)).get();
+  if (!row || !/^[A-Za-z0-9_.-]{1,80}$/.test(checkpoint.id)) return false;
+  const list = [...(row.checkpoints ?? []).filter((c) => c.id !== checkpoint.id), { id: checkpoint.id, at: new Date().toISOString(), label: checkpoint.label.slice(0, 120) || "Checkpoint", files: Math.max(0, Math.floor(checkpoint.files)) }].slice(-MAX_CHECKPOINTS);
+  db.update(codingSessions).set({ checkpoints: list, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(codingSessions.id, sessionId)).run();
+  return true;
 }
 
 /** The person switches the stored tier now; it applies at the next turn (design 3.2). A tier the person may not run is refused, never lowered silently. */

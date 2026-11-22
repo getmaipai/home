@@ -10,6 +10,8 @@ import { gitCredentialFor, storeConnection } from "@/lib/gitConnections";
 import { createCodingSession, CodingSessionError } from "@/lib/codingSessions";
 import { __setShareRemoteForTests, __setWorkspaceRootForTests, checkSecretsBeforeShare, codingWorkspace, pushCodingSession, setSecretScanner } from "@/lib/codingShare";
 import { listCodingEvents } from "@/lib/codingEvents";
+import { createGitleaksScanner } from "@/lib/codingGitleaks";
+import { listIssues } from "@/lib/issues";
 import { input, owner, startRig } from "./codingRig";
 
 const TOKEN = "gho_SUPERSECRETTOKEN123456";
@@ -35,9 +37,10 @@ async function readySession() {
 }
 
 describe("Push and the secret check", () => {
-  test("it fails closed with no scanner wired, and nothing is pushed", async () => {
-    const { a, s } = await readySession();
-    await expect(pushCodingSession(a, s.id, true)).rejects.toThrow(/secret check is not installed/);
+  test("it fails closed when gitleaks is missing, shows a Repairs row, and nothing is pushed", async () => {
+    const { a, s } = await readySession(); setSecretScanner(createGitleaksScanner(async () => "missing"));
+    await expect(pushCodingSession(a, s.id, true)).rejects.toThrow(/gitleaks\) is not installed/);
+    expect(listIssues().some((i) => i.source === "coding" && i.key === "gitleaks_missing" && !i.resolved_at)).toBe(true);
     expect(branches()).not.toContain("refs/heads/maipai/fix");
   });
   test("a confirmed push with a clean scan lands the session branch and records it", async () => {
