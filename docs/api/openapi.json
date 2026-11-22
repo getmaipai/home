@@ -34314,6 +34314,1128 @@
         }
       }
     },
+    "/api/tier-leases/{key}": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The shared tier lease for one key: who it is held by (you or not), what waits for it (counts and kinds) and why it holds (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The lease as you may see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "coding"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "waiters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "kinds"
+                      ]
+                    },
+                    "holder_jobs": {
+                      "type": "integer"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "pause_max_minutes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "releases_in_seconds",
+                    "waiters",
+                    "holder_jobs",
+                    "decision",
+                    "pause_max_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/touch": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The holder is typing or attaching: renews the grace. The composer calls it at most once every 10 seconds (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The lease as you may see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "coding"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "waiters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "kinds"
+                      ]
+                    },
+                    "holder_jobs": {
+                      "type": "integer"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "pause_max_minutes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "releases_in_seconds",
+                    "waiters",
+                    "holder_jobs",
+                    "decision",
+                    "pause_max_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/yield": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Hand the lease over: now when nothing is running, else at the next step. A running request is never cut off (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The lease as you may see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "coding"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "waiters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "kinds"
+                      ]
+                    },
+                    "holder_jobs": {
+                      "type": "integer"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "pause_max_minutes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "releases_in_seconds",
+                    "waiters",
+                    "holder_jobs",
+                    "decision",
+                    "pause_max_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/release": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Give the lease back; the standard model returns between requests (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The lease as you may see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "coding"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "waiters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "kinds"
+                      ]
+                    },
+                    "holder_jobs": {
+                      "type": "integer"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "pause_max_minutes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "releases_in_seconds",
+                    "waiters",
+                    "holder_jobs",
+                    "decision",
+                    "pause_max_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/pause": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Pause a coding session: the running step finishes, the session keeps all its state (also across a restart) and holds nothing. It ends by itself after the household's pause limit (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "session_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Paused now, or pausing when the running step ends.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "pausing",
+                        "paused"
+                      ]
+                    },
+                    "pause_max_minutes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "pause_max_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/resume": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Resume a paused coding session. It is a job in the household queue: it waits its turn and never preempts anyone (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "session_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The queued turn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "turn_id": {
+                      "type": "string"
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "turn_id",
+                    "tier"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/lower": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Use a lower tier: a coding session goes down to the chosen tier, or the chat lease is released. It can only lower, through the existing tier grants (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "to": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost"
+                    ]
+                  }
+                },
+                "required": [
+                  "to"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The tier now in use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tier"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tier-leases/{key}/pin": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Pin or unpin the held lease (admin waiver; ends after the key's pin cap of quiet). Admins only (TIER-LEASE-03)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "chat or coding"
+            },
+            "required": true,
+            "description": "chat or coding",
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pinned": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pinned"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The lease as you may see it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "coding"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "starting",
+                        "held",
+                        "releasing"
+                      ]
+                    },
+                    "held_by_you": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    },
+                    "releases_in_seconds": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "waiters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "kinds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "kinds"
+                      ]
+                    },
+                    "holder_jobs": {
+                      "type": "integer"
+                    },
+                    "decision": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "pause_max_minutes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "state",
+                    "held_by_you",
+                    "pinned",
+                    "releases_in_seconds",
+                    "waiters",
+                    "holder_jobs",
+                    "decision",
+                    "pause_max_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who holds it can do that",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be done right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/coding/pieces": {
       "get": {
         "tags": [
