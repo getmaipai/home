@@ -778,7 +778,7 @@ msgid "{level} needs attention"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:208
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:209
 msgid "{made} is ready. Pick it from the list and press Preview to hear it."
 msgstr ""
 
@@ -1156,7 +1156,7 @@ msgid "{name}, preview"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:187
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:188
 msgid "{name}, synth preview"
 msgstr ""
 
@@ -2278,7 +2278,7 @@ msgid "Add a title."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:205
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:206
 msgid "Add a voice"
 msgstr ""
 
@@ -2968,7 +2968,7 @@ msgid "All good"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:200
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:201
 msgid "All settings can be changed later."
 msgstr ""
 
@@ -3919,7 +3919,7 @@ msgstr ""
 #: src/apps/setup/SetupReviewPage.tsx:65
 #: src/shell/pageHeaderTitle.tsx:148
 #: src/shell/pages/companionFlow/AnimateStep.tsx:155
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:199
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:200
 #: src/shell/pages/packageAppHeaderBar.tsx:94
 #: src/shell/pages/PackageAppPage.tsx:284
 #: src/shell/pages/settings/settingsBackLink.ts:51
@@ -4017,8 +4017,8 @@ msgid "Backing up…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:180
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:181
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:182
 msgid "Backstory"
 msgstr ""
 
@@ -9080,7 +9080,7 @@ msgid "Diagnostics key. "
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:166
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:167
 msgid "Dials"
 msgstr ""
 
@@ -10237,7 +10237,7 @@ msgid "Everything, with pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:171
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:172
 msgid "Examples"
 msgstr ""
 
@@ -11313,7 +11313,7 @@ msgid "area.General"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:180
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:181
 msgid "Generate"
 msgstr ""
 
@@ -11323,7 +11323,7 @@ msgid "Generate a picture"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:182
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:183
 msgid "Generate a suggested backstory or write your own. You can edit it anytime."
 msgstr ""
 
@@ -11648,12 +11648,12 @@ msgid "Go back to {tag}?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:194
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:195
 msgid "Go to Animate Character"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:194
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:195
 msgid "Go to Create Character"
 msgstr ""
 
@@ -12135,7 +12135,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
-#: src/shell/pages/CompanionsPage.tsx:419
+#: src/shell/pages/CompanionsPage.tsx:420
 msgid "Home can't reach its voice service. Check Repairs, then come back."
 msgstr ""
 
@@ -13259,7 +13259,7 @@ msgid "How should it change? For example: heavy metal"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:158
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:159
 msgid "How should your synth behave, speak, and interact? (Optional)"
 msgstr ""
 
@@ -15845,8 +15845,8 @@ msgstr ""
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:104
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:143
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:161
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:161
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:162
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:162
 msgid "Loading voices"
 msgstr ""
 
@@ -16485,7 +16485,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:112
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:206
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:207
 msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."
 msgstr ""
 
@@ -20268,6 +20268,11 @@ msgid "setting.news.reader_open.option.site"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:419
+msgid "Open Voices"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/TodaySection.tsx:127
 msgid "Open Weather"
 msgstr ""
@@ -20749,9 +20754,9 @@ msgid "setting.person.quiet_hours.from.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:151
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:152
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:157
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:153
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:158
 msgid "Personality"
 msgstr ""
 
@@ -20766,7 +20771,7 @@ msgid "area.Personality"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:156
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:157
 msgid "Personality notes"
 msgstr ""
 
@@ -21323,12 +21328,12 @@ msgid "PIN"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:169
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:170
 msgid "Pin dial: {dial}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:174
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:175
 msgid "Pin example: {phrase}"
 msgstr ""
 
@@ -23769,7 +23774,7 @@ msgid "Save name and area"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:190
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:191
 msgid "Save Synth"
 msgstr ""
 
@@ -23893,7 +23898,7 @@ msgstr ""
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/CompanionAudienceDialog.tsx:65
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:190
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:191
 msgid "Saving"
 msgstr ""
 
@@ -26959,7 +26964,7 @@ msgstr ""
 #: src/apps/settings/styles/StyleConfirm.tsx:109
 #: src/apps/settings/styles/StyleEditor.tsx:93
 #: src/apps/settings/styles/stylesShared.tsx:45
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:164
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:165
 #: src/shell/pages/musicComposerMode.ts:21
 #: src/shell/pages/MusicRemix.tsx:45
 msgid "Style"
@@ -27080,7 +27085,7 @@ msgid "area.Synth controls"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:185
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:186
 msgid "Synth Preview"
 msgstr ""
 
@@ -27445,7 +27450,7 @@ msgid "Test connection"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:189
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:190
 msgid "Test Conversation"
 msgstr ""
 
@@ -27643,9 +27648,9 @@ msgstr ""
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:290
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:317
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:146
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:148
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:177
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:193
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:149
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:178
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:194
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:95
 #: src/shell/pages/companionFlow/PackSection.tsx:70
 #: src/shell/pages/EnginesPage.tsx:147
@@ -29544,7 +29549,7 @@ msgid "This does not fit this level on this computer."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:175
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:176
 msgid "This example is too long to pin. Shorten it to 60 characters or fewer."
 msgstr ""
 
@@ -29822,6 +29827,16 @@ msgstr ""
 #: src/apps/settings/VoiceManagerSection.tsx:145
 #: src/apps/settings/VoiceManagerSection.tsx:160
 msgid "this voice"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:148
+msgid "This voice engine has one built-in voice. To give this synth another voice, choose Create / Clone and add one from a short recording."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/CompanionsPage.tsx:419
+msgid "This voice engine has one built-in voice. To give this synth another, add a voice from a short recording in Settings, Voices."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -31606,8 +31621,8 @@ msgstr ""
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/AmbientCompanionPane.tsx:184
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:137
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:160
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:160
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:161
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:161
 #: src/shell/pages/CompanionsPage.tsx:367
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
@@ -32628,7 +32643,7 @@ msgid "Who is {name} for?"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:181
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:182
 msgid "Who is your synth? Describe their history, experiences, interests, occupation, relationships, and personal story..."
 msgstr ""
 
@@ -32832,7 +32847,7 @@ msgid "Write a note first."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:159
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:160
 msgid "Write backstory"
 msgstr ""
 
@@ -32863,8 +32878,8 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:20
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:159
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:180
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:160
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:181
 msgid "Writing"
 msgstr ""
 
@@ -33679,13 +33694,13 @@ msgid "Your storage is almost full. Delete some files, or raise the limit in Set
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:186
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:187
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:188
 msgid "Your synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/companionFlow/CustomizeStep.tsx:187
+#: src/shell/pages/companionFlow/CustomizeStep.tsx:188
 msgid "Your synth will appear here"
 msgstr ""
 

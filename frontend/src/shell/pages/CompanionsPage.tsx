@@ -416,6 +416,7 @@ function VoiceRow({ companion }: { companion: CompanionDetail }) {
           {saveVoice.isError ? <Alert variant="destructive"><AlertDescription>{errorLine(saveVoice.error, i18n._({ id: "Could not save this voice. Check your connection and try again.", message: "Could not save this voice. Check your connection and try again." }))}</AlertDescription></Alert> : null}
         </div>
       ) : null}
+      {picker && picker.options.length === 1 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "This voice engine has one built-in voice. To give this synth another, add a voice from a short recording in Settings, Voices.", message: "This voice engine has one built-in voice. To give this synth another, add a voice from a short recording in Settings, Voices." })} <Link to="/settings/home-voice">{i18n._({ id: "Open Voices", message: "Open Voices" })}</Link></p> : null}
       {voices.isError ? <Alert variant="destructive"><AlertDescription>{i18n._({ id: "Home can't reach its voice service. Check Repairs, then come back.", message: "Home can't reach its voice service. Check Repairs, then come back." })}</AlertDescription></Alert> : null}
       {preview.error ? <Alert variant="destructive"><AlertDescription>{preview.error}</AlertDescription></Alert> : null}
     </div>
