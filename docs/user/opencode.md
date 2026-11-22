@@ -59,6 +59,16 @@ Open `~/.config/opencode/opencode.json` and add this block. Replace the base URL
           "name": "Home coding model",
           "tool_call": true,
           "limit": { "context": 131072, "output": 16384 }
+        },
+        "maipai-coder-boost": {
+          "name": "Home coding model, Boost",
+          "tool_call": true,
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "maipai-coder-max": {
+          "name": "Home coding model, Max",
+          "tool_call": true,
+          "limit": { "context": 131072, "output": 16384 }
         }
       }
     }
@@ -68,6 +78,17 @@ Open `~/.config/opencode/opencode.json` and add this block. Replace the base URL
 ```
 
 The `apiKey` line reads the key from the file, so the config holds no secret.
+
+## Pick a level by the model name
+
+The model name is the level. `maipai-coder` is Standard. `maipai-coder-boost` is Boost. `maipai-coder-max` is Max, the big model: Home switches to it for you, keeps it while you keep working, and gives it back after a few idle minutes.
+
+```
+opencode run -m maipai/maipai-coder-max "Fix the failing test"
+```
+
+Boost and Max need your account to hold them (an admin sets this in Settings). Without the grant, Home answers with a plain line and nothing runs. If someone else is using Max, Home says so; use `maipai-coder` or try again in a minute. Max uses the whole home computer, so other jobs such as pictures wait behind it.
+
 
 ## 4. Try it
 

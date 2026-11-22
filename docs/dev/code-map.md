@@ -545,6 +545,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, previewInspiredVoice, renameClonedVoice |
 | `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, fromSandboxNetwork, transportRefusal, requestsPerMinute |
+| `backend/src/lib/codeGatewayTier.ts` | CODER_MODEL_BY_TIER, tierFromModel, tierForPersonalKey |
 | `backend/src/lib/codeReady.ts` | probeRoute, codeReady |
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |

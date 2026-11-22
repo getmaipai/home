@@ -37,6 +37,8 @@ import {
 } from "@/lib/codeWire";
 import { gateStream } from "@/lib/codeStream";
 import { sessionTierForKey } from "@/lib/codingSessions";
+import { CODER_MODEL_BY_TIER, tierForPersonalKey } from "@/lib/codeGatewayTier";
+import { getChatLease } from "@/lib/chatLeaseRuntime";
 import { ensureCodingPiecesFresh, missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { AppEnv } from "@/types";
 
@@ -74,6 +76,9 @@ const viaTransport = async (c: Context, next: () => Promise<void>) => {
   await ensureCodingPiecesFresh();
   return next();
 };
+const leaseLine = (refusal: string): string => refusal === "max_window" ? "Max coding is not available in this time window. Use maipai-coder, or try again later."
+  : refusal === "not_a_holder" ? "Your access does not include Max coding. Use the model name maipai-coder, or ask an admin."
+  : "Max coding is busy with someone else's work right now. Use maipai-coder, or try again in a minute.";
 const tooLarge = (c: Context) => refuse(c, 413, "This request is too large for the coding service. Start a new conversation or send less at once.", "request_too_large");
 
 function apiDoorOff(c: Context): Response | null {
@@ -111,7 +116,8 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
   const answer = (res: Response) => { recordApiRequest(res.status, started); return res; };
   let endStream: (() => void) | null = null;
   let slot: Slot | null = null;
-  const letGo = () => { slot?.release(); slot = null; endStream?.(); endStream = null; };
+  let endLease: (() => void) | null = null;
+  const letGo = () => { slot?.release(); slot = null; endStream?.(); endStream = null; endLease?.(); endLease = null; };
   try {
     const off = apiDoorOff(c);
     if (off) return answer(off);
@@ -128,6 +134,13 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
     let body;
     try { body = parseBody(wire, await c.req.json().catch(() => undefined)); }
     catch (error) { if (error instanceof CodeRequestError) return answer(refuse(c, 400, error.message, "invalid_request")); throw error; }
+
+    // A personal key (the tmux OpenCode, Claude Code, any tool) picks Standard, Boost or Max by the model name; a grant is required and Max takes the lease below.
+    if (!key.sessionId && wire !== "count_tokens") {
+      const asked = tierForPersonalKey(person, (body as { model?: unknown }).model);
+      if (!asked.ok) return answer(refuse(c, asked.status, asked.message, asked.code));
+      sessionTier = asked.tier === "standard" ? null : asked.tier;
+    }
 
     const band = bandOf(person);
     const minor = band !== "adult";
@@ -153,6 +166,13 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
       if (day) return answer(refusedBy(c, day));
       endStream = streamCounter.begin(person.id, maxStreamsFor(person));
       if (!endStream) return answer(refuse(c, 429, "You already have as many coding requests running as your access allows. Wait for one to finish, then try again.", "too_many_streams", 5));
+      if (!key.sessionId && sessionTier === "max") {
+        const lease = getChatLease();
+        const held = await lease.acquire(person, { category: "coding" });
+        if (!held.ok) { letGo(); return answer(refuse(c, held.refusal === "not_a_holder" ? 403 : 429, leaseLine(held.refusal), "max_unavailable", 30)); }
+        lease.requestStarted(person.id);
+        endLease = () => lease.requestEnded(person.id);
+      }
       await refreshCodingSlots();
       const got = await codingQueue.acquire(person.id, c.req.raw.signal);
       if (got === "aborted") { letGo(); return answer(new Response(null, { status: 499 })); }
@@ -227,7 +247,7 @@ codeGatewayRoutes.get("/models", viaTransport, requireApiKey("code", door), asyn
     if (!client.codingModels) return answer(refuse(c, 503, ENGINE_DOWN, "engine_unavailable", 30));
     const served = (await client.codingModels({ signal: c.req.raw.signal })).data.find(m => m.role === undefined || m.role === "coding");
     const entry = (id: string) => ({ id, object: "model", created: 0, owned_by: "maipai-home", ...(served?.context_length ? { context_length: served.context_length } : {}) });
-    const data = served ? [entry("maipai-coder"), ...(served.id !== "maipai-coder" ? [entry(served.id)] : [])] : [];
+    const data = served ? [entry(CODER_MODEL_BY_TIER.standard), entry(CODER_MODEL_BY_TIER.boost), entry(CODER_MODEL_BY_TIER.max), ...(served.id !== "maipai-coder" ? [entry(served.id)] : [])] : [];
     return answer(new Response(JSON.stringify({ object: "list", data }), { status: 200, headers: { "content-type": "application/json", "cache-control": "no-store" } }));
   } catch (error) {
     return answer(error instanceof StackError ? refuse(c, 503, ENGINE_DOWN, "engine_unavailable", 30) : refuse(c, 500, UNEXPECTED, "gateway_error"));

@@ -9,6 +9,9 @@ import { apiKeys, grants, people, settingsValues } from "@/db/schema";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { createApiKey, revokeApiKey } from "@/lib/apiKeys";
+import { createGrant } from "@/lib/grants";
+import { __resetChatLeaseForTests } from "@/lib/chatLeaseRuntime";
+import { tierFromModel } from "@/lib/codeGatewayTier";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setSelfLoginForTests, __setWhoisForTests } from "@/lib/tailnetNode";
 import { __resetCodeGateForTests, __setStreamIdleForTests, __setTrustProxyForTests, createFairQueue, createStreamCounter, createTokenLedger, isTailnetAddress, tokenLedger } from "@/lib/codeGate";
@@ -27,7 +30,8 @@ const PUBLIC = "192.0.2.10";
 const PROMPT = "ZEBRA-PROMPT-7731 sort my list";
 
 let stack: StackFixture | null = null;
-let seen: Array<{ path: string; body: Record<string, unknown> }> = [];
+let seen: Array<{ path: string; body: Record<string, unknown>; tier?: string | null }> = [];
+let codingMode: "normal" | "coding" = "normal";
 let engine: (path: string, body: Record<string, unknown>) => Response | Promise<Response> = defaultEngine;
 
 function person(role = "adult", displayName = "Willow"): PersonRow {
@@ -99,13 +103,18 @@ beforeEach(() => {
   __resetRateLimiterForTests();
   __resetCodeGateForTests(2);
   __setMissingCodingPieceForTests(null); // The fixture Stack answers only the coding wires; pieces are tested in stackCodingPieces.test.ts.
-  seen = []; engine = defaultEngine;
+  seen = []; engine = defaultEngine; codingMode = "normal";
   stack = startStackFixture({
     "*": async (req) => {
       const path = new URL(req.url).pathname;
       if (req.method === "GET" && path === "/v1/models") return Response.json({ object: "list", data: [{ id: "qwen-coder-27b", role: "coding", context_length: 131072, thinking_budget_ceiling: 2000 }] });
+      if (path === "/stack/v1/roles") return Response.json({ roles: [{ id: "coding", label: "Coding", wire: "chat", residency: "swap", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-10-22T00:00:00Z" }, reason: null, model: null, check: { state: "passed", at: null, reason: null, stale: false } }] });
+      if (path === "/stack/v1/coding/mode") {
+        if (req.method === "POST") codingMode = ((await req.json()) as { mode: "normal" | "coding" }).mode;
+        return Response.json({ mode: codingMode, target: codingMode, state: "stable", reason: null, available: true, checks: { engine: true, pieces: true, hardware: true, memory: true, bench: true }, memory: { plan_bytes: 1, budget_bytes: 2 }, self_test: { passed_at: "2026-11-01T00:00:00.000Z", stale: false } });
+      }
       const body = (await req.json()) as Record<string, unknown>;
-      seen.push({ path, body });
+      seen.push({ path, body, tier: req.headers.get("x-maipai-coding-tier") });
       return engine(path, body);
     },
   });
@@ -560,7 +569,7 @@ describe("what the engine says back, and what is kept quiet", () => {
     const res = await call("/code/v1/models", { secret });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: Array<{ id: string; context_length: number }> };
-    expect(body.data.map(m => m.id)).toEqual(["maipai-coder", "qwen-coder-27b"]);
+    expect(body.data.map(m => m.id)).toEqual(["maipai-coder", "maipai-coder-boost", "maipai-coder-max", "qwen-coder-27b"]);
     expect(body.data[0]!.context_length).toBe(131072);
     expect((await call("/code/v1/models", { secret: "nope" })).status).toBe(401);
   });
@@ -899,3 +908,56 @@ test("an adult may send source code about child protections; the same text from 
   expect((await call("/code/v1/chat/completions", { secret: teen.secret, body })).status).toBe(403);
 });
 
+
+// Tier by model name on a personal key (the tmux OpenCode): Standard by default, Boost and Max only with the grant, Max takes the lease.
+describe("a personal key picks its tier by the model name", () => {
+  const give = (p: PersonRow, action: string) => createGrant({ id: p.id, role: "owner" }, { person: p.id, action, effect: "allow", acknowledged_at: new Date().toISOString(), acknowledged_by_person_id: p.id });
+  const ask = (secret: string, model: string) => call("/code/v1/chat/completions", { secret, body: { model, messages: [{ role: "user", content: PROMPT }] } });
+  beforeEach(() => { __resetChatLeaseForTests(); });
+
+  test("names map to tiers and anything else is Standard", () => {
+    expect(tierFromModel("maipai-coder-max")).toBe("max");
+    expect(tierFromModel("maipai-coder-boost")).toBe("boost");
+    for (const m of ["maipai-coder", "qwen-coder-27b", undefined, 7]) expect(tierFromModel(m)).toBe("standard");
+  });
+
+  test("the default name sends no tier", async () => {
+    const { secret } = adultWithKey();
+    expect((await ask(secret, "maipai-coder")).status).toBe(200);
+    expect(seen.at(-1)?.tier ?? null).toBeNull();
+  });
+
+  test("Max without the grant is refused before the engine is called", async () => {
+    const { secret } = adultWithKey();
+    const before = seen.length;
+    const res = await ask(secret, "maipai-coder-max");
+    expect(res.status).toBe(403);
+    expect(JSON.stringify(await res.json())).toContain("tier_not_granted");
+    expect(seen.length).toBe(before);
+  });
+
+  test("Max with the grant reaches the engine as Max", async () => {
+    const { p, secret } = adultWithKey();
+    give(p, "tier.max:coding");
+    const res = await ask(secret, "maipai-coder-max");
+    expect(res.status).toBe(200);
+    expect(seen.at(-1)?.tier).toBe("max");
+  });
+
+  test("Max while someone else holds the lease is a plain 429 and the engine is not called", async () => {
+    const first = adultWithKey("Willow"); give(first.p, "tier.max:coding");
+    const second = adultWithKey("Clover"); give(second.p, "tier.max:coding");
+    expect((await ask(first.secret, "maipai-coder-max")).status).toBe(200);
+    const before = seen.length;
+    const res = await ask(second.secret, "maipai-coder-max");
+    expect(res.status).toBe(429);
+    expect(JSON.stringify(await res.json())).toContain("max_unavailable");
+    expect(seen.length).toBe(before);
+  });
+
+  test("models lists the three names", async () => {
+    const { secret } = adultWithKey();
+    const ids = ((await (await call("/code/v1/models", { secret })).json()) as { data: Array<{ id: string }> }).data.map(m => m.id);
+    expect(ids).toEqual(expect.arrayContaining(["maipai-coder", "maipai-coder-boost", "maipai-coder-max"]));
+  });
+});
