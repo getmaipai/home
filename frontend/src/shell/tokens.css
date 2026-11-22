@@ -306,6 +306,37 @@ html:not(.light) body {
 [data-slot="chat-rail"] [data-slot="aui_thread-list-group-label"]:first-child {
   padding-top: 0.25rem;
 }
+/* COMPACT-03 (owner, 2026-11-22, ChatGPT reference): a project row is the
+ * same size as a chat row (36px, 13.5px text, the chat row's 9px side padding,
+ * set through the kit's own row tokens), has no per-row chevron (a click on
+ * the row opens it), and its chats sit under the project name (16px icon plus
+ * 8px gap plus the 9px padding, less the chat row's own 9px, is 24px). The
+ * empty note and Show more match the chat text size. */
+[data-slot="chat-rail"],
+[data-chat-column-mobile] {
+  --aui-thread-list-row-min-height: 36px;
+  --aui-thread-list-row-font-size: 0.84375rem;
+  --aui-thread-list-row-padding-x: 0.5625rem;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-project-chevron"],
+[data-chat-column-mobile] [data-slot="aui_thread-list-project-chevron"] {
+  display: none;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-project-items"],
+[data-chat-column-mobile] [data-slot="aui_thread-list-project-items"] {
+  padding-inline-start: 1.5rem;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-project-empty"],
+[data-chat-column-mobile] [data-slot="aui_thread-list-project-empty"],
+[data-slot="chat-rail"] [data-slot="aui_thread-list-project-show-more"],
+[data-chat-column-mobile] [data-slot="aui_thread-list-project-show-more"] {
+  font-size: 0.84375rem;
+  padding-inline: 0.5625rem;
+}
+[data-slot="chat-rail"] [data-slot="aui_thread-list-project-show-more"],
+[data-chat-column-mobile] [data-slot="aui_thread-list-project-show-more"] {
+  height: 2.25rem;
+}
 /* COMPACT-02: the row of reply actions sits closer to the reply. */
 [data-slot="chat-pane"] .aui-assistant-action-bar-root {
   min-height: 1.75rem;

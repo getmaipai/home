@@ -63,3 +63,15 @@ describe("composer in Home (ELT-COMPOSER-KIT-01)", () => {
     expect(waveform).not.toContain("max-h-");
   });
 });
+
+describe("chat history projects match the chat rows (COMPACT-03)", () => {
+  test("project rows use the chat row size through the kit's row tokens", () => {
+    expect(tokens).toContain("--aui-thread-list-row-min-height: 36px;");
+    expect(tokens).toContain("--aui-thread-list-row-font-size: 0.84375rem;");
+    expect(tokens).toContain("--aui-thread-list-row-padding-x: 0.5625rem;");
+  });
+  test("no per-row chevron, and chats nest under the project name", () => {
+    expect(tokens).toMatch(/aui_thread-list-project-chevron"\]\s*\{\s*display: none;/);
+    expect(tokens).toMatch(/aui_thread-list-project-items"\]\s*\{\s*padding-inline-start: 1\.5rem;/);
+  });
+});
