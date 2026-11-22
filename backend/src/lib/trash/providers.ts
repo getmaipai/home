@@ -12,6 +12,7 @@ import { archivePath } from "@/lib/media/sources";
 import type { PersonRow } from "@/types";
 import { registerTrashProvider, type TrashRow } from "./registry";
 import { listTrashedFiles, purgeExpiredFiles, purgeTrashedFile, restoreFile } from "@/lib/libraryTrash";
+import "./codingSessions";
 
 type Item = typeof mediaItems.$inferSelect;
 function mayManage(person: PersonRow, row: Item): boolean {

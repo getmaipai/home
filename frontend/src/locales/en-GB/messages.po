@@ -1437,7 +1437,7 @@ msgid "+ Add voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:13
+#: src/apps/code/SessionList.tsx:18
 msgid "+{additions} -{deletions}"
 msgstr ""
 
@@ -3465,6 +3465,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:221
 #: src/apps/chat/chatHeaderBar.tsx:310
+#: src/apps/code/SessionRow.tsx:84
 msgid "Archive"
 msgstr ""
 
@@ -3474,6 +3475,7 @@ msgid "Archive \"{text}\""
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeList.ts:42
 #: src/apps/code/codeTranscript.ts:64
 msgid "Archived"
 msgstr ""
@@ -4915,7 +4917,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:43
 #: src/apps/code/SessionView.tsx:88
-#: src/apps/code/SessionView.tsx:103
+#: src/apps/code/SessionView.tsx:104
 msgid "Changes"
 msgstr ""
 
@@ -6232,7 +6234,7 @@ msgid "setting.robot.face.color.option_label.cloud"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:53
+#: src/apps/code/SessionList.tsx:55
 msgid "Code"
 msgstr ""
 
@@ -6861,6 +6863,11 @@ msgid "Could not approve that code."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:6
+msgid "Could not archive or unarchive this session."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:212
 #: src/apps/memory/PersonMemories.tsx:376
 msgid "Could not archive that memory. Check your connection and try again."
@@ -6877,6 +6884,11 @@ msgid "Could not be made"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:7
+msgid "Could not bring this session back."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:68
 msgid "Could not cancel maintenance."
 msgstr ""
@@ -6887,7 +6899,7 @@ msgid "Could not cancel the restore."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:6
+#: src/lib/hubMutationVerbs.ts:11
 msgid "Could not cancel the schedule."
 msgstr ""
 
@@ -6907,7 +6919,7 @@ msgid "Could not change access. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:118
+#: src/apps/code/SessionView.tsx:119
 msgid "Could not change that. Try again."
 msgstr ""
 
@@ -6927,12 +6939,12 @@ msgid "Could not change the robot's Wi-Fi. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:7
+#: src/lib/hubMutationVerbs.ts:12
 msgid "Could not change the timer."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:8
+#: src/lib/hubMutationVerbs.ts:13
 msgid "Could not change this chat's companion."
 msgstr ""
 
@@ -6977,7 +6989,7 @@ msgid "Could not clear those notifications."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:9
+#: src/lib/hubMutationVerbs.ts:14
 msgid "Could not complete engine setup."
 msgstr ""
 
@@ -7016,12 +7028,12 @@ msgid "Could not delete that project. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:10
+#: src/lib/hubMutationVerbs.ts:15
 msgid "Could not delete the alarm."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:11
+#: src/lib/hubMutationVerbs.ts:16
 msgid "Could not delete the quick timer."
 msgstr ""
 
@@ -7033,6 +7045,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:960
 msgid "Could not delete this chat. Try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:8
+msgid "Could not delete this session."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7439,7 +7456,7 @@ msgid "Could not load your sessions."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodePage.tsx:41
+#: src/apps/code/CodePage.tsx:52
 msgid "Could not load your sessions. Try again."
 msgstr ""
 
@@ -7517,6 +7534,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:167
 msgid "Could not open your library. Check that Home is running, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:9
+msgid "Could not pin or unpin this session."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7599,6 +7621,11 @@ msgid "Could not rename this key."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/hubMutationVerbs.ts:10
+msgid "Could not rename this session."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:80
 msgid "Could not rename this voice. Try again."
 msgstr ""
@@ -7624,7 +7651,7 @@ msgid "Could not revoke that."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:12
+#: src/lib/hubMutationVerbs.ts:17
 msgid "Could not revoke the link key."
 msgstr ""
 
@@ -7654,7 +7681,7 @@ msgid "Could not save"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:13
+#: src/lib/hubMutationVerbs.ts:18
 msgid "Could not save access."
 msgstr ""
 
@@ -7697,7 +7724,7 @@ msgid "Could not save the AI companions setting. Check your connection and try a
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:14
+#: src/lib/hubMutationVerbs.ts:19
 msgid "Could not save the alarm."
 msgstr ""
 
@@ -7707,7 +7734,7 @@ msgid "Could not save the enrollment."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:15
+#: src/lib/hubMutationVerbs.ts:20
 msgid "Could not save the quick timer."
 msgstr ""
 
@@ -7756,7 +7783,7 @@ msgid "Could not save those changes. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:16
+#: src/lib/hubMutationVerbs.ts:21
 msgid "Could not save your appearance."
 msgstr ""
 
@@ -7797,12 +7824,12 @@ msgid "Could not send that to {name}. Check that it is switched on, then try aga
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:112
+#: src/apps/code/SessionView.tsx:113
 msgid "Could not send that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:119
+#: src/apps/code/SessionView.tsx:120
 msgid "Could not send your answer. Try again."
 msgstr ""
 
@@ -7817,7 +7844,7 @@ msgid "Could not sign out that device."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:17
+#: src/lib/hubMutationVerbs.ts:22
 msgid "Could not skip the next alarm."
 msgstr ""
 
@@ -7873,7 +7900,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionView.tsx:102
-#: src/apps/code/SessionView.tsx:113
+#: src/apps/code/SessionView.tsx:114
 msgid "Could not stop. Try again."
 msgstr ""
 
@@ -7883,8 +7910,13 @@ msgid "Could not test that part. Reload the page and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:18
+#: src/lib/hubMutationVerbs.ts:23
 msgid "Could not test the connection."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:103
+msgid "Could not unarchive this session. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7893,7 +7925,7 @@ msgid "Could not undo that. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:19
+#: src/lib/hubMutationVerbs.ts:24
 msgid "Could not update reminders."
 msgstr ""
 
@@ -7906,12 +7938,12 @@ msgid "Could not update that project. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:20
+#: src/lib/hubMutationVerbs.ts:25
 msgid "Could not update the alarm."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/hubMutationVerbs.ts:21
+#: src/lib/hubMutationVerbs.ts:26
 msgid "Could not update the reminder."
 msgstr ""
 
@@ -8498,6 +8530,7 @@ msgstr ""
 #: src/apps/chat/chatHeaderBar.tsx:313
 #: src/apps/clock/AlarmEditor.tsx:115
 #: src/apps/clock/TimersTab.tsx:165
+#: src/apps/code/SessionRow.tsx:86
 #: src/apps/people/VoiceEnrollmentBody.tsx:105
 #: src/apps/reminders/ListMenu.tsx:38
 #: src/apps/settings/CommandsSection.tsx:203
@@ -8602,6 +8635,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:165
 msgid "Delete voice"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/sessionActions.ts:34
+msgid "Deleted ‘{title}’. It stays in Trash for 30 days."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -9771,6 +9809,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:841
 msgid "setting.generation.video.adult_adapters.option.allowed"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionList.tsx:37
+msgid "Every session is archived. Show archived sessions to see them."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11552,6 +11595,11 @@ msgid "setting.generation.styles.adult_only.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionList.tsx:46
+msgid "Hide archived"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/PerformanceSettings.tsx:58
 msgid "Hide customize"
 msgstr ""
@@ -11568,7 +11616,7 @@ msgid "Hide done"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:56
+#: src/apps/code/SessionList.tsx:58
 msgid "Hide sessions"
 msgstr ""
 
@@ -13823,7 +13871,7 @@ msgid "setting.storage.library.pictures.mode.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:56
+#: src/apps/code/SessionList.tsx:58
 msgid "Keep sessions open"
 msgstr ""
 
@@ -14705,7 +14753,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/CodeThread.tsx:129
-#: src/apps/code/SessionView.tsx:106
+#: src/apps/code/SessionView.tsx:107
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
 msgstr ""
@@ -16451,7 +16499,7 @@ msgid "setting.access.tier.max.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:107
+#: src/apps/code/SessionView.tsx:108
 msgid "Max from the next message"
 msgstr ""
 
@@ -16589,7 +16637,7 @@ msgid "Memory used by the whole system."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:116
+#: src/apps/code/SessionView.tsx:117
 msgid "Message {n} is waiting"
 msgstr ""
 
@@ -16900,6 +16948,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:161
 msgid "More options for {name}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionRow.tsx:76
+msgid "More options for {title}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -17483,6 +17536,12 @@ msgid "New"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionRow.tsx:27
+#: src/apps/code/SessionRow.tsx:72
+msgid "New activity"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:72
 msgid "New alarm"
 msgstr ""
@@ -17549,11 +17608,11 @@ msgid "New PIN"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodePage.tsx:46
+#: src/apps/code/CodePage.tsx:57
 #: src/apps/code/CodeThread.tsx:166
 #: src/apps/code/NewSession.tsx:128
-#: src/apps/code/SessionList.tsx:50
-#: src/apps/code/SessionList.tsx:61
+#: src/apps/code/SessionList.tsx:51
+#: src/apps/code/SessionList.tsx:63
 msgid "New session"
 msgstr ""
 
@@ -18104,7 +18163,7 @@ msgid "No selling"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:62
+#: src/apps/code/SessionList.tsx:37
 msgid "No session matches that. Clear the search to see them all."
 msgstr ""
 
@@ -19494,7 +19553,7 @@ msgid "Open chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodePage.tsx:50
+#: src/apps/code/CodePage.tsx:61
 msgid "Open Chat"
 msgstr ""
 
@@ -20656,6 +20715,7 @@ msgid "Pictures, videos and songs you make show up here while they are made and 
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionRow.tsx:82
 #: src/shell/pages/ProjectsPage.tsx:184
 msgid "Pin"
 msgstr ""
@@ -20695,6 +20755,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/roles.ts:123
 msgid "Pink"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeList.ts:34
+msgid "Pinned"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21083,7 +21148,6 @@ msgid "Preview. Nothing is downloaded, installed or saved."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:46
 #: src/apps/settings/styles/StyleBrowser.tsx:188
 #: src/shell/components/DataTableControls.tsx:33
 #: src/shell/pages/RepairsPage.tsx:148
@@ -21989,6 +22053,7 @@ msgstr ""
 #: src/apps/chat/chatHeaderBar.tsx:251
 #: src/apps/chat/chatHeaderBar.tsx:301
 #: src/apps/clock/TimersTab.tsx:164
+#: src/apps/code/SessionRow.tsx:80
 #: src/apps/reminders/ListMenu.tsx:36
 #: src/apps/settings/CodingSettings.tsx:187
 #: src/apps/settings/VoiceManagerSection.tsx:126
@@ -22026,6 +22091,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:174
 msgid "Rename quick timer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionRow.tsx:60
+msgid "Rename session"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -23553,7 +23623,9 @@ msgid "Search rows…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:58
+#: src/apps/code/SessionList.tsx:52
+#: src/apps/code/SessionList.tsx:52
+#: src/apps/code/SessionList.tsx:60
 msgid "Search sessions"
 msgstr ""
 
@@ -23928,9 +24000,9 @@ msgid "Session lock timeout, minutes, for {name}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodePage.tsx:60
-#: src/apps/code/SessionList.tsx:49
-#: src/apps/code/SessionList.tsx:60
+#: src/apps/code/CodePage.tsx:71
+#: src/apps/code/SessionList.tsx:50
+#: src/apps/code/SessionList.tsx:62
 #: src/apps/settings/DevicesSection.tsx:190
 msgid "Sessions"
 msgstr ""
@@ -24420,6 +24492,11 @@ msgid "Show all files"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionList.tsx:46
+msgid "Show archived ({count})"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1820
 msgid "Show conversations"
 msgstr ""
@@ -24503,7 +24580,7 @@ msgid "Show section {title}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:56
+#: src/apps/code/SessionList.tsx:58
 msgid "Show sessions"
 msgstr ""
 
@@ -27026,7 +27103,7 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:120
+#: src/apps/code/SessionView.tsx:121
 msgid "That message is not waiting any more."
 msgstr ""
 
@@ -29121,7 +29198,6 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:50
-#: src/apps/code/SessionList.tsx:45
 #: src/apps/reminders/ListColumn.tsx:32
 #: src/apps/reminders/SmartListView.tsx:14
 #: src/i18n.chain.test.tsx:96
@@ -29783,6 +29859,12 @@ msgid "Type your own style first, or pick one of the styles."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionRow.tsx:84
+#: src/apps/code/SessionView.tsx:103
+msgid "Unarchive"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FamilyPage.tsx:76
 msgid "Unconfirmed"
 msgstr ""
@@ -29813,6 +29895,7 @@ msgid "Understood the request"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/sessionActions.ts:35
 #: src/apps/settings/AutoLocksSection.tsx:73
 #: src/shell/library/TranscriptPanel.tsx:428
 #: src/shell/pages/FilesPage.tsx:190
@@ -29918,6 +30001,7 @@ msgid "Unmute microphone"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionRow.tsx:82
 #: src/shell/pages/ProjectsPage.tsx:184
 msgid "Unpin"
 msgstr ""
@@ -31604,7 +31688,7 @@ msgid "Who can control what"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:117
+#: src/apps/code/SessionView.tsx:118
 msgid "Who can fix this: {who}."
 msgstr ""
 
@@ -32387,7 +32471,7 @@ msgid "Your Coding keys"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodePage.tsx:61
+#: src/apps/code/CodePage.tsx:72
 msgid "Your coding sessions"
 msgstr ""
 
@@ -32619,8 +32703,7 @@ msgid "settings.attention.robots.line"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionList.tsx:51
-#: src/apps/code/SessionList.tsx:62
+#: src/apps/code/SessionList.tsx:36
 msgid "Your sessions will show up here. Start one with New session."
 msgstr ""
 

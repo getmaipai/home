@@ -193,6 +193,10 @@ export const codingSessions = sqliteTable("coding_sessions", {
   lastActivityAt: text("last_activity_at").notNull(),
   deletedAt: text("deleted_at"),
   trashUntil: text("trash_until"),
+  /** CODE-UX-01: the owner's own list choices (not shared records, so not in the spec): when it was pinned, when it was archived (state is untouched, so an unarchived session keeps its state), and when the owner last opened it (unread = activity after this). */
+  pinnedAt: text("pinned_at"),
+  archivedAt: text("archived_at"),
+  lastOpenedAt: text("last_opened_at"),
   provenance: text("provenance").notNull(),
   hlc: text("hlc").notNull(),
   updatedAt: text("updated_at").notNull(),

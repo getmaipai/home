@@ -62,7 +62,7 @@ test("the live line says what the agent is doing, and the header never shows a r
   expect(elapsedWords(4_000)).toBe("4 s");
 });
 
-import { contextFraction, contextInk, groupSessions, stopWords, tokenWords } from "./codeTranscript";
+import { contextFraction, contextInk, stopWords, tokenWords } from "./codeTranscript";
 test("a failed turn is explained in plain words by its reason code, each with a next step", () => {
   expect(stopWords("error", "feature_missing")).toContain("too old");
   expect(stopWords("error", "lock_not_ready")).toContain("sandbox is not ready");
@@ -85,11 +85,6 @@ test("the context ring goes calm, then warning, then critical, and says nothing 
   expect(contextFraction(5000, 1000)).toBe(1);
   expect(tokenWords(208_000)).toBe("208K");
   expect(tokenWords(1_000_000)).toBe("1.0M");
-});
-test("sessions split into Today and Previous", () => {
-  const now = Date.parse("2026-11-21T15:00:00");
-  const g = groupSessions([{ last_activity_at: "2026-11-21T09:00:00" }, { last_activity_at: "2026-11-19T09:00:00" }], now);
-  expect([g.today.length, g.previous.length]).toEqual([1, 1]);
 });
 
 import { toThreadMessages } from "./CodeThread";

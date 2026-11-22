@@ -100,6 +100,7 @@ export function SessionView({ id, onOpenSessions }: { id: string; onOpenSessions
         <ChatHeader name={session.title} media={<TerminalIcon aria-hidden className="size-6" />} {...(phone && onOpenSessions ? { onMenu: onOpenSessions, menuControls: "code-sessions-sheet" } : {})}
           actions={<>
             {working ? <Button size="sm" variant="outline" onClick={() => void run(() => codeApi.stop(id), i18n._({ id: "Could not stop. Try again.", message: "Could not stop. Try again." }))}>{i18n._({ id: "Stop", message: "Stop" })}</Button> : null}
+            {session.archived_at ? <Button size="sm" variant="outline" data-slot="code-unarchive" onClick={() => void run(() => codeApi.archive(id, false), i18n._({ id: "Could not unarchive this session. Try again.", message: "Could not unarchive this session. Try again." }))}>{i18n._({ id: "Unarchive", message: "Unarchive" })}</Button> : null}
             {!paneOpen || phone ? <Button size="sm" variant="ghost" onClick={() => setPaneOpen(true)}>{i18n._({ id: "Changes", message: "Changes" })}</Button> : null}
           </>}
           end={<div className="flex flex-wrap items-center gap-2" data-slot="code-header-tier">

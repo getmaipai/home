@@ -15,6 +15,11 @@ export interface CodeSession {
   pull_request?: { url: string; number: number; draft: boolean } | null;
   checkpoints?: { id: string; at: string; label: string; files: number }[];
   last_activity_at: string;
+  /** CODE-UX-01: the owner's list state, kept on the hub. */
+  pinned_at?: string | null;
+  archived_at?: string | null;
+  /** The session settled (done, failed or asked for you) after the owner last opened it. */
+  unread?: boolean;
 }
 
 export interface CodeView {
@@ -70,6 +75,14 @@ export const codeApi = {
   send: (id: string, text: string) => request<{ turn_id?: string; queued_message_id?: string }>(`${base}/${id}/messages`, json({ text })),
   setTier: (id: string, tier: CodeTier) => request<CodeSession>(`${base}/${id}/tier`, { method: "PUT", body: JSON.stringify({ tier }) }),
   setMode: (id: string, mode: CodeSession["mode"]) => request<CodeSession>(`${base}/${id}/mode`, { method: "PUT", body: JSON.stringify({ mode }) }),
+  /** CODE-UX-01: the row menu's actions. Each answers with the updated session. */
+  rename: (id: string, title: string) => request<CodeSession>(`${base}/${id}/title`, { method: "PUT", body: JSON.stringify({ title }) }),
+  pin: (id: string, pinned: boolean) => request<CodeSession>(`${base}/${id}/pin`, { method: "PUT", body: JSON.stringify({ pinned }) }),
+  archive: (id: string, archived: boolean) => request<CodeSession>(`${base}/${id}/archive`, { method: "PUT", body: JSON.stringify({ archived }) }),
+  opened: (id: string) => request<CodeSession>(`${base}/${id}/opened`, json({})),
+  /** Delete moves the session to the household Trash; restore is the Trash's own route (the Undo on the toast). */
+  remove: (id: string) => request<{ ok: true }>(`${base}/${id}`, { method: "DELETE" }),
+  restore: (id: string) => request<{ success: true }>(`/api/trash/coding_session/${id}/restore`, { method: "POST" }),
   /** Start the session's sandbox in the background (the next message then pays no start). Best effort. */
   warm: (id: string) => request<{ ok: true }>(`${base}/${id}/warm`, json({})).catch(() => undefined),
   stop: (id: string) => request<{ ok: true }>(`${base}/${id}/stop`, json({})),

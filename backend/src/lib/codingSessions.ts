@@ -18,7 +18,16 @@ import { trigger } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
 
 type Row = typeof codingSessions.$inferSelect;
-export type CodingSessionWire = z.infer<typeof CodingSession>;
+/** CODE-UX-01: the spec record plus the owner's own list state. These three are Home's, not shared fields, so they ride beside the spec shape (additive). */
+export const CodingSessionListed = CodingSession.extend({
+  /** When the owner pinned it, or null. Pinned sessions lead the list, newest pin first. */
+  pinned_at: z.string().nullable(),
+  /** When the owner archived it, or null. Archived sessions stay out of the default list. */
+  archived_at: z.string().nullable(),
+  /** The session finished a turn, failed or asked for the owner since the owner last opened it. */
+  unread: z.boolean(),
+});
+export type CodingSessionWire = z.infer<typeof CodingSessionListed>;
 export type CodingSessionState = Row["state"];
 
 /** How long a deleted session stays recoverable (a guess, see the slice notes: the design names a trash window but no length). */
@@ -55,13 +64,19 @@ export function requireCodingAccess(person: PersonRow): void {
   if (refusal) throw new CodingSessionError("not_allowed", refusal);
 }
 
+/** Settled states a person can come back to: unread means one of these was reached after the owner last opened the session. A working turn is not unread yet. */
+const UNREAD_STATES: readonly CodingSessionState[] = ["idle", "done", "failed", "needs_you", "paused"];
+export const isUnread = (row: Pick<Row, "state" | "lastActivityAt" | "lastOpenedAt" | "archivedAt">): boolean =>
+  !row.archivedAt && UNREAD_STATES.includes(row.state) && row.lastOpenedAt !== null && row.lastActivityAt > row.lastOpenedAt;
+
 function wire(row: Row): CodingSessionWire {
-  return CodingSession.parse({
+  const spec = CodingSession.parse({
     id: row.id, person_id: row.personId, title: row.title, repo: row.repo, environment_id: row.environmentId, mode: row.mode, state: row.state, tier: row.tier,
     network: row.network, ...(row.mounts ? { mounts: row.mounts } : {}), ...(row.modelId ? { model_id: row.modelId } : {}), ...(row.checkpoints ? { checkpoints: row.checkpoints } : {}), ...(row.pullRequest ? { pull_request: row.pullRequest } : {}), usage: row.usage, changes: row.changes,
     created_at: row.createdAt, last_activity_at: row.lastActivityAt, ...(row.deletedAt ? { deleted_at: row.deletedAt, trash_until: row.trashUntil } : {}),
     provenance: row.provenance, hlc: row.hlc,
   });
+  return { ...spec, pinned_at: row.pinnedAt, archived_at: row.archivedAt, unread: isUnread(row) };
 }
 
 /** What an admin sees (rule 6a): ids, state and tier only. No title, repository or path. */
@@ -106,7 +121,7 @@ export function createCodingSession(person: PersonRow, input: z.input<typeof Cre
   const row = db.insert(codingSessions).values({
     id: newCodingSessionId(), personId: person.id, title: body.title, repo: body.repo, environmentId: body.environment_id, mode: body.mode, state: "idle", tier,
     network: body.network, mounts: body.mounts ?? null, usage: { input_tokens: 0, output_tokens: 0 }, changes: { files: 0, additions: 0, deletions: 0 },
-    createdAt: at, lastActivityAt: at, provenance: "Started in the Code app", hlc: nextHlc(), updatedAt: at,
+    createdAt: at, lastActivityAt: at, lastOpenedAt: at, provenance: "Started in the Code app", hlc: nextHlc(), updatedAt: at,
   }).returning().get();
   appendLogLine(`coding session_created session=${row.id} person=${person.id} tier=${tier}`);
   return wire(row);
@@ -125,7 +140,7 @@ export function getCodingSession(person: Pick<PersonRow, "id">, id: string): Cod
 }
 
 /** The one writer of a session's state and counters; every change stamps the clock. */
-export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "mode" | "modelId" | "usage" | "lastActivityAt" | "changes">>): void {
+export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "mode" | "modelId" | "usage" | "lastActivityAt" | "changes" | "title" | "pinnedAt" | "archivedAt" | "lastOpenedAt">>): void {
   const at = new Date().toISOString();
   db.update(codingSessions).set({ ...patch, updatedAt: at, hlc: nextHlc() }).where(eq(codingSessions.id, id)).run();
 }
@@ -171,6 +186,45 @@ export function correctStoredTier(row: Pick<Row, "id" | "personId" | "tier">): T
     appendLogLine(`coding tier_corrected session=${row.id} from=${row.tier} to=${choice.tier} reason=${choice.note ?? "none"}`);
   }
   return choice;
+}
+
+/** CODE-UX-01: rename. The same trimmed 1 to 120 character title a new session takes. */
+export function renameSession(person: PersonRow, id: string, title: unknown): CodingSessionWire {
+  requireCodingAccess(person);
+  const row = getSessionRow(person.id, id);
+  if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  const parsed = CreateCodingSessionInput.shape.title.safeParse(title);
+  if (!parsed.success) throw new CodingSessionError("bad_input", "A session name needs 1 to 120 characters. Type a name and try again.");
+  updateSession(id, { title: parsed.data });
+  return wire(getSessionRow(person.id, id)!);
+}
+
+/** CODE-UX-01: pin or unpin. Pinning keeps the order of the list otherwise (the activity time is not touched). */
+export function setSessionPinned(person: PersonRow, id: string, pinned: boolean): CodingSessionWire {
+  requireCodingAccess(person);
+  const row = getSessionRow(person.id, id);
+  if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  if (pinned !== (row.pinnedAt !== null)) updateSession(id, { pinnedAt: pinned ? new Date().toISOString() : null });
+  return wire(getSessionRow(person.id, id)!);
+}
+
+/** CODE-UX-01: archive hides a session from the default list and unarchive brings it back. A session that is working or waiting on the owner is not archived: the state stays as it was either way. */
+export function setSessionArchived(person: PersonRow, id: string, archived: boolean): CodingSessionWire {
+  requireCodingAccess(person);
+  const row = getSessionRow(person.id, id);
+  if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  if (archived && ["queued", "starting", "working", "needs_you"].includes(row.state)) throw new CodingSessionError("busy", "This session is still working or waiting for you. Stop it or answer it first, then archive it.");
+  if (archived !== (row.archivedAt !== null)) updateSession(id, { archivedAt: archived ? new Date().toISOString() : null });
+  return wire(getSessionRow(person.id, id)!);
+}
+
+/** CODE-UX-01: the owner has seen the session as it is now, so its unread dot goes. Does not touch the activity time. */
+export function markSessionOpened(person: PersonRow, id: string): CodingSessionWire {
+  requireCodingAccess(person);
+  const row = getSessionRow(person.id, id);
+  if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  if (row.lastOpenedAt === null || row.lastOpenedAt < row.lastActivityAt) updateSession(id, { lastOpenedAt: row.lastActivityAt });
+  return wire(getSessionRow(person.id, id)!);
 }
 
 /** Soft delete: the record leaves the list and stays recoverable for TRASH_DAYS. The caller (lib/codingTurns.ts) stops a running turn and the sandbox first. */

@@ -163,11 +163,3 @@ export function contextInk(fraction: number | null): string {
 /** The kit ring has two tones: quiet while the window has room, the strong one once it is 60% full (the number beside it carries the warning and problem inks). */
 export const contextTone = (fraction: number | null): "muted" | "primary" => (fraction === null || fraction < 0.6 ? "muted" : "primary");
 export const tokenWords = (n: number): string => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 || n % 1000 === 0 ? 0 : 1)}K` : String(n);
-
-/** The sessions rail's two groups. */
-export function groupSessions<T extends { last_activity_at: string }>(rows: readonly T[], now = Date.now()): { today: T[]; previous: T[] } {
-  const start = new Date(now); start.setHours(0, 0, 0, 0);
-  const today: T[] = []; const previous: T[] = [];
-  for (const row of rows) (Date.parse(row.last_activity_at) >= start.getTime() ? today : previous).push(row);
-  return { today, previous };
-}

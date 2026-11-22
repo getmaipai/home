@@ -8,6 +8,7 @@ import { CodingSession } from "@maipai/spec/gen/ts/coding-session.js";
 import { CodingEvent } from "@maipai/spec/gen/ts/coding-event.js";
 import {
   CodingSessionError, createCodingSession, offeredCodingTiers, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionMode, setSessionTier, codingSessionRefusal,
+  CodingSessionListed, renameSession, setSessionPinned, setSessionArchived, markSessionOpened,
 } from "@/lib/codingSessions";
 import { warmCodingSession, cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
@@ -39,7 +40,7 @@ async function view(person: PersonRow, id: string) {
   return { session, coding_notice: concern.cause ? codingNotice(concern.cause) : null, waiting: turn ? { turn_id: turn, line: turnQueueLine(person, turn), offers_standard: offersUseStandard(turn) } : null, requests: pendingRequestsFor(person.id, id), queued_messages: queuedMessageIds(person, id) };
 }
 const ViewSchema = z.object({
-  session: CodingSession,
+  session: CodingSessionListed,
   /** CODE-NOTIFY-01: the one composer line while the coding engine cannot take a message (null when it can). */
   coding_notice: z.string().nullable(),
   waiting: z.object({ turn_id: z.string(), line: z.string().nullable(), offers_standard: z.boolean() }).nullable(),
@@ -58,7 +59,7 @@ codingSessionsRoutes.openapi(createR, (c) => {
 
 const listR = createRoute({
   method: "get", path: "/", tags: ["Code"], summary: "My Code sessions, newest activity first", middleware: [requireAuth] as const,
-  responses: { 200: { content: { "application/json": { schema: z.array(CodingSession) } }, description: "Only the signed-in person's sessions." }, ...errorResponses({ 401: "Not signed in", 403: "Coding is not available to you" }) },
+  responses: { 200: { content: { "application/json": { schema: z.array(CodingSessionListed) } }, description: "Only the signed-in person's sessions, with pinned_at, archived_at and unread (CODE-UX-01)." }, ...errorResponses({ 401: "Not signed in", 403: "Coding is not available to you" }) },
 });
 codingSessionsRoutes.openapi(listR, (c) => {
   const person = c.get("person"); const refusal = codingSessionRefusal(person);
@@ -103,6 +104,41 @@ const tierR = createRoute({
 });
 codingSessionsRoutes.openapi(tierR, (c) => {
   try { return c.json(setSessionTier(c.get("person"), c.req.valid("param").id, c.req.valid("json").tier), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+
+/** CODE-UX-01: the owner manages the list from a row's menu (rename, pin, archive, open). Delete is below. */
+const listed = (description: string) => ({ 200: { content: { "application/json": { schema: CodingSessionListed } }, description }, ...errorResponses(errors) });
+const renameR = createRoute({
+  method: "put", path: "/{id}/title", tags: ["Code"], summary: "Rename a session", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, body: { content: { "application/json": { schema: z.object({ title: z.string() }).strict() } } } },
+  responses: listed("The session with its new name."),
+});
+codingSessionsRoutes.openapi(renameR, (c) => {
+  try { return c.json(renameSession(c.get("person"), c.req.valid("param").id, c.req.valid("json").title), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+const pinR = createRoute({
+  method: "put", path: "/{id}/pin", tags: ["Code"], summary: "Pin or unpin a session; pinned sessions lead the list", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, body: { content: { "application/json": { schema: z.object({ pinned: z.boolean() }).strict() } } } },
+  responses: listed("The session with its pin state."),
+});
+codingSessionsRoutes.openapi(pinR, (c) => {
+  try { return c.json(setSessionPinned(c.get("person"), c.req.valid("param").id, c.req.valid("json").pinned), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+const archiveR = createRoute({
+  method: "put", path: "/{id}/archive", tags: ["Code"], summary: "Archive or unarchive a session (a working session is refused)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, body: { content: { "application/json": { schema: z.object({ archived: z.boolean() }).strict() } } } },
+  responses: listed("The session with its archive state."),
+});
+codingSessionsRoutes.openapi(archiveR, (c) => {
+  try { return c.json(setSessionArchived(c.get("person"), c.req.valid("param").id, c.req.valid("json").archived), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+const openedR = createRoute({
+  method: "post", path: "/{id}/opened", tags: ["Code"], summary: "The owner has seen the session as it is now (clears its unread dot)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam },
+  responses: listed("The session, no longer unread."),
+});
+codingSessionsRoutes.openapi(openedR, (c) => {
+  try { return c.json(markSessionOpened(c.get("person"), c.req.valid("param").id), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
 const messageR = createRoute({
@@ -212,7 +248,7 @@ const stopR = createRoute({
 codingSessionsRoutes.openapi(stopR, (c) => stopCodingSession(c.get("person"), c.req.valid("param").id) ? c.json({ ok: true as const }, 200) : c.json({ error: "That session was not found. It may have been deleted." }, 404));
 
 const deleteR = createRoute({
-  method: "delete", path: "/{id}", tags: ["Code"], summary: "Delete a session (it stays in the trash for a while)", middleware: [requireAuth] as const,
+  method: "delete", path: "/{id}", tags: ["Code"], summary: "Delete a session: it moves to the household Trash for 30 days and POST /api/trash/coding_session/{id}/restore brings it back", middleware: [requireAuth] as const,
   request: { params: sessionIdParam },
   responses: { 200: { content: { "application/json": { schema: okBody } }, description: "Deleted." }, ...errorResponses(errors) },
 });

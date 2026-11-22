@@ -4,6 +4,7 @@
 // page and inside a session. Code draws no phone list of its own.
 import { i18n } from "@lingui/core";
 import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
@@ -12,7 +13,9 @@ import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { getIcon } from "@maipai/ui/src/icons";
 import { ApiError } from "@/lib/api";
-import { NewSession } from "./NewSession";
+import { codeApi, type CodeSession } from "./codeApi";
+import { needsSeenMark } from "./codeList";
+import { CODE_SESSIONS_KEY, NewSession } from "./NewSession";
 import { CodeSidebar, useCodeSessions } from "./SessionList";
 import { SessionView } from "./SessionView";
 import { codeErrorLine } from "./codeShared";
@@ -36,6 +39,14 @@ export function CodePage() {
   const id = sessionIdOf(location.pathname);
   const sessions = useCodeSessions();
   const rows = sessions.data ?? [];
+  // CODE-UX-01: a session in view is seen. When the hub says the open session is unread (it settled while you looked), tell it so the dot never stays lit for it.
+  const queryClient = useQueryClient();
+  const current = rows.find((row) => row.id === id);
+  const unseen = needsSeenMark(current, id);
+  useEffect(() => {
+    if (!unseen || !id) return;
+    void codeApi.opened(id).then((next) => queryClient.setQueryData<CodeSession[]>(CODE_SESSIONS_KEY, (list) => list?.map((row) => (row.id === next.id ? { ...row, ...next } : row)))).catch(() => undefined);
+  }, [unseen, id, current?.last_activity_at, queryClient]);
   const failed = sessions.isError;
   const refused = failed && sessions.error instanceof ApiError && sessions.error.status === 403;
   const line = failed ? codeErrorLine(sessions.error, i18n._({ id: "Could not load your sessions. Try again.", message: "Could not load your sessions. Try again." })) : "";
