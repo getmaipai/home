@@ -551,6 +551,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, previewInspiredVoice, renameClonedVoice |
 | `backend/src/lib/closeAppsProbe.ts` | HARMLESS_TEST_APP, probeCloseApps |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, fromSandboxNetwork, transportRefusal, requestsPerMinute |
+| `backend/src/lib/codeReady.ts` | codeReady |
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
@@ -568,7 +569,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingRuntime.ts` | mintSessionKeyFor, startCodingRuntime |
 | `backend/src/lib/codingSandbox.ts` | SandboxClientError, gatewayPortBody, sandboxIdOf, createStackSandbox |
 | `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess, getSessionRow |
-| `backend/src/lib/codingShare.ts` | setSecretScanner, __setWorkspaceRootForTests, codingWorkspace, __setShareRemoteForTests, checkSecretsBeforeShare, pushCodingSession |
+| `backend/src/lib/codingShare.ts` | setSecretScanner, codingWorkspaceRoot, __setWorkspaceRootForTests, codingWorkspace, handWorkspaceToEngine, __setShareRemoteForTests |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
 | `backend/src/lib/codingTurns.ts` | setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, messageBudgetMs, DEFAULT_MAX_SESSIONS, __setSessionCapForTests |
 | `backend/src/lib/codingWorkspaceView.ts` | FILE_VIEW_CAP, sessionChanges, sessionTree, sessionFile |

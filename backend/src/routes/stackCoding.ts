@@ -5,6 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
+import { codeReady } from "@/lib/codeReady";
 import { CodingPieceError, installCodingPiece, listCodingPieces, removeCodingPiece } from "@/lib/stackCodingPieces";
 
 export const stackCodingRoutes = apiRouter();
@@ -83,3 +84,14 @@ stackCodingRoutes.openapi(selfTestRoute, async c => {
     return c.json({ error:"Home could not reach the AI engine." },503);
   }
 });
+
+const ItemSchema = z.object({ id: z.enum(["coding_on", "not_paused", "engine", "model", "folder", "sandbox", "gateway"]), ok: z.boolean(), say: z.string(), who: z.enum(["an admin", "the computer's owner", "nobody"]) });
+const readyRoute = createRoute({
+  method: "get", path: "/ready", tags: ["Coding"], summary: "Can this home run a Code session and an outside coding tool right now, and what is missing", middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({
+    ready: z.boolean(), first_missing: z.object({ id: ItemSchema.shape.id, say: z.string(), who: ItemSchema.shape.who }).nullable(), items: z.array(ItemSchema),
+    tiers: z.object({ standard: z.literal("on"), boost: z.enum(["on", "off"]), max: z.enum(["on", "off"]) }),
+    gateway: z.object({ loopback_url: z.string(), away_access: z.boolean(), sandbox_url: z.string() }),
+  }) } }, description: "Plain-word checks in order; `first_missing` is the one to fix first. Read-only." } },
+});
+stackCodingRoutes.openapi(readyRoute, async (c) => c.json(await codeReady(), 200));

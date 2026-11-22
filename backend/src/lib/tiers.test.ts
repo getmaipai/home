@@ -191,3 +191,20 @@ describe("Max on a card (TIER-HOME-03)", () => {
     expect(maxOffered(child, "image")).toBe(false);
   });
 });
+
+describe("the coding slots (CODE-TIER-02, minimal)", () => {
+  beforeEach(() => resetDb());
+  test("Standard is the Stack's recommended coding model; Boost and Max are off until a slot is set", () => {
+    expect(readSlot("coding", "standard").model).toBe("recommended");
+    expect(readSlot("coding", "boost").model).toBe("off");
+    expect(readSlot("coding", "max").model).toBe("off");
+    expect(readSlot("chat", "boost").model).toBe("recommended");
+  });
+  test("an admin's coding slot is read as stored, and a request above the offered tier runs at Standard", () => {
+    const owner = addPerson("person-owner001", "owner");
+    expect(authorizeTier({ person: owner, category: "coding", requested: "max" }).tier).toBe("standard");
+    expect(setHouseholdSettingValue(slotKey("coding", "boost"), { model: "recommended", options: {} }).ok).toBe(true);
+    expect(readSlot("coding", "boost").model).toBe("recommended");
+  });
+});
+

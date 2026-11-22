@@ -14,7 +14,7 @@ import { StackError } from "@/lib/stack/errors";
 import type { StackClient } from "@/lib/stack/client";
 import { appendLogLine } from "@/lib/log";
 import { sandboxGatewayUrl } from "@/lib/codingGatewayAddress";
-import { codingWorkspace } from "@/lib/codingShare";
+import { codingWorkspace, handWorkspaceToEngine } from "@/lib/codingShare";
 import { db } from "@/db";
 import { codingSessions } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
@@ -81,6 +81,7 @@ export function createStackSandbox(getClient: () => Pick<StackClient, "sandboxCa
       else await existing.body?.cancel().catch(() => undefined);
       const workspace = codingWorkspace(row.personId, sessionId);
       await mkdir(workspace, { recursive: true });
+      handWorkspaceToEngine(row.personId, sessionId);
       const created = await call("POST", "/stack/v1/sandboxes", { id, workspace, network: { policy: "none", hosts: [] }, ...gatewayPortBody() });
       if (created.status !== 201) await refuse(created, "create");
       const info = await new Response(created.body).json() as { state?: string };

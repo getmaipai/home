@@ -2,8 +2,11 @@
 // (design local-coding section 8: gitleaks over the diff, blocks with path and line). Only the person starts either: the route that calls this is their
 // click, and the brake never lets the agent act on these effects. The scanner is gitleaks (lib/codingGitleaks.ts) unless a test replaces it; a missing or
 // failed scanner fails closed, so nothing leaves unchecked. Findings carry a path and a line, never the value.
+import { chownSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { dataDir } from "@/lib/paths";
+import { dataDir, dataDirIsExplicit } from "@/lib/paths";
+import { stackDataDir } from "@/lib/localStackService";
 import { gitCredentialFor } from "@/lib/gitConnections";
 import { pushSessionBranch, GitHostError } from "@/lib/gitHost";
 import { recordCodingEvent } from "@/lib/codingEvents";
@@ -21,12 +24,41 @@ export function setSecretScanner(next: SecretScanner | null): void { scanner = n
 const activeScanner = (): SecretScanner => scanner ?? createGitleaksScanner();
 
 /** The hub-side workspace of a session (design 3.4): the only folder the agent sees. */
-/** The folder Code workspaces live in. The Stack only mounts a workspace inside ITS coding folder (STACK_CODING_ROOT, default <stack data>/coding), so a Home whose
- * data folder is elsewhere sets MAIPAI_CODING_ROOT to that same folder; the default stays <data>/coding. */
-const defaultWorkspaceRoot = (): string => process.env.MAIPAI_CODING_ROOT?.trim() || path.join(dataDir, "coding");
+/** The folder Code workspaces live in. The Stack only mounts a workspace inside ITS coding folder (STACK_CODING_ROOT, default <stack data>/coding), so the
+ * order is: MAIPAI_CODING_ROOT, then STACK_CODING_ROOT, then (the installed hub, whose data folder is the default one) the local Stack's own
+ * `<stack data>/coding`, which is where the Stack looks. A hub with an explicit data folder (development, scratch) keeps `<data>/coding`.
+ * Before 2026-11-21 the installed hub wrote to `<data>/coding` and the Stack refused every workspace ("outside the coding folder"). */
+export function codingWorkspaceRoot(env: NodeJS.ProcessEnv = process.env, layout: { explicitData: boolean; data: string; stackData: string } = { explicitData: dataDirIsExplicit, data: dataDir, stackData: stackDataDir() }): string {
+  const explicit = env.MAIPAI_CODING_ROOT?.trim() || env.STACK_CODING_ROOT?.trim();
+  if (explicit) return explicit;
+  return layout.explicitData ? path.join(layout.data, "coding") : path.join(layout.stackData, "coding");
+}
+const defaultWorkspaceRoot = (): string => codingWorkspaceRoot();
 let workspaceRoot: string = defaultWorkspaceRoot();
 export function __setWorkspaceRootForTests(root: string | null): void { workspaceRoot = root ?? defaultWorkspaceRoot(); }
 export const codingWorkspace = (personId: string, sessionId: string): string => path.join(workspaceRoot, personId, sessionId, "work");
+
+/** The installed hub runs as root and the Stack (which mounts the workspace into the sandbox) as the computer's owner. A folder Home creates is root's, and the sandbox's user
+ * would then be unable to write in it. So after Home makes a session's folders it hands them to the owner of the Stack's data folder, the coding folder's own parents
+ * included. A hub that is not root (development) changes nothing. */
+export interface HandOver { uid: () => number | undefined; ownerOf: (folder: string) => { uid: number; gid: number } | null; chown: (folder: string, owner: { uid: number; gid: number }, recursive: boolean) => void }
+const realHandOver: HandOver = {
+  uid: () => process.getuid?.(),
+  ownerOf: (folder) => { try { const st = statSync(folder); return { uid: st.uid, gid: st.gid }; } catch { return null; } },
+  chown: (folder, owner, recursive) => { if (recursive) spawnSync("chown", ["-R", `${owner.uid}:${owner.gid}`, folder]); else chownSync(folder, owner.uid, owner.gid); },
+};
+export function handWorkspaceToEngine(personId: string, sessionId: string, over: Partial<HandOver> = {}, stackData: string = stackDataDir()): boolean {
+  const h = { ...realHandOver, ...over };
+  if (h.uid() !== 0) return false;
+  const owner = h.ownerOf(stackData);
+  if (!owner || owner.uid === 0) return false;
+  const root = workspaceRoot;
+  const session = path.join(root, personId, sessionId);
+  if (!session.startsWith(stackData + path.sep)) return false; // only folders inside the engine's own data folder are handed over
+  for (const folder of [root, path.join(root, personId)]) h.chown(folder, owner, false);
+  h.chown(session, owner, true);
+  return true;
+}
 
 let remoteForTests: { url: string } | null = null;
 export function __setShareRemoteForTests(remote: { url: string } | null): void { remoteForTests = remote; }

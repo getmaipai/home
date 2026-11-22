@@ -44,6 +44,7 @@ day the hub arrives; the rest are for when you need them.
 - [Max chat](coding-mode.md): use one big model for the strongest answers, and what an admin sets up first.
 - [Coding settings for admins](coding-settings.md): turn local coding on, choose who may use it and manage its parts.
 - [Coding keys](coding-keys.md): make a personal key and connect a coding tool.
+- [Use OpenCode with Home](opencode.md): the base URL, your key and the config block for the OpenCode terminal tool.
 - [Use another computer for the AI](engine-computer.md): pair a second computer to run the AI engines.
 - [Keep copies on this device](keep-on-this-device.md): keep a video, song or audiobook on a device.
 - [Read the offline library](reference.md): open the books saved on your hub and read articles.

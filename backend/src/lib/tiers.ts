@@ -32,7 +32,10 @@ export interface SlotRecord { model: string; options: Record<string, TierOptionV
 
 /** The slot's stored record with the tier's default `who`; an unreadable value reads as the default slot, never as a reason to allow more. */
 export function readSlot(category: TierCategory, tier: Tier | "reduced"): SlotRecord {
-  const fallback: SlotRecord = { model: tier === "reduced" ? "off" : "recommended", options: {}, who: vocab.who_default[tier] as TierWho };
+  // CODE-TIER-02 (minimal, 2026-11-21): the Stack serves one coding model, so Standard is "recommended" (the Stack's installed coding model) and a coding Boost or
+  // Max is off until a slot is set (the bench has not justified a second model). A slot an admin sets is read as stored.
+  const unmeasured = category === "coding" && tier !== "standard";
+  const fallback: SlotRecord = { model: tier === "reduced" || unmeasured ? "off" : "recommended", options: {}, who: vocab.who_default[tier] as TierWho };
   try {
     const parsed = TierSlot.safeParse(getHouseholdSettingValue(slotKey(category, tier)));
     if (!parsed.success || checkTierSlotOptions(category, parsed.data.options).length > 0) return fallback;

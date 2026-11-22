@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { __allowFileRemotesForTests, cloneIntoWorkspace } from "@/lib/gitHost";
 import { gitCredentialFor, storeConnection } from "@/lib/gitConnections";
 import { createCodingSession, CodingSessionError } from "@/lib/codingSessions";
-import { __setShareRemoteForTests, __setWorkspaceRootForTests, checkSecretsBeforeShare, codingWorkspace, pushCodingSession, setSecretScanner } from "@/lib/codingShare";
+import { __setShareRemoteForTests, __setWorkspaceRootForTests, checkSecretsBeforeShare, codingWorkspace, codingWorkspaceRoot, handWorkspaceToEngine, pushCodingSession, setSecretScanner } from "@/lib/codingShare";
 import { listCodingEvents } from "@/lib/codingEvents";
 import { createGitleaksScanner } from "@/lib/codingGitleaks";
 import { listIssues } from "@/lib/issues";
@@ -71,5 +71,34 @@ describe("Push and the secret check", () => {
   test("a session with no git repository cannot push", async () => {
     const a = owner(); const s = createCodingSession(a, input()); setSecretScanner(async () => []);
     await expect(pushCodingSession(a, s.id, true)).rejects.toThrow(/no git repository/);
+  });
+});
+
+describe("the folder Code workspaces live in (2026-11-21: the installed hub wrote outside the Stack's coding folder)", () => {
+  test("a named folder wins, MAIPAI_CODING_ROOT before STACK_CODING_ROOT", () => {
+    expect(codingWorkspaceRoot({ MAIPAI_CODING_ROOT: "/srv/a", STACK_CODING_ROOT: "/srv/b" })).toBe("/srv/a");
+    expect(codingWorkspaceRoot({ STACK_CODING_ROOT: " /srv/b " })).toBe("/srv/b");
+  });
+  test("without one: the installed hub uses the local Stack's coding folder, a hub with its own data folder keeps <data>/coding", () => {
+    expect(codingWorkspaceRoot({}, { explicitData: false, data: "/hub/data", stackData: "/hub/stack/data" })).toBe("/hub/stack/data/coding");
+    expect(codingWorkspaceRoot({}, { explicitData: true, data: "/scratch/data", stackData: "/hub/stack/data" })).toBe("/scratch/data/coding");
+  });
+});
+
+describe("handing a session's folders to the engine's user (the installed hub is root, the engine is the computer's owner)", () => {
+  const rec = () => { const calls: string[] = []; return { calls, over: { ownerOf: () => ({ uid: 501, gid: 20 }), chown: (f: string, o: { uid: number; gid: number }, r: boolean) => { calls.push(`${f}|${o.uid}:${o.gid}|${r}`); } } }; };
+  test("root hands the coding folder, the person's folder and the session's tree to the owner", () => {
+    __setWorkspaceRootForTests("/hub/stack/data/coding");
+    const { calls, over } = rec();
+    expect(handWorkspaceToEngine("person-a", "csess-b", { uid: () => 0, ...over }, "/hub/stack/data")).toBe(true);
+    expect(calls).toEqual(["/hub/stack/data/coding|501:20|false", "/hub/stack/data/coding/person-a|501:20|false", "/hub/stack/data/coding/person-a/csess-b|501:20|true"]);
+  });
+  test("a hub that is not root, or a folder outside the engine's data folder, changes nothing", () => {
+    __setWorkspaceRootForTests("/hub/stack/data/coding");
+    const { calls, over } = rec();
+    expect(handWorkspaceToEngine("p", "c", { uid: () => 501, ...over }, "/hub/stack/data")).toBe(false);
+    __setWorkspaceRootForTests("/elsewhere/coding");
+    expect(handWorkspaceToEngine("p", "c", { uid: () => 0, ...over }, "/hub/stack/data")).toBe(false);
+    expect(calls).toEqual([]);
   });
 });
