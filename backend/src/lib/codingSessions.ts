@@ -10,7 +10,7 @@ import { codingSessions, people } from "@/db/schema";
 import { newCodingSessionId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { codeAdmission, revokeSessionKeys } from "@/lib/apiKeys";
-import { listGitConnections } from "@/lib/gitConnections";
+import { gitConnectionRefusal, listGitConnections } from "@/lib/gitConnections";
 import { authorizeTier, isTier, readSlot, type Tier, type TierChoice } from "@/lib/tiers";
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import { appendLogLine } from "@/lib/log";
@@ -92,6 +92,9 @@ export function createCodingSession(person: PersonRow, input: z.input<typeof Cre
   if (!parsed.success) throw new CodingSessionError("bad_input", "The session details are invalid. Give it a title, a repository choice and an environment, then try again.");
   const body = parsed.data;
   if (body.repo.kind === "github" || body.repo.kind === "gitea") {
+    // A minor reaches no git host (the same rule as connecting one): a connection their record held from before a role change is not theirs to use.
+    const gitRefusal = gitConnectionRefusal(person);
+    if (gitRefusal) throw new CodingSessionError("not_allowed", gitRefusal);
     // The connection must be the person's own and still working; the token itself is never read here (lib/gitConnections.ts keeps that one reader).
     const connection = listGitConnections(person).find((c) => c.id === body.repo.connection_id);
     if (!connection || connection.status !== "active" || connection.kind !== body.repo.kind) {

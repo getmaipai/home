@@ -265,6 +265,12 @@ export function revokeSessionKeys(sessionId: string): number {
   return db.update(apiKeys).set({ revokedAt: at, status: "revoked", updatedAt: at, hlc: nextHlc() })
     .where(and(eq(apiKeys.sessionId, sessionId), isNull(apiKeys.revokedAt))).returning({ id: apiKeys.id }).all().length;
 }
+/** CODE-SAFE-01: the kill switch ends every per-session key at once, whatever session it belongs to. */
+export function revokeAllSessionKeys(): number {
+  const at = new Date().toISOString();
+  return db.update(apiKeys).set({ revokedAt: at, status: "revoked", updatedAt: at, hlc: nextHlc() })
+    .where(and(isNotNull(apiKeys.sessionId), isNull(apiKeys.revokedAt))).returning({ id: apiKeys.id }).all().length;
+}
 export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): PersonRow | null {
   const outcome = resolveApiKeyOutcome(secret, scope, origin);
   return outcome.ok ? outcome.person : null;

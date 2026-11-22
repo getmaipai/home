@@ -2,7 +2,7 @@
 // sandboxes and a session key exist the agent reports "not ready", so a message is refused with a plain line and no sandbox is started.
 import { createStackSandbox } from "@/lib/codingSandbox";
 import { createOpenCodeAgent } from "@/lib/codingOpencode";
-import { setCodingRuntime } from "@/lib/codingTurns";
+import { setCodingRuntime, watchCodingKillSwitch } from "@/lib/codingTurns";
 import { notifyExpiringWorkspaces, settleSessionsAtStartup } from "@/lib/codingSessions";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
 import { getStackClient } from "@/lib/stackEngine";
@@ -32,4 +32,5 @@ export function startCodingRuntime(): void {
   const sandbox = createStackSandbox(() => getStackClient());
   const agent = createOpenCodeAgent({ sandbox, gatewayUrl, canMintKeys: () => true, sessionKey: async (who) => mintSessionKeyFor(who) });
   setCodingRuntime({ agent, sandbox, lease: getChatLease });
+  watchCodingKillSwitch();
 }
