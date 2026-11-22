@@ -831,8 +831,12 @@ stack_commons_deps() {
 
 # One Commons package into <workspace>/commons-tags/<dir>/<package>, the place the Stack's
 # file:../../commons-tags/<dir>/<package> resolves to from <workspace>/stack/backend.
+# With a fifth argument "with-siblings", every package the placed one names as file:../<name> (the
+# ui tag names spec that way) is also taken from the same archive, into <dir>/<name>, so that
+# package builds against the sibling of its own commit and never against a spec tag another
+# package of the Stack pinned. That sibling is covered by the one verified digest.
 fetch_one_stack_commons() {
-  local work="$1" pkg="$2" dir="$3" tag="$4" expected actual tmp dest="$1/commons-tags/$3"
+  local work="$1" pkg="$2" dir="$3" tag="$4" siblings="${5:-}" expected actual tmp dest="$1/commons-tags/$3" name
   if ! expected=$(commons_archive_sha256 "$tag"); then
     log "Commons ${tag} is pinned by a package.json, and this script has no pinned SHA-256 for it. Add the SHA-256 of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run this again."
     return 1
@@ -875,6 +879,16 @@ fetch_one_stack_commons() {
     trap - RETURN
     rm -rf "$tmp"
     return 1
+  fi
+  if [ "$siblings" = "with-siblings" ]; then
+    for name in $(grep -oE '"file:\.\./[a-z0-9-]+"' "${dest}/${pkg}/package.json" | sed -E 's/^"file:\.\.\/(.*)"$/\1/'); do
+      if ! tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/${name}" || [ ! -f "${dest}/${name}/package.json" ]; then
+        log "Could not unpack ${name}, which ${pkg} in the Commons ${tag} archive names as file:../${name}. The Stack pin needs a Commons tag whose archive has it."
+        trap - RETURN
+        rm -rf "$tmp"
+        return 1
+      fi
+    done
   fi
   trap - RETURN
   rm -rf "$tmp"
@@ -939,8 +953,11 @@ fetch_stack_admin_ui() {
   fi
   while read -r pkg dir tag; do
     [ -n "$pkg" ] || continue
-    [ -f "${work}/commons-tags/${dir}/${pkg}/package.json" ] && continue
-    if ! fetch_one_stack_commons "$work" "$pkg" "$dir" "$tag"; then
+    # A ui folder left by an earlier run is kept only when its own siblings are real folders (an older layout linked spec to
+    # the backend's spec tag, which does not match the ui's own source); otherwise it is placed again.
+    if [ -f "${work}/commons-tags/${dir}/${pkg}/package.json" ] && ! ui_has_stale_sibling "${work}/commons-tags/${dir}" "$pkg"; then continue; fi
+    rm -rf "${work}/commons-tags/${dir}"
+    if ! fetch_one_stack_commons "$work" "$pkg" "$dir" "$tag" with-siblings; then
       rm -rf "${work}/commons-tags/${dir}"
       for row in $placed; do rm -rf "${work}/commons-tags/${row}"; done
       log "The Stack's admin page was skipped because Commons ${tag} could not be placed (see the line above); the Stack itself is installed without it, and running this installer again tries the page again."
@@ -948,11 +965,18 @@ fetch_stack_admin_ui() {
     fi
     placed="${placed} ${dir}"
   done <<< "$ui_deps"
-  if ! why=$( (link_commons_siblings "$work" "$(printf '%s\n%s\n' "$backend_deps" "$ui_deps")" "$ui_deps") 2>&1 ); then
-    log "${why}"
-    log "The Stack's admin page was skipped because its Commons packages could not be linked; the Stack itself is installed without it."
-    return 0
-  fi
+  # No linking: each ui package arrived with its own file:../ siblings from its own archive (fetch_one_stack_commons).
+  # The backend's spec tag is never used for the page: it can be older than the spec the page's ui was written against.
+  return 0
+}
+
+# True when a placed package's file:../<name> sibling is missing or is a link (not the folder from its own archive).
+ui_has_stale_sibling() {
+  local pdir="$1" pkg="$2" name
+  for name in $(grep -oE '"file:\.\./[a-z0-9-]+"' "${pdir}/${pkg}/package.json" | sed -E 's/^"file:\.\.\/(.*)"$/\1/'); do
+    if [ -L "${pdir}/${name}" ] || [ ! -f "${pdir}/${name}/package.json" ]; then return 0; fi
+  done
+  return 1
 }
 
 # When the Stack build fails with the admin page's @maipai/ui in place, move that package aside so

@@ -93,6 +93,12 @@ Stack, checks the archive against the same `commons_archive_sha256` table and pl
 for every Commons tag the Stack's `backend/` and `admin-ui/` name that the table lacks. A tag that cannot be placed, verified or built never
 blocks the Stack: the installer says in one sentence that the admin page was skipped, builds without it, and `/admin/` answers 503 until the next run.
 
+The ui tag's own `file:../spec` (and any other `file:../<name>`) is never taken from the Stack backend's `spec` tag, which can be older (Stack
+6895990: backend spec-v0.1.471, ui-v0.5.728 written against the spec of its own commit, 0.1.478; linking the older one failed `tsc` on
+`@maipai/spec/stack/ts/stack-choices` and the live `/admin/` answered 503). A Commons archive is the whole repository at that commit, so the
+installer unpacks the ui tag's siblings from the same archive into `commons-tags/ui-<tag>/<name>`, under the ui tag's one verified digest. No second
+digest is needed, so `pin.sh stack <sha>` adds none for them; a test fails if the page's spec is a link or lacks the files the ui imports.
+
 ## Bumping `STACK_TAG` also copies the disk plan table
 
 `shared/diskPlan.json` is a verbatim copy of the Stack's `docs/disk-plan.json` (every install's size per component and tier, from the

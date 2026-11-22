@@ -38,6 +38,7 @@ open(path, "w").write(updated)
 PY
 }
 # The Commons tags a Stack commit names (backend/ and admin-ui/ package.json, file:../../commons-tags/<pkg>-<tag>/<pkg>), one per line.
+# The ui tag's own sibling packages (its file:../spec) come out of the ui tag's archive at install time, so they need no digest of their own here.
 stack_commons_tags() {
   local sha="$1" manifest
   for manifest in backend/package.json admin-ui/package.json; do

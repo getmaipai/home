@@ -1,6 +1,6 @@
 import { describe, test, expect, setDefaultTimeout } from "bun:test";
 setDefaultTimeout(30_000);
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -117,6 +117,12 @@ describe("fetch_stack_commons", () => {
     const pkgDir = join(root, "archive", "ui", "commons-ui-v0.5.726", "ui");
     mkdirSync(pkgDir, { recursive: true });
     writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: "@maipai/ui", version: "0.0.1", dependencies: { "@maipai/spec": "file:../spec" } }));
+    // A Commons archive is the whole repository at that commit: the ui tag carries the spec the ui was written against, and
+    // that spec is newer than the backend's spec tag (spec-v0.1.136 here has no stack/ts/stack-choices; this one has).
+    const specDir = join(root, "archive", "ui", "commons-ui-v0.5.726", "spec");
+    mkdirSync(join(specDir, "stack", "ts"), { recursive: true });
+    writeFileSync(join(specDir, "package.json"), JSON.stringify({ name: "@maipai/spec", version: "0.1.478" }));
+    writeFileSync(join(specDir, "stack", "ts", "stack-choices.ts"), "export const choices = 1;\n");
     const archive = join(root, "ui-v0.5.726.tar.gz");
     expect(Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive", "ui"), "commons-ui-v0.5.726"]).exitCode).toBe(0);
     return Bun.spawnSync(["shasum", "-a", "256", archive]).stdout.toString().split(/\s+/)[0]!;
@@ -146,9 +152,36 @@ describe("fetch_stack_commons", () => {
       // The path build-binary.sh tests: admin-ui/<file: path>/package.json.
       const resolved = join(workspace, "stack", "admin-ui", "../../commons-tags/ui-ui-v0.5.726/ui");
       expect(readFileSync(join(resolved, "package.json"), "utf8")).toContain('"name":"@maipai/ui"');
-      // ui names spec as file:../spec; the link points at the spec folder the backend already got.
-      expect(readFileSync(join(workspace, "commons-tags", "ui-ui-v0.5.726", "spec", "package.json"), "utf8")).toContain('"name":"@maipai/spec"');
+      // ui names spec as file:../spec; the page's spec is the one in the ui's own archive (a real folder, newer than the
+      // backend's spec tag), never a link to the spec folder the backend got. The old link pointed at spec-v0.1.136, which has no
+      // stack/ts/stack-choices, so the page's type check failed on a live ship (2026-11-22, Stack 6895990).
+      const uiSpec = join(workspace, "commons-tags", "ui-ui-v0.5.726", "spec");
+      expect(readFileSync(join(uiSpec, "package.json"), "utf8")).toContain('"version":"0.1.478"');
+      expect(lstatSync(uiSpec).isSymbolicLink()).toBe(false);
+      expect(existsSync(join(uiSpec, "stack", "ts", "stack-choices.ts"))).toBe(true);
+      expect(readFileSync(join(workspace, "commons-tags", "spec-spec-v0.1.136", "spec", "package.json"), "utf8")).toContain('"name":"@maipai/spec"');
+      expect(existsSync(join(workspace, "commons-tags", "spec-spec-v0.1.136", "spec", "stack"))).toBe(false);
       expect(result.stdout.toString()).not.toContain("skipped");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: a ui folder left with the old spec link is placed again with the ui's own spec", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-adminui-stale-"));
+    try {
+      const { digests } = commonsFixture(root);
+      const uiDigest = uiFixture(root);
+      const workspace = adminWorkspace(root);
+      const stale = join(workspace, "commons-tags", "ui-ui-v0.5.726");
+      mkdirSync(join(stale, "ui"), { recursive: true });
+      writeFileSync(join(stale, "ui", "package.json"), JSON.stringify({ name: "@maipai/ui", dependencies: { "@maipai/spec": "file:../spec" } }));
+      mkdirSync(join(workspace, "commons-tags", "spec-spec-v0.1.136", "spec"), { recursive: true });
+      symlinkSync("../spec-spec-v0.1.136/spec", join(stale, "spec"));
+      const result = runFetchWithUi(script, root, digests, workspace, uiDigest);
+      expect(result.exitCode, result.stdout.toString() + result.stderr.toString()).toBe(0);
+      expect(lstatSync(join(stale, "spec")).isSymbolicLink()).toBe(false);
+      expect(existsSync(join(stale, "spec", "stack", "ts", "stack-choices.ts"))).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
