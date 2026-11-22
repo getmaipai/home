@@ -48,6 +48,12 @@ export function codingSessionRefusal(person: PersonRow): string | null {
   return null;
 }
 
+/** Throws the household's admission copy when this person may not use Code now (a revoked grant, a guest, an ungranted minor, Coding off). Stop and delete skip it so a running turn can always be ended. */
+export function requireCodingAccess(person: PersonRow): void {
+  const refusal = codingSessionRefusal(person);
+  if (refusal) throw new CodingSessionError("not_allowed", refusal);
+}
+
 function wire(row: Row): CodingSessionWire {
   return CodingSession.parse({
     id: row.id, person_id: row.personId, title: row.title, repo: row.repo, environment_id: row.environmentId, mode: row.mode, state: row.state, tier: row.tier,
@@ -115,6 +121,7 @@ export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "ti
 
 /** The person switches the stored tier now; it applies at the next turn (design 3.2). A tier the person may not run is refused, never lowered silently. */
 export function setSessionTier(person: PersonRow, id: string, requested: Tier): CodingSessionWire {
+  requireCodingAccess(person);
   const row = getSessionRow(person.id, id);
   if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
   const choice = authorizeTier({ person, category: "coding", requested });

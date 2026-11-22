@@ -5,7 +5,7 @@ import { createCodingSession, getCodingSession } from "@/lib/codingSessions";
 import { __setBudgetMsForTests, cancelQueuedMessage, queuedMessageIds, sendMessage, stopCodingSession, submitTurn, turnFinished, turnState, undoToCheckpoint } from "@/lib/codingTurns";
 import { answerHostRequest, isSessionTainted, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
-import { listCodingEvents } from "@/lib/codingEvents";
+import { listCodingEvents, recordCodingEvent } from "@/lib/codingEvents";
 import { brakeFor } from "@/lib/toolBrake";
 import { redactCredentials } from "@/lib/codingRedact";
 import { input, owner, person, settled, startRig } from "./codingRig";
@@ -61,6 +61,12 @@ describe("events become message parts and audit lines", () => {
     const r = redactCredentials(`a ${GITHUB_TOKEN} b maipai_key0123456789abcdefghij_secretsecretsecret c`);
     expect(r.found).toBe(2); expect(r.text).not.toContain("github_pat_"); expect(r.text).not.toContain("maipai_key");
     expect(redactCredentials("plain words")).toEqual({ text: "plain words", found: 0 });
+  });
+  test("the trail redacts a token before it clips, so a token across the cut leaves no fragment", () => {
+    rig = startRig(); const a = owner(); const s = createCodingSession(a, input());
+    recordCodingEvent({ sessionId: s.id, personId: a.id, kind: "command", detail: { command: `${"x".repeat(470)} ${GITHUB_TOKEN} tail`, exit_code: 0, duration_ms: 1 } });
+    const stored = JSON.stringify(listCodingEvents(a.id, s.id));
+    expect(stored).not.toContain("github_pat"); expect(stored).not.toContain("FINEGRAINED"); expect(stored).toContain("[credential removed]");
   });
   test("another person cannot read the transcript or the trail", async () => {
     rig = startRig(); const a = owner(); const b = person(); const s = createCodingSession(a, input());

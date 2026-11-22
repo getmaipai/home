@@ -17,8 +17,9 @@ const clip = (v: unknown): unknown => (typeof v === "string" && v.length > MAX_T
 
 /** Writes one line of the trail. Returns the number of credentials removed from it (a count), so a caller can log that and nothing else. */
 export function recordCodingEvent(input: { sessionId: string; personId: string; kind: CodingEventKind; detail: Record<string, unknown> }): { id: string; redacted: number } {
-  const capped = Object.fromEntries(Object.entries(input.detail).map(([k, v]) => [k, clip(v)]));
-  const clean = redactDeep(capped);
+  // Redact first, then clip: a token that straddles the cut would otherwise survive as an undetectable fragment.
+  const clean = redactDeep(input.detail);
+  clean.value = Object.fromEntries(Object.entries(clean.value).map(([k, v]) => [k, clip(v)]));
   const at = new Date().toISOString();
   const row = { id: newCodingEventId(), sessionId: input.sessionId, personId: input.personId, at, kind: input.kind, detail: clean.value, provenance: "Recorded by the Code agent bridge", hlc: nextHlc() };
   CodingEvent.parse({ id: row.id, session_id: row.sessionId, at, kind: row.kind, detail: row.detail, provenance: row.provenance, hlc: row.hlc });

@@ -14,7 +14,7 @@ import { appendLogLine } from "@/lib/log";
 import { newCodingRequestId } from "@/lib/id";
 import { appendCodingMessage, replaceCodingMessageParts, type CodingPart } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
-import { CodingSessionError, getSessionRow, updateSession } from "@/lib/codingSessions";
+import { CodingSessionError, getSessionRow, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import type { PersonRow } from "@/types";
 
 /** What the agent reports while it works. The OpenCode adapter (later) maps its own event stream onto these. */
@@ -61,7 +61,8 @@ function settleRequest(p: Pending, answer: PermissionAnswer): void {
 }
 
 /** The person answers a held request (their click). Only the owner of the session can. */
-export function answerHostRequest(person: Pick<PersonRow, "id">, sessionId: string, requestId: string, answer: PermissionAnswer): void {
+export function answerHostRequest(person: PersonRow, sessionId: string, requestId: string, answer: PermissionAnswer): void {
+  requireCodingAccess(person);
   const p = pending.get(requestId);
   if (!p || p.sessionId !== sessionId || p.personId !== person.id) throw new CodingSessionError("not_found", "That request is no longer waiting. It may have been answered or the session stopped.");
   settleRequest(p, answer);

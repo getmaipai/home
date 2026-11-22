@@ -63,6 +63,7 @@ const getR = createRoute({
   responses: { 200: { content: { "application/json": { schema: ViewSchema } }, description: "The session." }, ...errorResponses(errors) },
 });
 codingSessionsRoutes.openapi(getR, (c) => {
+  const refusal = codingSessionRefusal(c.get("person")); if (refusal) return c.json({ error: refusal }, 403);
   const v = view(c.get("person"), c.req.valid("param").id);
   return v ? c.json(v, 200) : c.json({ error: "That session was not found. It may have been deleted." }, 404);
 });
@@ -95,6 +96,7 @@ const transcriptR = createRoute({
 });
 codingSessionsRoutes.openapi(transcriptR, (c) => {
   const person = c.get("person"); const id = c.req.valid("param").id;
+  const refusal = codingSessionRefusal(person); if (refusal) return c.json({ error: refusal }, 403);
   if (!getCodingSession(person, id)) return c.json({ error: "That session was not found. It may have been deleted." }, 404);
   return c.json(listCodingMessages(person.id, id), 200);
 });
@@ -106,6 +108,7 @@ const trailR = createRoute({
 });
 codingSessionsRoutes.openapi(trailR, (c) => {
   const person = c.get("person"); const id = c.req.valid("param").id;
+  const refusal = codingSessionRefusal(person); if (refusal) return c.json({ error: refusal }, 403);
   if (!getCodingSession(person, id)) return c.json({ error: "That session was not found. It may have been deleted." }, 404);
   return c.json(listCodingEvents(person.id, id), 200);
 });
@@ -132,6 +135,7 @@ const standardR = createRoute({
 });
 codingSessionsRoutes.openapi(standardR, (c) => {
   const p = c.req.valid("param");
+  const refusal = codingSessionRefusal(c.get("person")); if (refusal) return c.json({ error: refusal }, 403);
   if (!getCodingSession(c.get("person"), p.id)) return c.json({ error: "That session was not found. It may have been deleted." }, 404);
   return useStandardForThisMessage(c.get("person"), p.turn) ? c.json({ ok: true as const }, 200) : c.json({ error: "That message is not waiting for Max any more." }, 409);
 });

@@ -435,6 +435,10 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[], pr
   sqlite.query("DELETE FROM made_albums WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM made_revisions WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM coding_token_usage WHERE person_id = ?").run(personId);
+  // CODE-AGENT-01: a Code session's events and messages point at the session, so they go first (foreign keys are on), then the sessions.
+  sqlite.query("DELETE FROM coding_events WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM coding_messages WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM coding_sessions WHERE person_id = ?").run(personId);
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id
   // column this table does not have.

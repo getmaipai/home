@@ -77,4 +77,20 @@ describe("sessions over HTTP", () => {
     expect((await client.get("/api/code/sessions/csess-nothere0001")).status).toBe(404);
     expect((await client.post("/api/code/sessions/csess-nothere0001/stop")).status).toBe(404);
   });
+  test("a person who lost Coding access (a guest, an ungranted teen) cannot read, switch, answer or undo, but can still Stop", async () => {
+    const s = await make();
+    const sent = await (await client.post(`/api/code/sessions/${s.id}/messages`, { text: "go" })).json() as { turn_id: string }; await settled();
+    for (const role of ["guest", "teen"] as const) {
+      db.update(people).set({ role }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
+      const base = `/api/code/sessions/${s.id}`;
+      const refused = [
+        await client.get(base), await client.get(`${base}/messages`), await client.get(`${base}/events`), await client.put(`${base}/tier`, { tier: "standard" }),
+        await client.post(`${base}/requests/creq-abcdef1234`, { answer: "allow" }), await client.post(`${base}/undo`, { checkpoint_id: "ckpt-1" }),
+        await client.post(`${base}/turns/${sent.turn_id}/use-standard`),
+      ];
+      expect(refused.map((r) => r.status)).toEqual([403, 403, 403, 403, 403, 403, 403]);
+      expect(((await refused[0]!.json()) as { error: string }).error).toContain("Coding is not allowed for you");
+    }
+    expect((await client.post(`/api/code/sessions/${s.id}/stop`)).status).toBe(200); await turnFinished(sent.turn_id);
+  });
 });

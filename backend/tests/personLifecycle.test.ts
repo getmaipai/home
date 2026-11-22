@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
-import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets, mediaProductions, memoryRecords } from "@/db/schema";
+import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets, mediaProductions, memoryRecords, codingSessions, codingMessages, codingEvents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { newPersonId } from "@/lib/id";
 import { hashSecret } from "@/lib/secret";
@@ -25,6 +25,22 @@ test("person erasure deletes their media productions", () => {
   // Erasure uses the same transactional deletion path as deletePerson; exercise it directly here.
   erasePersonData(owner.id, []);
   expect(db.select().from(mediaProductions).all()).toEqual([]);
+});
+
+test("person erasure deletes their Code sessions, transcript and audit trail, and leaves other people's", () => {
+  const owner = insertPerson({ role: "owner" }); const other = insertPerson({ role: "adult" });
+  const keep = (id: string, personId: string) => {
+    const at = new Date().toISOString();
+    db.insert(codingSessions).values({ id: `csess-${id}000001`, personId, title: "t", repo: { kind: "none", base_branch: "main", work_branch: "w" }, environmentId: "cenv-abcdef12", mode: "ask", state: "idle", tier: "standard",
+      network: { policy: "none", hosts: [] }, usage: { input_tokens: 0, output_tokens: 0 }, changes: { files: 0, additions: 0, deletions: 0 }, createdAt: at, lastActivityAt: at, provenance: "t", hlc: "1700000000000:0:testfix", updatedAt: at }).run();
+    db.insert(codingMessages).values({ id: `cmsg-${id}`, sessionId: `csess-${id}000001`, personId, seq: 1, role: "user", parts: [{ type: "text", text: "x" }], createdAt: at, hlc: "1700000000000:0:testfix" }).run();
+    db.insert(codingEvents).values({ id: `cevt-${id}00001`, sessionId: `csess-${id}000001`, personId, at, kind: "stopped", detail: {}, provenance: "t", hlc: "1700000000000:0:testfix" }).run();
+  };
+  keep("mine", owner.id); keep("theirs", other.id);
+  erasePersonData(owner.id, []);
+  expect(db.select().from(codingSessions).all().map((r) => r.personId)).toEqual([other.id]);
+  expect(db.select().from(codingMessages).all().map((r) => r.personId)).toEqual([other.id]);
+  expect(db.select().from(codingEvents).all().map((r) => r.personId)).toEqual([other.id]);
 });
 
 test("person erasure tombstones memories and clears private metadata", () => {

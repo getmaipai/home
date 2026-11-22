@@ -16,7 +16,7 @@ import { jobQueueCopy, type JobQueueReason } from "@/lib/jobQueueCopy";
 import { chatLeaseHeldBy, type ChatLease, type LeaseRefusal } from "@/lib/chatLease";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import type { Tier } from "@/lib/tiers";
-import { CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, updateSession } from "@/lib/codingSessions";
+import { CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
 import { appendCodingMessage } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
@@ -214,6 +214,7 @@ export function turnQueueLine(person: PersonRow, turnId: string): string | null 
 
 /** Design 3.4: a Max turn that cannot get the lease offers one action. It runs this one turn at Standard and leaves the stored tier on Max. */
 export function useStandardForThisMessage(person: PersonRow, turnId: string): boolean {
+  requireCodingAccess(person);
   const turn = turns.get(turnId);
   if (!turn || turn.personId !== person.id || turn.state !== "queued" || turn.tier !== "max" || !turn.leaseReason) return false;
   turn.standardOnce = true; turn.tier = "standard"; turn.leaseReason = null; turn.leaseRefusal = null;
@@ -288,7 +289,8 @@ export function stopCodingSession(person: Pick<PersonRow, "id">, sessionId: stri
 }
 
 /** Undo on a receipt: restores the checkpoint through the sandbox and records it in the person's trail. The person's own click; the brake lets undo through always. */
-export async function undoToCheckpoint(person: Pick<PersonRow, "id">, sessionId: string, checkpointId: string): Promise<void> {
+export async function undoToCheckpoint(person: PersonRow, sessionId: string, checkpointId: string): Promise<void> {
+  requireCodingAccess(person);
   if (!getSessionRow(person.id, sessionId)) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
   if (!runtime?.sandbox.restoreCheckpoint) throw new CodingSessionError("not_allowed", "Undo is not available for this session yet.");
   if (!/^[A-Za-z0-9_.-]{1,80}$/.test(checkpointId)) throw new CodingSessionError("bad_input", "That checkpoint is not valid. Pick one from the session's history.");
