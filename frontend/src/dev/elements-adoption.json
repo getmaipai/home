@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T02:29:59.335Z",
+  "generatedAt": "2026-11-22T02:39:35.232Z",
   "kitTag": "ui-v0.5.727",
   "items": [
     {
@@ -510,7 +510,7 @@
       "group": "canvas/artifacts",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "code-runner.tsx",
@@ -526,7 +526,7 @@
       "group": "code",
       "verdict": "later",
       "verdictReason": "New in ui-v0.5.727; not drawn by a Home page yet (verdict \"later\" set automatically by the pin); assess and wire it when a page uses it.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "command-palette.tsx",
