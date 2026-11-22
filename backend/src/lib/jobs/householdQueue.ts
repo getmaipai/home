@@ -20,8 +20,10 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "aged_guard" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "aged_guard" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | "coding.max_sessions" | "coding.person.max_sessions" | null;
   category?: JobCategory;
+  /** CODE-TIER-03: this Max job's owner already holds the Max lease, so the `max_chat` hold does not apply to it. */
+  ownsChatLease?: boolean;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
   backfillFits?: boolean;
@@ -189,7 +191,7 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
   let ordered = positions.map(({ id }) => queued.get(id)!).filter(Boolean);
 
   if (state.chatLeaseHeld) {
-    for (const job of ordered) if (job.tier === "boost" || job.tier === "max") holds[job.id] = "max_chat";
+    for (const job of ordered) if ((job.tier === "boost" || job.tier === "max") && !job.ownsChatLease) holds[job.id] = "max_chat";
     ordered = ordered.filter((job) => !holds[job.id]);
   }
 

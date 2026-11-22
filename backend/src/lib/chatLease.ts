@@ -3,7 +3,7 @@
 // lease ends by itself when nothing is in flight. This file is the state machine only. The swap (unload residents, load the big model,
 // post-load check, rollback on failure) is injected, so the Stack's coding-mode transaction stays the one implementation. In-memory state,
 // no person text: the record holds a person id, times and a state.
-import { holdsMax } from "@/lib/tiers";
+import { holdsMax, type TierCategory } from "@/lib/tiers";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdmin } from "@/lib/access";
 
@@ -67,9 +67,10 @@ export function createChatLease(deps: LeaseDeps) {
   /** The admission hold: Boost and Max generator jobs queue with `max_chat` while this is true (section 7 T6). Standard jobs that fit still run. */
   const holdsGenerators = () => state === "starting" || state === "held" || state === "releasing";
 
-  async function acquire(person: Holder, opts: { pinned?: boolean } = {}): Promise<AcquireResult> {
+  async function acquire(person: Holder, opts: { pinned?: boolean; category?: TierCategory } = {}): Promise<AcquireResult> {
     // A minor never holds Max chat (RULES.md rules 0 and 8): holdsMax already refuses child, guest and a teen's chat.
-    if (person.role === "teen" || !holdsMax(person, "chat")) return { ok: false, refusal: "not_a_holder" };
+    // CODE-TIER-03: a Max Code turn takes this same lease and is checked against its own category's grant (`tier.max:coding`).
+    if (person.role === "teen" || !holdsMax(person, opts.category ?? "chat")) return { ok: false, refusal: "not_a_holder" };
     if (state === "held" && holderId === person.id) {
       lastActivityAt = deps.now();
       if (opts.pinned && isOwnerOrAdmin(person)) pinned = true;

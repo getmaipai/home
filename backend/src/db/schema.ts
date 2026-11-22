@@ -165,6 +165,31 @@ export const gitConnections = sqliteTable("git_connections", {
   updatedAt: text("updated_at").notNull(),
 }, (t) => [index("git_connections_person_idx").on(t.personId)]);
 
+// CODE-AGENT-01: a Code app session (spec coding-session). `tier` is the person's stored choice and survives a restart; each turn clamps it and
+// writes the corrected value back (lib/codingSessions.ts). The transcript is not stored here. Nothing in the queue or logs reads title or repo (rule 6a).
+export const codingSessions = sqliteTable("coding_sessions", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  title: text("title").notNull(),
+  repo: text("repo", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  environmentId: text("environment_id").notNull(),
+  mode: text("mode", { enum: ["plan", "ask", "auto_edit"] }).notNull(),
+  state: text("state", { enum: ["queued", "starting", "working", "needs_you", "idle", "paused", "done", "failed", "archived"] }).notNull(),
+  tier: text("tier", { enum: ["standard", "boost", "max"] }).notNull().default("standard"),
+  network: text("network", { mode: "json" }).$type<{ policy: "none" | "hosts"; hosts: string[] }>().notNull(),
+  mounts: text("mounts", { mode: "json" }).$type<string[]>(),
+  modelId: text("model_id"),
+  usage: text("usage", { mode: "json" }).$type<{ input_tokens: number; output_tokens: number }>().notNull(),
+  changes: text("changes", { mode: "json" }).$type<{ files: number; additions: number; deletions: number }>().notNull(),
+  createdAt: text("created_at").notNull(),
+  lastActivityAt: text("last_activity_at").notNull(),
+  deletedAt: text("deleted_at"),
+  trashUntil: text("trash_until"),
+  provenance: text("provenance").notNull(),
+  hlc: text("hlc").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (t) => [index("coding_sessions_person_idx").on(t.personId)]);
+
 // Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for
 // memory/entity/episode records: one monotonic counter per record_kind.
 // See lib/id.ts.

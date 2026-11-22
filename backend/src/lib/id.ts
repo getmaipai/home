@@ -21,6 +21,11 @@ export function newGitConnectionId(): string {
   return `gitc-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/coding-session.schema.json's `^csess-[a-z0-9]{6,}$`. */
+export function newCodingSessionId(): string {
+  return `csess-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/biometric-print.schema.json's `^print-[a-z0-9]{6,}$`. */
 export function newBiometricPrintId(): string {
   return `print-${randomSuffix(10)}`;

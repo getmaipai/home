@@ -16,13 +16,13 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { peekPictureEngineStatus } from "@/lib/pictures/ready";
 
 export type Tier = "standard" | "boost" | "max";
-export type TierCategory = "chat" | "image" | "video" | "music" | "voice";
+export type TierCategory = "chat" | "image" | "video" | "music" | "voice" | "coding";
 export type TierWho = "everyone" | "assigned" | "admins";
 /** Why a request was lowered: `no_boost_access` and `no_max_access` (the pass lacks the item), `no_minor_part` (a minor's lane runs Standard until the Stack serves a minor's parts list), `slot_off`, `not_for_this_person` (a guest, or the slot's Who can use it). */
 export type TierNote = "no_max_access" | "no_boost_access" | "no_minor_part" | "slot_off" | "not_for_this_person";
 
 const LADDER: readonly Tier[] = ["standard", "boost", "max"];
-const ROLE_OF_CATEGORY: Record<TierCategory, string> = { chat: "chat", image: "image", video: "video", music: "music", voice: "tts" };
+const ROLE_OF_CATEGORY: Record<TierCategory, string> = { chat: "chat", image: "image", video: "video", music: "music", voice: "tts", coding: "coding" };
 export const TIER_GRANT = "tier.max";
 export const tierGrantFor = (category: TierCategory) => `tier.max:${category}`;
 export const isTier = (value: unknown): value is Tier => value === "standard" || value === "boost" || value === "max";
