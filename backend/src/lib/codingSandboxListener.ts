@@ -34,6 +34,9 @@ export function guardSandboxRequest(bridge: string, inner: SandboxFetch, peerOf:
 
 let handler: SandboxFetch | null = null;
 let server: { stop(force?: boolean): void } | null = null;
+let lastFailure: "port_in_use" | "other" | null = null;
+/** Why the last bind failed: `port_in_use` when another program holds the port (a leftover probe or a second Home), so the turn can say so instead of "gateway unreachable". Null while the listener is up. */
+export function sandboxListenerFailure(): "port_in_use" | "other" | null { return server ? null : lastFailure; }
 /** index.ts gives the listener the app's fetch once; nothing is bound until a Code turn needs it. */
 export function configureSandboxListener(fetch: SandboxFetch): void { handler = fetch; }
 
@@ -47,9 +50,10 @@ export async function ensureSandboxListener(attempts = 25, waitMs = 200): Promis
     if (server) return true;
     try {
       server = Bun.serve({ hostname: bridge, port, fetch: guarded as never, idleTimeout: 120 });
+      lastFailure = null;
       appendLogLine(`coding sandbox_listener_up port=${port} try=${i + 1}`);
       return true;
-    } catch (e) { server = null; if (i === attempts - 1) appendLogLine(`coding sandbox_listener_failed ${String((e as Error)?.message ?? e).slice(0, 120)}`); else await Bun.sleep(waitMs); }
+    } catch (e) { server = null; lastFailure = /EADDRINUSE|address already in use|in use/i.test(`${(e as { code?: string })?.code ?? ""} ${(e as Error)?.message ?? ""}`) ? "port_in_use" : "other"; if (i === attempts - 1) appendLogLine(`coding sandbox_listener_failed ${String((e as Error)?.message ?? e).slice(0, 120)}`); else await Bun.sleep(waitMs); }
   }
   return false;
 }

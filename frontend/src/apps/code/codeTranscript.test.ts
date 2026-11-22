@@ -71,6 +71,7 @@ test("a failed turn is explained in plain words by its reason code, each with a 
   expect(stopWords("error", "budget_spent")).toContain("budget");
   expect(stopWords("error", "not_allowed")).toContain("access changed");
   expect(stopWords("error", "gateway_unreachable")).toContain("coding gateway");
+  expect(stopWords("error", "gateway_port_in_use")).toContain("Another program is using the port");
   expect(stopWords("error", "agent_exit")).toContain("quit unexpectedly");
   expect(stopWords("user")).toContain("You stopped");
   expect(stopWords("error", "zzz")).not.toContain("Stopped by a problem");

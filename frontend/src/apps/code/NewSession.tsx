@@ -1,9 +1,9 @@
 // CODE-APP-01 and CODE-TIER-04: the New session row. A box for the first message and the tier control, listing only the tiers this person may run;
 // a new session starts on the tier they used last (the hub says which).
 import { i18n } from "@lingui/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { TierSegment, type TierId, type TierOptionDef } from "@maipai/ui/src/elements/tier-segment";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
@@ -23,6 +23,8 @@ export const tierOptions = (tiers: readonly CodeTier[]): TierOptionDef[] => tier
 
 export function NewSession() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const box = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
   const tiers = useQuery({ queryKey: CODE_TIERS_KEY, queryFn: codeApi.tiers, retry: false });
   const [text, setText] = useState("");
@@ -39,6 +41,8 @@ export function NewSession() {
   const offered = tiers.data?.tiers ?? [];
   const value: CodeTier = tier && offered.includes(tier) ? tier : tiers.data?.last ?? "standard";
   useEffect(() => { setProblem(""); }, [text]);
+  // The box takes focus when the page opens and again on every click of New session (each click is a new navigation key).
+  useEffect(() => { box.current?.focus(); }, [location.key]);
 
   async function start() {
     const message = text.trim();
@@ -58,7 +62,7 @@ export function NewSession() {
   return (
     <Stack as="form" data-slot="code-new-session" className="mx-auto w-full max-w-2xl p-4" onSubmit={(event) => { event.preventDefault(); void start(); }}>
       <h2 className="text-title">{i18n._({ id: "What should we work on?", message: "What should we work on?" })}</h2>
-      <Textarea value={text} onChange={(event) => setText(event.target.value)} rows={4} aria-label={i18n._({ id: "Describe the task", message: "Describe the task" })} placeholder={i18n._({ id: "Describe the task, for example: fix the failing test in the thermostat code.", message: "Describe the task, for example: fix the failing test in the thermostat code." })} />
+      <Textarea ref={box} value={text} onChange={(event) => setText(event.target.value)} rows={4} aria-label={i18n._({ id: "Describe the task", message: "Describe the task" })} placeholder={i18n._({ id: "Describe the task, for example: fix the failing test in the thermostat code.", message: "Describe the task, for example: fix the failing test in the thermostat code." })} />
       {active.length > 0 ? <Stack data-slot="code-repo">
         <Select aria-label={i18n._({ id: "Repository", message: "Repository" })} value={connectionId} onValueChange={setConnectionId} options={["none", ...active.map((c) => c.id)]}
           getLabel={(id) => { const c = active.find((x) => x.id === id); return c ? `${c.kind === "github" ? "GitHub" : "Gitea"}: ${c.account}` : i18n._({ id: "No repository", message: "No repository" }); }} />

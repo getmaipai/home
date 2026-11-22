@@ -1,6 +1,6 @@
 // The sandbox's own gateway door: plain http on the sandbox bridge only, /code/v1 only, bridge /24 sources only.
 import { afterEach, describe, expect, test } from "bun:test";
-import { configureSandboxListener, ensureSandboxListener, guardSandboxRequest, inBridgeNetwork, sandboxBridgeAddress, stopSandboxListener } from "@/lib/codingSandboxListener";
+import { configureSandboxListener, ensureSandboxListener, guardSandboxRequest, inBridgeNetwork, sandboxBridgeAddress, sandboxListenerFailure, stopSandboxListener } from "@/lib/codingSandboxListener";
 import { sandboxGatewayPort, sandboxGatewayUrl } from "@/lib/codingGatewayAddress";
 import { fromSandboxNetwork } from "@/lib/codeGate";
 
@@ -48,6 +48,17 @@ describe("the real listener", () => {
     process.env.MAIPAI_SANDBOX_GATEWAY_URL = "http://192.0.2.77:38999/code/v1";
     configureSandboxListener(ok);
     expect(await ensureSandboxListener(2, 10)).toBe(false);
+  });
+  test("a port held by another program is reported as port_in_use (not a generic failure), and clears once it binds", async () => {
+    const port = 38000 + Math.floor(Math.random() * 1000);
+    process.env.MAIPAI_SANDBOX_GATEWAY_URL = `http://127.0.0.1:${port}/code/v1`;
+    configureSandboxListener(ok);
+    const holder = Bun.serve({ hostname: "127.0.0.1", port, fetch: () => new Response("busy") });
+    expect(await ensureSandboxListener(2, 10)).toBe(false);
+    expect(sandboxListenerFailure()).toBe("port_in_use");
+    holder.stop(true);
+    expect(await ensureSandboxListener(10, 50)).toBe(true);
+    expect(sandboxListenerFailure()).toBeNull();
   });
   test("a rebind that finds the port still closing succeeds once it frees (the live sandbox_listener_failed after a release)", async () => {
     const port = 38000 + Math.floor(Math.random() * 1000);

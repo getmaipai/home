@@ -19,6 +19,7 @@ import type { Tier } from "@/lib/tiers";
 import { revokeAllSessionKeys, revokeSessionKeys } from "@/lib/apiKeys";
 import { addCheckpoint, CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import { createTurnHost, denyAllPending, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
+import { sandboxListenerFailure } from "@/lib/codingSandboxListener";
 import { trigger } from "@/lib/notifications";
 import { readChangeCounts } from "@/lib/codingChanges";
 import { appendCodingMessage } from "@/lib/codingTranscript";
@@ -49,7 +50,7 @@ export interface CodingGatewayDoor { ensure(): Promise<boolean>; release(): void
 export interface CodingRuntime { agent: CodingAgent; sandbox: CodingSandbox; lease: () => ChatLease; gateway?: CodingGatewayDoor }
 /** A turn failure with a reason code the log and the app can tell apart. */
 export class CodingTurnError extends Error {
-  constructor(readonly reason: "gateway_unreachable" | "agent_exit") { super(reason); this.name = "CodingTurnError"; }
+  constructor(readonly reason: "gateway_unreachable" | "gateway_port_in_use" | "agent_exit") { super(reason); this.name = "CodingTurnError"; }
 }
 
 let runtime: CodingRuntime | null = null;
@@ -225,7 +226,7 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   try {
     let at = Date.now();
     await startSandboxOnce(rt, turn.sessionId, environmentId); at = mark("sandbox", at);
-    if (rt.gateway && !(await rt.gateway.ensure())) throw new CodingTurnError("gateway_unreachable");
+    if (rt.gateway && !(await rt.gateway.ensure())) throw new CodingTurnError(sandboxListenerFailure() === "port_in_use" ? "gateway_port_in_use" : "gateway_unreachable");
     at = mark("gateway", at);
     if (rt.sandbox.snapshot && !turn.abort.signal.aborted) {
       // The checkpoint Undo goes back to. A failed snapshot never fails the turn; the person just has no checkpoint for this message (reason code in the log).

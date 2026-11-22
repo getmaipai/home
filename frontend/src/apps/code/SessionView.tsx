@@ -18,13 +18,10 @@ import { codeApi, type CodeTier } from "./codeApi";
 import { stopWords, activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWord, tierWord } from "./codeTranscript";
 import { CODE_SESSIONS_KEY, CODE_TIERS_KEY, tierOptions } from "./NewSession";
 import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
-import { Stack } from "./layout";
+import { Stack, codeDensity } from "./layout";
 import { CodeThread } from "./CodeThread";
 
 const TerminalIcon = getIcon("terminal");
-
-/** The Code app sets its own tighter type size and spacing by token, the way the references (an editor, a terminal) read: small, even, quiet. */
-export const CODE_DENSITY = { ["--font-size-body" as string]: "12.5px", ["--spacing" as string]: "calc(0.25rem * 0.8)" } as const;
 
 export function SessionView({ id }: { id: string }) {
   const navigate = useNavigate();
@@ -98,7 +95,7 @@ export function SessionView({ id }: { id: string }) {
   const subtitle = repoLine(session.repo);
 
   return (
-    <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1" style={CODE_DENSITY}>
+    <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1" style={codeDensity(phone)}>
       <Stack gap="none" className="min-h-0 min-w-0 flex-1">
         <ChatHeader name={session.title} media={<TerminalIcon aria-hidden className="size-6" />} {...(phone ? { onMenu: () => navigate("/apps/code") } : {})}
           actions={<>
