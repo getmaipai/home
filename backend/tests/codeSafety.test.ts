@@ -18,10 +18,10 @@ import { apiKeys, grants, people, settingsValues } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { invalidatePass } from "@/lib/filter/passCache";
 import { createApiKey, createSessionKey, resolveApiKeyOutcome } from "@/lib/apiKeys";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { resetValue, setHouseholdSettingValue } from "@/lib/settings";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { createCodingSession, CodingSessionError, getCodingSession } from "@/lib/codingSessions";
-import { codingKilled, enforceCodingKillSwitch, sendMessage, stopCodingSession, submitTurn, turnFinished, turnState, watchCodingKillSwitch, __setSessionCapForTests } from "@/lib/codingTurns";
+import { codingKilled, enforceCodingKillSwitch, sendMessage, setCodingRuntime, stopCodingSession, submitTurn, turnFinished, turnState, watchCodingKillSwitch, __setSessionCapForTests } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
@@ -113,6 +113,34 @@ describe("the kill switch", () => {
     expect(rig.agent.calls.map((c) => c.sessionId)).not.toContain(sb.id);
     expect(rig.sandbox.events).not.toContain(`start:${sb.id}`);
     expect(listCodingMessages(b.id, sb.id).at(-1)!.parts[0]).toEqual({ type: "stopped", reason: "denied" });
+  });
+
+  test("a queued turn that is killed says why, and resetting Coding to its default (off) trips the switch like any other write", async () => {
+    rig = startRig(); __setSessionCapForTests(1);
+    const a = owner(); const b = person("adult");
+    const first = submitTurn(a, createCodingSession(a, input()).id, "go"); await settled();
+    const sb = createCodingSession(b, input({ title: "B" }));
+    const second = submitTurn(b, sb.id, "go"); await settled();
+    expect(turnState(second.turn_id)).toBe("queued");
+    expect(resetValue(a, "household", "coding.enabled").ok).toBe(true); // the default is off
+    await turnFinished(first.turn_id); await turnFinished(second.turn_id); await settled();
+    expect(turnState(second.turn_id)).toBe("cancelled");
+    expect(listCodingMessages(b.id, sb.id).at(-1)!.parts[0]).toEqual({ type: "stopped", reason: "denied" });
+    expect(listCodingEvents(b.id, sb.id).at(-1)).toMatchObject({ kind: "stopped", detail: { reason: "denied" } });
+  });
+
+  test("a sandbox that was still starting when the switch fell is stopped again after the turn ends", async () => {
+    rig = startRig();
+    let release = () => undefined as void; const gate = new Promise<void>((r) => { release = r; });
+    const stops: string[] = [];
+    setCodingRuntime({ agent: rig.agent.agent, lease: () => rig.lease, sandbox: { start: async () => { await gate; }, stop: async (id) => { stops.push(id); }, destroy: async () => undefined } });
+    const a = owner(); const s = createCodingSession(a, input());
+    const t = submitTurn(a, s.id, "go"); await settled();
+    setHouseholdSettingValue("coding.paused", true); await settled();
+    expect(stops).toEqual([s.id]); // the sweep reached it, but start() had not returned
+    release(); await turnFinished(t.turn_id); await settled();
+    expect(stops).toEqual([s.id, s.id]); // the turn's own end stops what the start left behind
+    expect(rig.agent.calls).toHaveLength(0);
   });
 
   test("with Coding on and not paused the enforcer does nothing", async () => {
