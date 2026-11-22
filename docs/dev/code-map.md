@@ -840,6 +840,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |
 | `backend/src/lib/manifestLint.ts` | fixedPartOf, isQuestionWordOpener, COMPUTED_WILDCARD_RESOLVERS, lintManifestPatterns, NEVER_FIRES_WILDCARDS |
 | `backend/src/lib/manifestStat.ts` | MANIFEST_STAT_TTL_MS, cachedMtimeMs, invalidateManifestStats |
+| `backend/src/lib/maxAutoSelfTest.ts` | ensureSelfTest |
 | `backend/src/lib/mcp/connector.ts` | createConnector |
 | `backend/src/lib/mcp/nameMap.ts` | MAX_TOOL_NAME, createNameMap |
 | `backend/src/lib/mcp/schemaSanitiser.ts` | sanitiseSchema |
