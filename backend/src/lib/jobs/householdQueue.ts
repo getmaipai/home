@@ -21,7 +21,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "aged_guard" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | "coding.max_sessions" | "coding.person.max_sessions" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | "quiet_wait" | "cooldown_wait" | "heavy_slot" | "held_coding" | "aged_guard" | "fairness_wait" | "max_window" | "max_chat" | "max_drain" | "tier_ask" | "tier_no_room" | "coding.max_sessions" | "coding.person.max_sessions" | null;
   category?: JobCategory;
   /** CODE-TIER-03: this Max job's owner already holds the Max lease, so the `max_chat` hold does not apply to it. */
   ownsChatLease?: boolean;
@@ -40,13 +40,13 @@ export interface QueueJob {
 }
 
 /** Waits a job store keeps on the card across a restart (the phase or stage reads `held:<reason>`), and the card words for them. One list for the three kinds of job. */
-const HOLD_LIST = ["heavy_slot", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
+const HOLD_LIST = ["heavy_slot", "held_coding", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain", "tier_ask", "tier_no_room"] as const;
 export type PersistedHold = typeof HOLD_LIST[number];
 export const PERSISTED_HOLDS: readonly string[] = HOLD_LIST;
 export interface QueuePosition { id: string; position: number }
 /** The Stack's `backfillMaxWaitMs` (10 minutes): how long a big job waits while smaller ones pass it, unless the household set `resources.max_wait_before_aging`. */
 const BACKFILL_MAX_WAIT_MINUTES = 10;
-export type AdmissionHold = "heavy_slot" | "max_drain" | "max_window" | "fairness_wait" | "max_chat" | "aged_guard";
+export type AdmissionHold = "heavy_slot" | "held_coding" | "max_drain" | "max_window" | "fairness_wait" | "max_chat" | "aged_guard";
 export interface TierState {
   windowOpenFor: string | null;
   startedSinceMax: readonly string[];
@@ -197,7 +197,9 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
   }
 
   if (openMax) {
-    for (const job of ordered) holds[job.id] = "max_window";
+    // TIER-LEASE-02: behind a Max coding turn the reason is the coding job itself, so the line can say how long.
+    const reason: AdmissionHold = openMax.category === "coding" ? "held_coding" : "max_window";
+    for (const job of ordered) holds[job.id] = reason;
     return { start, holds };
   }
 
@@ -209,6 +211,7 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
   /** QUEUE-FIT-01: how long a big job may wait while others pass it (`resources.max_wait_before_aging.<kind>`, else the Stack's 10 minutes). */
   const aged = (job: QueueJob) => now - createdAt(job) > (policy.maxWaitBeforeAgingMinutes?.[category(job)] ?? BACKFILL_MAX_WAIT_MINUTES) * 60_000;
   const heavyBusy = running.some((job) => job.tier === "boost" || job.tier === "max");
+  const heavyIsCoding = running.some((job) => (job.tier === "boost" || job.tier === "max") && job.category === "coding");
   let maxDoor: "open" | "closed" = "open";
   let agedBoostGuard = false;
 
@@ -223,7 +226,7 @@ export function admit(jobs: readonly QueueJob[], now: number, state: TierState):
     }
     if (maxDoor === "closed") { holds[job.id] = "max_drain"; continue; }
     if (job.tier === "boost" && heavyBusy) {
-      holds[job.id] = "heavy_slot";
+      holds[job.id] = heavyIsCoding ? "held_coding" : "heavy_slot";
       if (aged(job)) agedBoostGuard = true;
       continue;
     }
@@ -386,13 +389,16 @@ export function leaseQueueSignals(forPersonId?: string): LeaseQueueSignals {
   let holderJobs = 0;
   const kinds = new Set<string>();
   let waiting = 0;
+  let paused = 0;
   let heavyRunningElsewhere = false;
   for (const { job } of currentEntries) {
     if (job.ownsChatLease && (job.state === "running" || job.state === "queued")) holderJobs += 1;
-    if (job.state === "queued" && job.riseReason === "max_chat") { waiting += 1; kinds.add(job.category ?? job.jobClass); }
+    // TIER-LEASE-02: a job held behind a coding turn (`held_coding`) waits for the lease as much as one held for the chat lease; a Boost hold counts the same way.
+    if (job.state === "queued" && (job.riseReason === "max_chat" || job.riseReason === "held_coding")) { waiting += 1; kinds.add(job.category ?? job.jobClass); }
+    if (job.state === "paused") paused += 1;
     if (job.state === "running" && (job.tier === "boost" || job.tier === "max") && !job.ownsChatLease && (forPersonId === undefined || job.personId !== forPersonId)) heavyRunningElsewhere = true;
   }
-  return { holderJobs, waiters: { count: waiting, kinds: [...kinds].sort() }, heavyRunningElsewhere };
+  return { holderJobs, waiters: { count: waiting, kinds: [...kinds].sort() }, heavyRunningElsewhere, pausedJobs: paused };
 }
 export function resetTierStateForTests(): void { tierState.windowOpenFor = null; tierState.startedSinceMax = []; tierState.lastMaxPersonId = null; }
 
@@ -404,7 +410,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
   for (const job of jobs) {
     const next = byId.get(job.id) ?? null;
     const old = previous.get(job.id) ?? null;
-    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "tier_ask" || job.riseReason === "tier_no_room" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" || job.riseReason === "heavy_slot" || job.riseReason === "fairness_wait" || job.riseReason === "max_window" || job.riseReason === "max_chat" || job.riseReason === "max_drain" ? job.riseReason : null;
+    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "tier_ask" || job.riseReason === "tier_no_room" || job.riseReason === "profile_lowered" || job.riseReason === "quiet_wait" || job.riseReason === "cooldown_wait" || job.riseReason === "heavy_slot" || job.riseReason === "held_coding" || job.riseReason === "fairness_wait" || job.riseReason === "max_window" || job.riseReason === "max_chat" || job.riseReason === "max_drain" ? job.riseReason : null;
     if (next !== null && old !== null && next > old) {
       const overtaker = positions.filter((item) => item.position < next && item.position < (previous.get(item.id) ?? Infinity)).sort((a, b) => b.position - a.position)[0];
       if (overtaker) {
@@ -434,10 +440,18 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
 
 function estimate(jobs: readonly QueueJob[], positions: readonly QueuePosition[], position: number): number | null {
   const before = positions.filter((item) => item.position < position);
+  // TIER-LEASE-02: a running Boost or Max coding turn holds the others until it ends, so its time left is the first part of the wait (the longest, if two run).
   let seconds = 0;
+  for (const job of jobs) {
+    if (job.state !== "running" || job.category !== "coding" || (job.tier !== "boost" && job.tier !== "max")) continue;
+    const left = job.remainingSeconds ?? job.typicalSeconds;
+    if (left === undefined) return null;
+    seconds = Math.max(seconds, left);
+  }
   for (const item of before) {
     const job = jobs.find((candidate) => candidate.id === item.id)!;
-    const duration = job.state === "running" || job.resourcePaused ? job.remainingSeconds : job.typicalSeconds;
+    // TIER-LEASE-02: a running job without a measured remaining time falls back to its typical time, so a waiter behind it still gets a number.
+    const duration = job.state === "running" || job.resourcePaused ? (job.remainingSeconds ?? job.typicalSeconds) : job.typicalSeconds;
     if (duration === undefined) return null;
     seconds += duration;
   }
@@ -558,7 +572,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
         const hold = admission.holds[entry.job.id] ?? null;
         const specific = entry.job.riseReason === "tier_ask" || entry.job.riseReason === "tier_no_room" || entry.job.riseReason === "profile_lowered" || entry.job.riseReason === "quiet_wait" || entry.job.riseReason === "cooldown_wait" || entry.job.riseReason === "requeued_memory";
         if (hold && !specific && entry.job.riseReason !== hold) { entry.job.riseReason = hold; entry.save(); }
-        else if (!hold && ["heavy_slot", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
+        else if (!hold && ["heavy_slot", "held_coding", "aged_guard", "fairness_wait", "max_window", "max_chat", "max_drain"].includes(entry.job.riseReason ?? "")) { entry.job.riseReason = null; entry.save(); }
       }
       const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
       const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));

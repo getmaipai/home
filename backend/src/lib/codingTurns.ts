@@ -65,6 +65,10 @@ interface Turn {
   tier: Tier; state: TurnState; createdAt: number;
   capReason: WaitReason | null; leaseReason: WaitReason | null; leaseRefusal: LeaseRefusal | null;
   queueReason: QueueJob["riseReason"]; position: number | null;
+  /** TIER-LEASE-02: when the turn went running; the queue reads the time left from it. */
+  startedAt: number | null;
+  /** TIER-LEASE-03: Pause was asked while the turn runs; it takes effect at the turn boundary, never mid-turn. */
+  pauseAfter: boolean;
   standardOnce: boolean; leaseHeld: boolean; stopReason: "user" | "wall_clock" | "denied" | null; abort: AbortController; done: Promise<void>; finish: () => void;
 }
 const turns = new Map<string, Turn>();
@@ -109,12 +113,22 @@ function scheduleRetry(): void {
   retryTimer.unref?.();
 }
 
+/** A Code turn typically takes this long; the queue shows waiters a number from it until the turn is measured. */
+export const CODING_TYPICAL_SECONDS = 120;
+const CODING_MIN_REMAINING_SECONDS = 30;
+export function codingRemainingSeconds(startedAt: number | null, now: number): number {
+  const elapsed = startedAt === null ? 0 : Math.max(0, Math.round((now - startedAt) / 1000));
+  return Math.max(CODING_MIN_REMAINING_SECONDS, CODING_TYPICAL_SECONDS - elapsed);
+}
+
 /** The household queue reads Code turns through this provider; tests that isolate the queue register it again. */
-export const codingQueueProvider = () => [...turns.values()].filter((turn) => turn.state === "queued" || turn.state === "running").map((turn) => {
+const codingTurnEntries = () => [...turns.values()].filter((turn) => turn.state === "queued" || turn.state === "running").map((turn) => {
   const wait = turn.state === "queued" ? turn.capReason ?? capReasonFor(turn) ?? turn.leaseReason : null;
   const job: QueueJob = {
     id: turn.id, personId: turn.personId, jobClass: "other", category: "coding", tier: turn.tier, state: turn.state === "running" ? "running" : "queued",
-    createdAt: turn.createdAt, position: turn.position, riseReason: wait ?? turn.queueReason, typicalSeconds: 120,
+    createdAt: turn.createdAt, position: turn.position, riseReason: wait ?? turn.queueReason, typicalSeconds: CODING_TYPICAL_SECONDS,
+    // TIER-LEASE-02: a running turn always reports time left, so a job behind it gets a number (never below the floor: a turn past its typical time still has some left).
+    ...(turn.state === "running" ? { remainingSeconds: codingRemainingSeconds(turn.startedAt, Date.now()) } : {}),
     ownsChatLease: turn.tier === "max" && chatLeaseHeldBy(turn.personId),
   };
   return {
@@ -125,7 +139,60 @@ export const codingQueueProvider = () => [...turns.values()].filter((turn) => tu
     save: () => { turn.position = job.position ?? null; turn.queueReason = job.riseReason && !String(job.riseReason).startsWith("coding.") && job.riseReason !== turn.leaseReason ? job.riseReason : null; },
   };
 });
+
+/** TIER-LEASE-02: a paused session is a queue record in the state `paused`: it holds nothing, is never started by the queue and never counts as the lease holder's job. Resume makes it a real queued turn. */
+const pausedEntries = () => {
+  expirePausedSessions(Date.now());
+  return db.select().from(codingSessions).where(eq(codingSessions.state, "paused")).all().filter((row) => !row.deletedAt).map((row) => ({
+    job: { id: `paused-${row.id}`, personId: row.personId, jobClass: "other", category: "coding", tier: row.tier, state: "paused", createdAt: Date.parse(row.lastActivityAt) } as QueueJob,
+    save: () => undefined,
+  }));
+};
+export const codingQueueProvider = () => [...codingTurnEntries(), ...pausedEntries()];
 registerQueueProvider(codingQueueProvider);
+
+/** TIER-LEASE-03: how long a Pause lasts before the session goes back to idle. A household setting (`coding.pause_max_minutes`, minutes) once the spec registers it; 60 minutes until then. */
+export const DEFAULT_PAUSE_MAX_MINUTES = 60;
+export function pauseMaxMs(): number {
+  let value: unknown; try { value = getHouseholdSettingValue("coding.pause_max_minutes"); } catch { value = undefined; }
+  return (typeof value === "number" && Number.isFinite(value) && value >= 1 ? value : DEFAULT_PAUSE_MAX_MINUTES) * 60_000;
+}
+/** A Pause ends by itself after `pauseMaxMs()`: the session goes back to idle (its transcript, sandbox and checkpoints untouched), and the person can send again. Returns how many ended. */
+export function expirePausedSessions(now: number): number {
+  const limit = pauseMaxMs(); let ended = 0;
+  for (const row of db.select().from(codingSessions).where(eq(codingSessions.state, "paused")).all()) {
+    if (now - Date.parse(row.lastActivityAt) >= limit) { updateSession(row.id, { state: "idle" }); log("pause_expired", { id: "none", sessionId: row.id, personId: row.personId }); ended += 1; }
+  }
+  return ended;
+}
+
+/** Writes the messages typed while the agent worked into the transcript and clears the in-memory queue, so a Pause loses none of them across a restart. */
+function holdPaused(sessionId: string, personId: string): void {
+  for (const m of messageQueues.get(sessionId) ?? []) appendCodingMessage({ sessionId, personId, role: "user", parts: [{ type: "text", text: m.text }] });
+  clearQueue(sessionId);
+  updateSession(sessionId, { state: "paused", lastActivityAt: new Date().toISOString() });
+  log("session_paused", { id: "none", sessionId, personId });
+}
+
+/** TIER-LEASE-03: Pause. A running turn is never cut off: it finishes its step (the turn) and then the session holds. A queued turn is taken back. Owner only. Returns null for a missing session. */
+export function pauseSession(person: PersonRow, sessionId: string): "paused" | "pausing" | null {
+  const row = getSessionRow(person.id, sessionId);
+  if (!row) return null;
+  const turn = [...turns.values()].find((t) => t.sessionId === sessionId && (t.state === "queued" || t.state === "running"));
+  if (turn?.state === "running") { turn.pauseAfter = true; return "pausing"; }
+  if (turn) { turn.stopReason ??= "user"; turn.abort.abort(); settle(turn, "cancelled"); }
+  holdPaused(sessionId, person.id);
+  refreshHouseholdQueue();
+  return "paused";
+}
+
+/** Resume is a queue job: one new turn that waits its turn like any other and never preempts. Null when the session is not paused. */
+export function resumeSession(person: PersonRow, sessionId: string): { turn_id: string; tier: Tier } | null {
+  const row = getSessionRow(person.id, sessionId);
+  if (!row || row.state !== "paused") return null;
+  updateSession(sessionId, { state: "idle" });
+  return submitTurn(person, sessionId, "Continue where you left off.");
+}
 
 function settle(turn: Turn, state: TurnState): void {
   turn.state = state;
@@ -163,7 +230,7 @@ async function startTurn(turn: Turn): Promise<void> {
     lease.requestStarted(person.id); turn.leaseHeld = true;
   }
   if (turn.state !== "queued") { settle(turn, turn.state); return; } // stopped while the lease was loading
-  turn.state = "running";
+  turn.state = "running"; turn.startedAt = Date.now();
   updateSession(session.id, { state: "starting" });
   void runTurn(turn, session.environmentId);
 }
@@ -262,7 +329,8 @@ const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown 
     // The sandbox listener lives only while a turn runs: the last one out lets it go.
     if (rt.gateway && ![...turns.values()].some((t) => t.state === "running" && t !== turn)) rt.gateway.release();
   }
-  if (turn.state === "done") {
+  if (turn.pauseAfter && turn.state !== "cancelled") { holdPaused(turn.sessionId, turn.personId); }
+  else if (turn.state === "done") {
     // CODE-NOTIFY-01: "finished its work" means nothing is left in the message queue; a person who typed ahead is not pinged between messages.
     if (!(messageQueues.get(turn.sessionId)?.length)) void trigger("coding.session_done", {}, { personId: turn.personId });
     advanceQueue(turn.sessionId, turn.personId);
@@ -287,7 +355,7 @@ export function submitTurn(person: PersonRow, sessionId: string, message: string
   let finish = () => undefined as void;
   const done = new Promise<void>((resolve) => { finish = resolve; });
   const turn: Turn = { id: newTurnId(), sessionId, personId: person.id, message, tier: choice.tier, state: "queued", createdAt: Date.now(), capReason: null, leaseReason: null, leaseRefusal: null,
-    queueReason: null, position: null, standardOnce: false, leaseHeld: false, stopReason: null, abort: new AbortController(), done, finish };
+    queueReason: null, position: null, startedAt: null, pauseAfter: false, standardOnce: false, leaseHeld: false, stopReason: null, abort: new AbortController(), done, finish };
   turns.set(turn.id, turn);
   startTaint(sessionId, (session.repo as { kind?: string }).kind ?? "none");
   // A retry runs the message already in the transcript again: it is not written twice.

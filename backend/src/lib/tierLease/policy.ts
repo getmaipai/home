@@ -36,6 +36,8 @@ export interface LeaseQueueSignals {
   waiters: { count: number; kinds: string[] };
   /** Another person's heavy job is running: a take would have to preempt it, so it waits. */
   heavyRunningElsewhere?: boolean;
+  /** Paused jobs (coding sessions on Pause): they hold nothing and never keep the lease. A count only. */
+  pausedJobs?: number;
 }
 export const NO_QUEUE_SIGNALS: LeaseQueueSignals = { holderJobs: 0, waiters: { count: 0, kinds: [] } };
 

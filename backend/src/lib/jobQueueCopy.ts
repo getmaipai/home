@@ -5,7 +5,7 @@ export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "memory_stopped_failure" | "started"
   | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room" | "coding.max_sessions" | "coding.person.max_sessions"
-  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "aged_guard" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
+  | "quiet_wait" | "profile_lowered" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "max_hold" | "max_chat" | "heavy_slot" | "held_coding" | "aged_guard" | "fairness_wait" | "picture_line" | "picture_engine" | "picture_memory" | "picture_paused_memory" | "picture_starting" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -102,6 +102,8 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     child: "Waiting for its turn.",
   },
   heavy_slot: { adult: "Another job is running; this one starts when it finishes.", child: "Another job is running. Yours starts when it finishes." },
+  // TIER-LEASE-02: held behind a running Boost or Max coding turn; one short sentence, the number when the queue has one. No person, title or id (rule 6a).
+  held_coding: { adult: "A coding job is running; this starts after it (about N minutes).", child: "A grown-up's job is running. Yours starts after." },
   aged_guard: { adult: "Waiting for a big job that has been in line a while.", child: "Waiting for a big job that has been in line a while." },
   fairness_wait: { adult: "Other people's jobs go first this round; this one is next.", child: "Other people's jobs go first this round. Yours is next." },
   picture_line: { adult: "Waiting in line, number N", child: "Waiting in line, number N" },
@@ -153,6 +155,10 @@ export function jobQueueCopy(
   }
   if (reason === "max_window" && audience === "adult") {
     if (typeof estimateSeconds !== "number" || !Number.isFinite(estimateSeconds)) return line.replace(" in about N minutes", "");
+    return line.replace("N", String(Math.max(1, Math.round(estimateSeconds / 60))));
+  }
+  if (reason === "held_coding" && audience === "adult") {
+    if (typeof estimateSeconds !== "number" || !Number.isFinite(estimateSeconds)) return line.replace(" (about N minutes)", "");
     return line.replace("N", String(Math.max(1, Math.round(estimateSeconds / 60))));
   }
   if (reason === "max_drain" && audience === "adult") {
