@@ -45,7 +45,7 @@ const PERMISSION_ERROR = /permission|denied|rejected|not allowed|disabled/i;
 export function mapOpenCodeEvent(raw: unknown): { events: AgentEvent[]; tokens?: { input: number; output: number }; blocked?: BlockedAction } {
   const e = raw as { type?: unknown; part?: Record<string, unknown> } | null;
   if (!e || typeof e !== "object" || !e.part || typeof e.part !== "object") return { events: [] };
-  const part = e.part as { text?: unknown; tool?: unknown; state?: { input?: Record<string, unknown>; error?: unknown; metadata?: { exit?: unknown }; status?: unknown; time?: { start?: number; end?: number } }; tokens?: { input?: unknown; output?: unknown } };
+  const part = e.part as { text?: unknown; tool?: unknown; state?: { output?: unknown; input?: Record<string, unknown>; error?: unknown; metadata?: { exit?: unknown }; status?: unknown; time?: { start?: number; end?: number } }; tokens?: { input?: unknown; output?: unknown } };
   if (e.type === "text" && typeof part.text === "string") return { events: [{ kind: "text", text: part.text }] };
   if (e.type === "step_finish" && part.tokens) return { events: [], tokens: { input: Number(part.tokens.input) || 0, output: Number(part.tokens.output) || 0 } };
   if (e.type === "tool_use" && typeof part.tool === "string") {
@@ -59,7 +59,7 @@ export function mapOpenCodeEvent(raw: unknown): { events: AgentEvent[]; tokens?:
       case "bash": {
         const exit = typeof part.state?.metadata?.exit === "number" ? part.state.metadata.exit : part.state?.status === "completed" ? 0 : 1;
         const t = part.state?.time; const duration = t?.start !== undefined && t.end !== undefined ? Math.max(0, t.end - t.start) : 0;
-        return { events: [{ kind: "command", command: String(input.command ?? ""), exit_code: exit, duration_ms: duration }] };
+        return { events: [{ kind: "command", command: String(input.command ?? ""), exit_code: exit, duration_ms: duration, ...(typeof part.state?.output === "string" ? { output: part.state.output } : {}) }] };
       }
       case "edit": case "write": case "patch": return { events: [{ kind: "file_write", path: String(input.filePath ?? input.path ?? "") }] };
       case "todowrite": {

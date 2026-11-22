@@ -1,9 +1,18 @@
 // CODE-APP-01: what the session view's tabs show, read from the transcript the hub already sends (no second source). Pure, so it is tested alone.
 import { i18n } from "@lingui/core";
 import type { FileTreeNode } from "@maipai/ui/src/elements/file-tree";
+import type { DiffLine } from "@maipai/ui/src/elements/code-diff";
 import type { CodeMessage, CodePart, CodeState } from "./codeApi";
 
-export interface CommandRun { key: string; command: string; status: "running" | "done" | "failed"; exitCode: number }
+export interface CommandRun { key: string; command: string; status: "running" | "done" | "failed"; exitCode: number; lines: string[]; truncated: boolean }
+
+const CUT = "[earlier output cut]";
+/** A command's stored output as terminal lines. */
+export function outputLines(output: string | undefined): { lines: string[]; truncated: boolean } {
+  if (!output) return { lines: [], truncated: false };
+  const truncated = output.startsWith(CUT);
+  return { lines: (truncated ? output.slice(CUT.length) : output).replace(/\n$/, "").split("\n").filter((l, i) => !(i === 0 && truncated && l === "")), truncated };
+}
 
 export interface SessionActivity {
   commands: CommandRun[];
@@ -19,7 +28,7 @@ export function activityOf(messages: readonly CodeMessage[]): SessionActivity {
   let plan: SessionActivity["plan"] = null;
   for (const message of messages) {
     message.parts.forEach((part, index) => {
-      if (part.type === "tool" && part.tool === "command") commands.push({ key: `${message.id}:${index}`, command: part.summary, status: part.status, exitCode: part.exit_code ?? (part.status === "failed" ? 1 : 0) });
+      if (part.type === "tool" && part.tool === "command") commands.push({ key: `${message.id}:${index}`, command: part.summary, status: part.status, exitCode: part.exit_code ?? (part.status === "failed" ? 1 : 0), ...outputLines(part.output) });
       if (part.type === "tool" && part.tool === "file_write") { const at = files.indexOf(part.summary); if (at >= 0) files.splice(at, 1); files.push(part.summary); }
       if (part.type === "plan") plan = { steps: part.items.map((item) => item.text), done: part.items.filter((item) => item.done).length };
     });
@@ -74,3 +83,23 @@ export function approvalWords(effect: string): { title: string; subtitle: string
 export const tierWord = (tier: string): string => tier === "max" ? i18n._({ id: "Max", message: "Max" }) : tier === "boost" ? i18n._({ id: "Boost", message: "Boost" }) : i18n._({ id: "Standard", message: "Standard" });
 
 export type { CodePart };
+
+/** A unified diff split per file into the kit diff's lines (hunk headers become the line numbers, not rows). */
+export function parseDiff(diff: string): Record<string, DiffLine[]> {
+  const files: Record<string, DiffLine[]> = {};
+  let current: DiffLine[] | null = null; let oldAt = 0; let newAt = 0; let inHunk = false;
+  for (const row of diff.split("\n")) {
+    const head = /^diff --git a\/.* b\/(.*)$/.exec(row);
+    if (head) { current = files[head[1]!] = []; inHunk = false; continue; }
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(row);
+    if (hunk) { oldAt = Number(hunk[1]); newAt = Number(hunk[2]); inHunk = true; continue; }
+    if (!current || !inHunk) continue;
+    if (row.startsWith("+")) current.push({ kind: "added", text: row.slice(1), line: newAt++ });
+    else if (row.startsWith("-")) current.push({ kind: "removed", text: row.slice(1), line: oldAt++ });
+    else if (row.startsWith(" ")) { current.push({ kind: "context", text: row.slice(1), line: newAt }); oldAt++; newAt++; }
+  }
+  return files;
+}
+
+const LANGS: Record<string, string> = { ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", json: "json", py: "python", md: "markdown", css: "css", html: "html", sh: "bash", rs: "rust", go: "go", yml: "yaml", yaml: "yaml" };
+export const languageOf = (path: string): string => LANGS[path.split(".").pop()?.toLowerCase() ?? ""] ?? "text";

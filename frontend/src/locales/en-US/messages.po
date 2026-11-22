@@ -541,7 +541,7 @@ msgid "{feature} for {name}"
 msgstr "{feature} for {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:24
+#: src/apps/code/SessionTabs.tsx:32
 msgid "{files} files changed, +{additions} -{deletions}"
 msgstr "{files} files changed, +{additions} -{deletions}"
 
@@ -742,7 +742,7 @@ msgid "{label} version"
 msgstr "{label} version"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:30
+#: src/apps/code/SessionTabs.tsx:42
 msgid "{label}: {files} files saved"
 msgstr "{label}: {files} files saved"
 
@@ -3564,7 +3564,7 @@ msgid "Archive \"{text}\""
 msgstr "Archive \"{text}\""
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:55
+#: src/apps/code/codeTranscript.ts:64
 msgid "Archived"
 msgstr "Archived"
 
@@ -4245,6 +4245,11 @@ msgid "setting.tts.voice_id.option_label.bill_boerst"
 msgstr "Bill Boerst"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:36
+msgid "binary file"
+msgstr "binary file"
+
+#. js-lingui-explicit-id
 #: src/apps/people/ProfileForm.tsx:177
 msgid "Bio"
 msgstr "Bio"
@@ -4451,7 +4456,7 @@ msgid "Books that live on this Home, like Wikipedia and health information. Each
 msgstr "Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:74
+#: src/apps/code/codeTranscript.ts:83
 #: src/apps/settings/AiGlance.tsx:37
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
@@ -4709,7 +4714,7 @@ msgstr "Can use it now"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:278
-#: src/apps/code/SessionTabs.tsx:21
+#: src/apps/code/SessionTabs.tsx:29
 #: src/apps/people/ProfileForm.tsx:195
 #: src/apps/people/ProfileForm.tsx:200
 #: src/apps/reminders/RemindersPage.tsx:188
@@ -4941,7 +4946,7 @@ msgid "Change a few settings"
 msgstr "Change a few settings"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:69
+#: src/apps/code/codeTranscript.ts:78
 msgid "Change a file?"
 msgstr "Change a file?"
 
@@ -6606,7 +6611,7 @@ msgid "area.Commands"
 msgstr "Commands"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:41
+#: src/apps/code/SessionTabs.tsx:61
 msgid "Commands the agent runs show here."
 msgstr "Commands the agent runs show here."
 
@@ -6695,7 +6700,7 @@ msgid "setting.news.default_topics.teen.option.technology"
 msgstr "Computers, phones, the internet, software, artificial intelligence, gadgets and the companies that make them."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:21
+#: src/apps/code/SessionTabs.tsx:29
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
@@ -7683,6 +7688,11 @@ msgid "Could not open that conversation. Check your connection and try again."
 msgstr "Could not open that conversation. Check your connection and try again."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:55
+msgid "Could not open that file. Try again."
+msgstr "Could not open that file. Try again."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:143
 msgid "Could not open the live view of {name}. Check that it is switched on, then try again."
 msgstr "Could not open the live view of {name}. Check that it is switched on, then try again."
@@ -7740,6 +7750,11 @@ msgstr "Could not reach Home. Check your connection and try again."
 #: ../backend/src/lib/failureCopy.ts:406
 msgid "failure.tool.unavailable.verb"
 msgstr "could not reach its service"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:33
+msgid "Could not read the changes. Try again."
+msgstr "Could not read the changes. Try again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsAndStorageSection.tsx:68
@@ -8045,7 +8060,7 @@ msgid "Could not start the camera"
 msgstr "Could not start the camera"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:45
+#: src/apps/code/NewSession.tsx:54
 msgid "Could not start the session. Try again."
 msgstr "Could not start the session. Try again."
 
@@ -8788,7 +8803,7 @@ msgid "Delete this file forever?"
 msgstr "Delete this file forever?"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:67
+#: src/apps/code/codeTranscript.ts:76
 msgid "Delete this session?"
 msgstr "Delete this session?"
 
@@ -8894,12 +8909,12 @@ msgid "Describe the sound you want, like a door creaking or rain on a tin roof."
 msgstr "Describe the sound you want, like a door creaking or rain on a tin roof."
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:52
+#: src/apps/code/NewSession.tsx:61
 msgid "Describe the task"
 msgstr "Describe the task"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:52
+#: src/apps/code/NewSession.tsx:61
 msgid "Describe the task, for example: fix the failing test in the thermostat code."
 msgstr "Describe the task, for example: fix the failing test in the thermostat code."
 
@@ -9210,7 +9225,7 @@ msgid "setting.notifications.file_shared.muted_senders.label"
 msgstr "Don't notify me about shares from"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:53
+#: src/apps/code/codeTranscript.ts:62
 #: src/apps/people/FaceEnrollmentPage.tsx:603
 #: src/apps/reminders/ComingUpRow.tsx:43
 #: src/apps/reminders/ComingUpRow.tsx:58
@@ -13927,7 +13942,7 @@ msgid "It will need to be paired again. This also deletes the robot's memories a
 msgstr "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:70
+#: src/apps/code/codeTranscript.ts:79
 msgid "It will wait until you answer."
 msgstr "It will wait until you answer."
 
@@ -15020,7 +15035,7 @@ msgid "setting.coding.api.away.does"
 msgstr "Lets your key connect through your Tailscale when you are out."
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:54
+#: src/apps/code/NewSession.tsx:71
 #: src/apps/code/SessionView.tsx:107
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
@@ -16798,7 +16813,7 @@ msgid "setting.ui.look.option_label.mauve"
 msgstr "Mauve"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:74
+#: src/apps/code/codeTranscript.ts:83
 #: src/apps/settings/AiGlance.tsx:37
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
@@ -17846,7 +17861,7 @@ msgid "Needs setup"
 msgstr "Needs setup"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:50
+#: src/apps/code/codeTranscript.ts:59
 #: src/shell/pages/CompanionsPage.tsx:331
 #: src/shell/pages/CompanionsPage.tsx:334
 #: src/shell/pages/CompanionsPage.tsx:334
@@ -18299,7 +18314,7 @@ msgid "No change was made."
 msgstr "No change was made."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:24
+#: src/apps/code/SessionTabs.tsx:32
 msgid "No changes yet."
 msgstr "No changes yet."
 
@@ -18542,6 +18557,7 @@ msgid "No replies timed yet."
 msgstr "No replies timed yet."
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:64
 #: src/apps/code/SessionView.tsx:96
 msgid "No repository"
 msgstr "No repository"
@@ -19932,6 +19948,11 @@ msgid "Only models that fit this level on this computer are listed."
 msgstr "Only models that fit this level on this computer are listed."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:54
+msgid "Only the first files are listed."
+msgstr "Only the first files are listed."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:146
 msgid "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it."
 msgstr "Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it."
@@ -20000,7 +20021,7 @@ msgid "Open {title}"
 msgstr "Open {title}"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:65
+#: src/apps/code/codeTranscript.ts:74
 msgid "Open a pull request?"
 msgstr "Open a pull request?"
 
@@ -20108,7 +20129,7 @@ msgid "Open one to play it and see everything you can do."
 msgstr "Open one to play it and see everything you can do."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:28
+#: src/apps/code/SessionTabs.tsx:40
 msgid "Open pull request"
 msgstr "Open pull request"
 
@@ -20562,7 +20583,7 @@ msgid "Pause coding requests until you resume. This does not delete keys."
 msgstr "Pause coding requests until you resume. This does not delete keys."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:52
+#: src/apps/code/codeTranscript.ts:61
 #: src/apps/reminders/DeviceSchedulesView.tsx:29
 #: src/apps/settings/AssistantKeysSettings.tsx:65
 #: src/apps/settings/ReferenceLibrarySettings.tsx:88
@@ -21297,7 +21318,7 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr "Plain-language health and medicine pages from the US National Library of Medicine."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:47
+#: src/apps/code/SessionTabs.tsx:67
 #: src/apps/code/SessionView.tsx:92
 msgid "Plan"
 msgstr "Plan"
@@ -21744,17 +21765,17 @@ msgid "Publishing failed. Review the appearance and try again."
 msgstr "Publishing failed. Review the appearance and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:28
+#: src/apps/code/SessionTabs.tsx:40
 msgid "Pull request #{number}"
 msgstr "Pull request #{number}"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:27
+#: src/apps/code/SessionTabs.tsx:39
 msgid "Push branch"
 msgstr "Push branch"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:64
+#: src/apps/code/codeTranscript.ts:73
 msgid "Push this branch?"
 msgstr "Push this branch?"
 
@@ -22001,7 +22022,7 @@ msgid "Re-enroll"
 msgstr "Re-enroll"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:66
+#: src/apps/code/codeTranscript.ts:75
 msgid "Reach a new website?"
 msgstr "Reach a new website?"
 
@@ -22079,7 +22100,7 @@ msgid "settings.attention.ai.ready"
 msgstr "Ready"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:51
+#: src/apps/code/codeTranscript.ts:60
 #: src/apps/library/appPresentation.ts:18
 #: src/apps/settings/AiGlance.tsx:36
 #: src/apps/settings/CodingSettings.tsx:112
@@ -22741,6 +22762,16 @@ msgstr "Replies: \"{text}\""
 #: src/shell/pages/PerformancePage.tsx:74
 msgid "Reply time per day"
 msgstr "Reply time per day"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:63
+msgid "Repository"
+msgstr "Repository"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:66
+msgid "Repository name, for example owner/name"
+msgstr "Repository name, for example owner/name"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:191
@@ -23441,7 +23472,7 @@ msgid "Rules fired:"
 msgstr "Rules fired:"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:68
+#: src/apps/code/codeTranscript.ts:77
 msgid "Run a command?"
 msgstr "Run a command?"
 
@@ -26184,7 +26215,7 @@ msgid "Staged"
 msgstr "Staged"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:74
+#: src/apps/code/codeTranscript.ts:83
 #: src/apps/settings/AiGlance.tsx:37
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
@@ -26301,7 +26332,7 @@ msgid "Start over"
 msgstr "Start over"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:55
+#: src/apps/code/NewSession.tsx:72
 msgid "Start session"
 msgstr "Start session"
 
@@ -26363,7 +26394,7 @@ msgid "starting"
 msgstr "starting"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:48
+#: src/apps/code/codeTranscript.ts:57
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/MusicRemix.tsx:41
@@ -26382,6 +26413,11 @@ msgstr "Starting {label}. This takes about a minute."
 #: src/apps/settings/ReferenceLibrarySettings.tsx:157
 msgid "Starting {title}…"
 msgstr "Starting {title}…"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:67
+msgid "Starting branch"
+msgstr "Starting branch"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:246
@@ -26612,7 +26648,7 @@ msgid "Stopped because you said no. Send a message to carry on another way."
 msgstr "Stopped because you said no. Send a message to carry on another way."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:54
+#: src/apps/code/codeTranscript.ts:63
 msgid "Stopped by a problem"
 msgstr "Stopped by a problem"
 
@@ -27436,7 +27472,7 @@ msgstr "That did not send. Try again."
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
-#: src/apps/code/NewSession.tsx:57
+#: src/apps/code/NewSession.tsx:74
 #: src/apps/code/SessionView.tsx:118
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
@@ -27875,42 +27911,42 @@ msgid "setting.home.base_url.help"
 msgstr "The address of your Home Assistant instance, e.g. http://homeassistant.local:8123."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:70
+#: src/apps/code/codeTranscript.ts:79
 msgid "The agent is asking first"
 msgstr "The agent is asking first"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:67
+#: src/apps/code/codeTranscript.ts:76
 msgid "The agent wants to delete this session."
 msgstr "The agent wants to delete this session."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:66
+#: src/apps/code/codeTranscript.ts:75
 msgid "The agent wants to open a connection to a site it has not used in this session."
 msgstr "The agent wants to open a connection to a site it has not used in this session."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:65
+#: src/apps/code/codeTranscript.ts:74
 msgid "The agent wants to open a pull request for its branch."
 msgstr "The agent wants to open a pull request for its branch."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:68
+#: src/apps/code/codeTranscript.ts:77
 msgid "The agent wants to run a command in its workspace."
 msgstr "The agent wants to run a command in its workspace."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:64
+#: src/apps/code/codeTranscript.ts:73
 msgid "The agent wants to send its work to your git host."
 msgstr "The agent wants to send its work to your git host."
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:69
+#: src/apps/code/codeTranscript.ts:78
 msgid "The agent wants to write to a file in its workspace."
 msgstr "The agent wants to write to a file in its workspace."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:46
+#: src/apps/code/SessionTabs.tsx:66
 msgid "The agent's plan shows here when it makes one."
 msgstr "The agent's plan shows here when it makes one."
 
@@ -28125,6 +28161,11 @@ msgid "The details you want MaiPai to remember."
 msgstr "The details you want MaiPai to remember."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:37
+msgid "The diff is long, so only the first part is shown."
+msgstr "The diff is long, so only the first part is shown."
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:918
 msgid "setting.music.dj.option.full"
 msgstr "The DJ introduces songs and adds a short fact."
@@ -28195,9 +28236,9 @@ msgid "The face samples could not be saved."
 msgstr "The face samples could not be saved."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionTabs.tsx:36
-msgid "The files the agent changes show here."
-msgstr "The files the agent changes show here."
+#: src/apps/code/SessionTabs.tsx:51
+msgid "The files in the workspace show here."
+msgstr "The files in the workspace show here."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/PackSection.tsx:99
@@ -31599,6 +31640,11 @@ msgid "VoxCPM2 (smaller)"
 msgstr "VoxCPM2 (smaller)"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:35
+msgid "vs {branch}"
+msgstr "vs {branch}"
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:390
 msgid "failure.advice.busy.next_step"
 msgstr "Wait a moment, then retry."
@@ -31683,7 +31729,7 @@ msgid "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, bi
 msgstr "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, big jobs {burst}"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:47
+#: src/apps/code/codeTranscript.ts:56
 #: src/shell/pages/companionFlow/AnimateStep.tsx:29
 msgid "Waiting its turn"
 msgstr "Waiting its turn"
@@ -31977,7 +32023,7 @@ msgid "What should it sound like?"
 msgstr "What should it sound like?"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:51
+#: src/apps/code/NewSession.tsx:60
 msgid "What should we work on?"
 msgstr "What should we work on?"
 
@@ -32550,7 +32596,7 @@ msgid "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, p
 msgstr "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 
 #. js-lingui-explicit-id
-#: src/apps/code/codeTranscript.ts:49
+#: src/apps/code/codeTranscript.ts:58
 #: src/apps/settings/CodingSettings.tsx:119
 #: src/shell/pages/CompanionsPage.tsx:311
 #: src/shell/pages/CompanionsPage.tsx:326

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { activityOf, approvalWords, fileTreeOf, isBusy } from "./codeTranscript";
+import { activityOf, approvalWords, fileTreeOf, isBusy, languageOf, outputLines, parseDiff } from "./codeTranscript";
 import type { CodeMessage } from "./codeApi";
 
 const msg = (seq: number, parts: CodeMessage["parts"]): CodeMessage => ({ id: `m${seq}`, seq, role: "agent", parts, created_at: "2026-11-21T10:00:00.000Z" });
@@ -30,4 +30,16 @@ test("a held request that only the person may start is named in plain words", ()
 test("a session is busy while queued, starting, working or waiting on the person", () => {
   expect(["queued", "starting", "working", "needs_you"].every((s) => isBusy(s as never))).toBe(true);
   expect(["idle", "done", "failed", "paused", "archived"].some((s) => isBusy(s as never))).toBe(false);
+});
+
+test("a unified diff splits per file with line numbers, and hunk headers are not rows", () => {
+  const diff = "diff --git a/src/a.ts b/src/a.ts\nindex 1..2 100644\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -3,2 +3,3 @@ fn\n keep\n-old\n+new\n+more\n";
+  expect(parseDiff(diff)["src/a.ts"]).toEqual([{ kind: "context", text: "keep", line: 3 }, { kind: "removed", text: "old", line: 4 }, { kind: "added", text: "new", line: 4 }, { kind: "added", text: "more", line: 5 }]);
+});
+
+test("command output becomes terminal lines, and a cut marker is reported", () => {
+  expect(outputLines("a\nb\n")).toEqual({ lines: ["a", "b"], truncated: false });
+  expect(outputLines("[earlier output cut]\nz").truncated).toBe(true);
+  expect(outputLines(undefined)).toEqual({ lines: [], truncated: false });
+  expect(languageOf("x/y.tsx")).toBe("tsx");
 });

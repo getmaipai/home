@@ -21,12 +21,16 @@ import type { PersonRow } from "@/types";
 export type AgentEvent =
   | { kind: "text"; text: string }
   | { kind: "plan"; items: { text: string; done: boolean }[] }
-  | { kind: "command"; command: string; exit_code: number; duration_ms: number }
+  | { kind: "command"; command: string; exit_code: number; duration_ms: number; output?: string }
   | { kind: "file_write"; path: string }
   | { kind: "external_read" }
   | { kind: "checkpoint"; id: string; label: string; files: number };
 
 /** One thing the agent asks to do. `detail` is what the approval card names; it stays in the person's own records. */
+/** The last part of a command's output the transcript keeps (the stored copy is redacted again on the way in). */
+export const OUTPUT_KEEP = 20_000;
+const tailOf = (text: string): string => (text.length > OUTPUT_KEEP ? `[earlier output cut]\n${text.slice(-OUTPUT_KEEP)}` : text);
+
 export interface PermissionRequest { effect: CodeEffect; detail?: { host?: string; branch?: string; path?: string; command?: string } }
 export type PermissionAnswer = "allow" | "deny";
 /** What the bridge gives the agent for one turn. */
@@ -101,7 +105,7 @@ export function createTurnHost(input: { sessionId: string; personId: string; sig
           return;
         }
         case "command":
-          write({ type: "tool", tool: "command", status: event.exit_code === 0 ? "done" : "failed", summary: event.command, exit_code: event.exit_code });
+          write({ type: "tool", tool: "command", status: event.exit_code === 0 ? "done" : "failed", summary: event.command, exit_code: event.exit_code, ...(event.output ? { output: tailOf(event.output) } : {}) });
           recordCodingEvent({ sessionId, personId, kind: "command", detail: { command: event.command, exit_code: event.exit_code, duration_ms: event.duration_ms } });
           return;
         case "file_write":

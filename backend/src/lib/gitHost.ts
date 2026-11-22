@@ -233,3 +233,32 @@ export async function pushSessionBranch(input: PushInput): Promise<void> {
     if (pushed.code !== 0) throw failure(input.personId, input.credential, `${pushed.stderr}\n${pushed.stdout}`, "push");
   } finally { await fs.rm(copy, { recursive: true, force: true }); }
 }
+
+/** CODE-APP-01: the Changes tab. The session's committed work against its base branch, read from a clean copy the hub makes (hooks, filters, monitors and the folder's own settings
+ * off, no textconv or external diff), never by running git inside the workspace. Output is capped; a binary file shows in the list without a body. */
+export interface BranchDiff { files: { path: string; additions: number; deletions: number; binary: boolean }[]; diff: string; truncated: boolean }
+export const DIFF_BODY_CAP = 200 * 1024;
+export async function diffBranchAgainstBase(input: { workspace: string; branch: string; baseBranch: string }): Promise<BranchDiff | null> {
+  const { branch, baseBranch } = input;
+  if (!BRANCH_PATTERN.test(branch) || branch.includes("..") || /[\s~^:?*\[\\]/.test(baseBranch) || baseBranch.includes("..") || baseBranch.startsWith("-")) return null;
+  const git = path.join(input.workspace, ".git");
+  const info = await fs.lstat(git).catch(() => null);
+  if (!info || !info.isDirectory()) return null;
+  await inspectWorkspaceGit(git);
+  const copy = await fs.mkdtemp(path.join(os.tmpdir(), "maipai-diff-"));
+  try {
+    if ((await runGit(["init", "--quiet", "--template=", copy])).code !== 0) throw new GitHostError("Home could not read the changes. Try again.");
+    const fetched = await runGit(["fetch", "--quiet", "--no-tags", "--no-recurse-submodules", git, `refs/heads/${baseBranch}:refs/heads/base`, `refs/heads/${branch}:refs/heads/work`],
+      { cwd: copy, allowFile: true, extraConfig: [["safe.directory", "*"]] });
+    if (fetched.code !== 0) return { files: [], diff: "", truncated: false };
+    const flags = ["--no-color", "--no-ext-diff", "--no-textconv", "--no-renames"];
+    const stat = await runGit(["diff", ...flags, "--numstat", "refs/heads/base...refs/heads/work"], { cwd: copy });
+    const files = stat.stdout.split("\n").filter(Boolean).slice(0, 2000).map((line) => {
+      const [add, del, ...rest] = line.split("\t");
+      return { path: rest.join("\t"), additions: Number(add) || 0, deletions: Number(del) || 0, binary: add === "-" };
+    });
+    const body = await runGit(["diff", ...flags, "-U3", "refs/heads/base...refs/heads/work"], { cwd: copy });
+    const truncated = body.stdout.length > DIFF_BODY_CAP;
+    return { files, diff: truncated ? body.stdout.slice(0, DIFF_BODY_CAP) : body.stdout, truncated };
+  } finally { await fs.rm(copy, { recursive: true, force: true }); }
+}

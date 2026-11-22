@@ -13,6 +13,7 @@ import { cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMess
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
+import { sessionChanges, sessionFile, sessionTree } from "@/lib/codingWorkspaceView";
 import { pushCodingSession } from "@/lib/codingShare";
 import { createCodingPullRequest } from "@/lib/codingPullRequest";
 import type { PersonRow } from "@/types";
@@ -122,6 +123,33 @@ codingSessionsRoutes.openapi(trailR, (c) => {
   const refusal = codingSessionRefusal(person); if (refusal) return c.json({ error: refusal }, 403);
   if (!getCodingSession(person, id)) return c.json({ error: "That session was not found. It may have been deleted." }, 404);
   return c.json(listCodingEvents(person.id, id), 200);
+});
+
+const changesR = createRoute({
+  method: "get", path: "/{id}/changes", tags: ["Code"], summary: "The session's committed changes against its base branch (from a clean copy, hooks off)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ available: z.boolean(), files: z.array(z.object({ path: z.string(), additions: z.number(), deletions: z.number(), binary: z.boolean() })), diff: z.string(), truncated: z.boolean() }) } }, description: "Empty when the session has no repository." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(changesR, async (c) => {
+  try { return c.json(await sessionChanges(c.get("person"), c.req.valid("param").id), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+
+const treeR = createRoute({
+  method: "get", path: "/{id}/files", tags: ["Code"], summary: "The workspace's file tree (links are never followed, .git is left out)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ entries: z.array(z.object({ path: z.string(), name: z.string(), depth: z.number(), kind: z.enum(["folder", "file"]) })), truncated: z.boolean() }) } }, description: "Folders and files, depth first." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(treeR, async (c) => {
+  try { return c.json(await sessionTree(c.get("person"), c.req.valid("param").id), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
+});
+
+const fileR = createRoute({
+  method: "get", path: "/{id}/file", tags: ["Code"], summary: "One text file from the workspace (size-capped, binary refused, credentials removed)", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, query: z.object({ path: z.string().min(1).max(500) }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ path: z.string(), content: z.string() }) } }, description: "The file." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(fileR, async (c) => {
+  try { return c.json(await sessionFile(c.get("person"), c.req.valid("param").id, c.req.valid("query").path), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
 const okBody = z.object({ ok: z.literal(true) });

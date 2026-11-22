@@ -8,13 +8,17 @@ import { CodePage, sessionIdOf } from "./CodePage";
 const realFetch = globalThis.fetch;
 const person = { id: "sage", role: "owner" } as Roster;
 const session = { id: "csess-abc123", title: "Fix the thermostat", repo: { kind: "none", base_branch: "main", work_branch: "code/x" }, mode: "ask", state: "idle", tier: "standard", changes: { files: 0, additions: 0, deletions: 0 }, last_activity_at: "2026-11-21T10:00:00.000Z" };
-let tiers = ["standard", "max"]; let calls: string[] = [];
+let tiers = ["standard", "max"]; let calls: string[] = []; let conns: unknown[] = [];
 let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
 
 beforeEach(() => {
-  tiers = ["standard", "max"]; calls = []; waiting = null;
+  tiers = ["standard", "max"]; calls = []; waiting = null; conns = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
+    if (path.endsWith("/git-connections")) return Promise.resolve(Response.json({ connections: conns }));
+    if (path.endsWith("/changes")) return Promise.resolve(Response.json({ available: true, files: [{ path: "src/a.ts", additions: 1, deletions: 0, binary: false }], diff: "diff --git a/src/a.ts b/src/a.ts\n@@ -0,0 +1 @@\n+hello\n", truncated: false }));
+    if (path.endsWith("/files")) return Promise.resolve(Response.json({ entries: [{ path: "src", name: "src", depth: 0, kind: "folder" }, { path: "src/a.ts", name: "a.ts", depth: 1, kind: "file" }], truncated: false }));
+    if (path.includes("/file?path=")) return Promise.resolve(Response.json({ path: "src/a.ts", content: "const a = 1;\n" }));
     if (path.endsWith("/tiers")) return Promise.resolve(Response.json({ tiers, last: "standard" }));
     if (path.endsWith("/messages") && (init?.method ?? "GET") === "GET") return Promise.resolve(Response.json([]));
     if (path.includes("/use-standard")) return Promise.resolve(Response.json({ ok: true }));
@@ -56,5 +60,22 @@ describe("the Code app page", () => {
   test("the session view has Changes, Files, Terminal and Plan tabs", async () => {
     open("/apps/code/csess-abc123");
     for (const name of ["Changes", "Files", "Terminal", "Plan"]) expect((await within(document.body).findAllByText(name)).length).toBeGreaterThan(0);
+  });
+  test("the repository picker appears only with an active git connection, and a chosen one asks for owner/name", async () => {
+    conns = [{ id: "gitc-abc123", kind: "github", host: "github.com", account: "willow", status: "active" }];
+    open("/apps/code");
+    await waitFor(() => expect(document.querySelector('[data-slot="code-repo"]')).toBeTruthy());
+    expect(document.querySelector('input[placeholder="owner/name"]')).toBeNull();
+  });
+  test("no connection means no picker (an empty repository is the default)", async () => {
+    open("/apps/code");
+    await within(document.body).findByText("What should we work on?");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelector('[data-slot="code-repo"]')).toBeNull();
+  });
+  test("Changes shows the diff and Files lists the workspace tree from the hub", async () => {
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="code-diff"]')).toBeTruthy());
+    expect(calls.some((c) => c.endsWith("/csess-abc123/changes"))).toBe(true);
   });
 });

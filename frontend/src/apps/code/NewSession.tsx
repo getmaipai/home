@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { TierSegment, type TierId, type TierOptionDef } from "@maipai/ui/src/elements/tier-segment";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Select } from "@maipai/ui/src/primitives/Select";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { errorLine } from "@/lib/hubReachability";
 import { Stack } from "./layout";
@@ -27,16 +29,23 @@ export function NewSession() {
   const [tier, setTier] = useState<CodeTier | null>(null);
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
+  const connections = useQuery({ queryKey: ["git-connections"], queryFn: codeApi.connections, retry: false });
+  const active = (connections.data?.connections ?? []).filter((c) => c.status === "active");
+  const [connectionId, setConnectionId] = useState("none");
+  const [fullName, setFullName] = useState("");
+  const [baseBranch, setBaseBranch] = useState("main");
+  const chosen = active.find((c) => c.id === connectionId);
+  const repoOk = !chosen || /^[\w.-]+\/[\w.-]+$/.test(fullName.trim());
   const offered = tiers.data?.tiers ?? [];
   const value: CodeTier = tier && offered.includes(tier) ? tier : tiers.data?.last ?? "standard";
   useEffect(() => { setProblem(""); }, [text]);
 
   async function start() {
     const message = text.trim();
-    if (!message || busy) return;
+    if (!message || busy || !repoOk) return;
     setBusy(true);
     try {
-      const session = await codeApi.create(message.split("\n")[0]!.slice(0, 100), value);
+      const session = await codeApi.create(message.split("\n")[0]!.slice(0, 100), value, chosen ? { kind: chosen.kind, connectionId: chosen.id, fullName: fullName.trim(), baseBranch: baseBranch.trim() || "main" } : undefined);
       await codeApi.send(session.id, message);
       setText("");
       await queryClient.invalidateQueries({ queryKey: CODE_SESSIONS_KEY });
@@ -50,9 +59,17 @@ export function NewSession() {
     <Stack as="form" data-slot="code-new-session" className="mx-auto w-full max-w-2xl p-4" onSubmit={(event) => { event.preventDefault(); void start(); }}>
       <h2 className="text-title">{i18n._({ id: "What should we work on?", message: "What should we work on?" })}</h2>
       <Textarea value={text} onChange={(event) => setText(event.target.value)} rows={4} aria-label={i18n._({ id: "Describe the task", message: "Describe the task" })} placeholder={i18n._({ id: "Describe the task, for example: fix the failing test in the thermostat code.", message: "Describe the task, for example: fix the failing test in the thermostat code." })} />
+      {active.length > 0 ? <Stack data-slot="code-repo">
+        <Select aria-label={i18n._({ id: "Repository", message: "Repository" })} value={connectionId} onValueChange={setConnectionId} options={["none", ...active.map((c) => c.id)]}
+          getLabel={(id) => { const c = active.find((x) => x.id === id); return c ? `${c.kind === "github" ? "GitHub" : "Gitea"}: ${c.account}` : i18n._({ id: "No repository", message: "No repository" }); }} />
+        {chosen ? <Stack row className="flex-wrap">
+          <Input value={fullName} onChange={(event) => setFullName(event.target.value)} aria-label={i18n._({ id: "Repository name, for example owner/name", message: "Repository name, for example owner/name" })} placeholder="owner/name" aria-invalid={fullName !== "" && !repoOk} />
+          <Input value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} aria-label={i18n._({ id: "Starting branch", message: "Starting branch" })} placeholder="main" />
+        </Stack> : null}
+      </Stack> : null}
       <Stack row className="flex-wrap items-center justify-between">
         {offered.length > 1 ? <div data-slot="code-tier"><TierSegment value={value as TierId} onValueChange={(next) => setTier(next)} tiers={tierOptions(offered)} presentation="segment" label={i18n._({ id: "Level", message: "Level" })} /></div> : <span />}
-        <Button type="submit" disabled={busy || !text.trim()}>{i18n._({ id: "Start session", message: "Start session" })}</Button>
+        <Button type="submit" disabled={busy || !text.trim() || !repoOk}>{i18n._({ id: "Start session", message: "Start session" })}</Button>
       </Stack>
       {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
     </Stack>

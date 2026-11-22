@@ -11,7 +11,7 @@ import { redactDeep } from "@/lib/codingRedact";
 export type CodingPart =
   | { type: "text"; text: string }
   | { type: "plan"; items: { text: string; done: boolean }[] }
-  | { type: "tool"; tool: "command" | "file_write" | "read" | "fetch"; status: "running" | "done" | "failed"; summary: string; exit_code?: number }
+  | { type: "tool"; tool: "command" | "file_write" | "read" | "fetch"; status: "running" | "done" | "failed"; summary: string; exit_code?: number; output?: string }
   | { type: "approval"; request_id: string; effect: string; status: "pending" | "allowed" | "denied" }
   | { type: "stopped"; reason: "user" | "wall_clock" | "error" | "denied" }
   | { type: "notice"; text: string };

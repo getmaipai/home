@@ -554,7 +554,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeSafety.ts` | codingFloor, bandOf, crisisText, inputRefusalLine, outputRefusalLine, alertIfMinor |
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
-| `backend/src/lib/codingBridge.ts` | isSessionTainted, markSessionTainted, startTaint, pendingRequestsFor, answerHostRequest, denyPendingFor |
+| `backend/src/lib/codingBridge.ts` | OUTPUT_KEEP, isSessionTainted, markSessionTainted, startTaint, pendingRequestsFor, answerHostRequest |
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
 | `backend/src/lib/codingGatewayAddress.ts` | DEFAULT_SANDBOX_GATEWAY_HOST, sandboxGatewayUrl |
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
@@ -568,6 +568,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingShare.ts` | setSecretScanner, __setWorkspaceRootForTests, codingWorkspace, __setShareRemoteForTests, checkSecretsBeforeShare, pushCodingSession |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
 | `backend/src/lib/codingTurns.ts` | setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, messageBudgetMs, DEFAULT_MAX_SESSIONS, __setSessionCapForTests |
+| `backend/src/lib/codingWorkspaceView.ts` | FILE_VIEW_CAP, sessionChanges, sessionTree, sessionFile |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, __setCompanionArtStatusReadersForTests, promptHash, resolveCompanionStillFromCatalog |

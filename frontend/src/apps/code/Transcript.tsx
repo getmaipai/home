@@ -6,7 +6,7 @@ import { LightMarkdown } from "@maipai/ui/src/elements/light-markdown";
 import { TerminalBlock } from "@maipai/ui/src/elements/terminal-block";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { CodeMessage, CodePart } from "./codeApi";
-import { approvalWords } from "./codeTranscript";
+import { approvalWords, outputLines } from "./codeTranscript";
 
 const ShieldIcon = getIcon("shield-check");
 
@@ -22,7 +22,7 @@ function partNode(part: CodePart, onAnswer: (requestId: string, answer: "allow" 
     case "text": return <LightMarkdown text={part.text} />;
     case "plan": return <p className="text-body text-muted-foreground">{i18n._({ id: "Plan updated: {done} of {total} steps done.", message: "Plan updated: {done} of {total} steps done.", values: { done: part.items.filter((i) => i.done).length, total: part.items.length } })}</p>;
     case "tool":
-      if (part.tool === "command") return <div><TerminalBlock command={part.summary} lines={[]} done={part.status !== "running"} streaming={part.status === "running"} exitCode={part.exit_code ?? (part.status === "failed" ? 1 : 0)} /></div>;
+      if (part.tool === "command") return <div><TerminalBlock command={part.summary} lines={outputLines(part.output).lines} truncated={outputLines(part.output).truncated} done={part.status !== "running"} streaming={part.status === "running"} exitCode={part.exit_code ?? (part.status === "failed" ? 1 : 0)} /></div>;
       return <p className="truncate font-mono text-body text-muted-foreground">{part.tool === "file_write" ? i18n._({ id: "Changed {path}", message: "Changed {path}", values: { path: part.summary } }) : part.summary}</p>;
     case "approval": {
       const words = approvalWords(part.effect);

@@ -87,7 +87,7 @@ export function SessionView({ id }: { id: string }) {
   const statusLine = waiting?.line ?? stateWord(session.state);
   const tabs = [
     { id: "changes", label: i18n._({ id: "Changes", message: "Changes" }), content: <ChangesTab session={session} activity={activity} busy={busy} onUndo={(cid) => void run(() => codeApi.undo(id, cid), i18n._({ id: "Could not undo that. Try again.", message: "Could not undo that. Try again." }))} onPush={() => void run(() => codeApi.push(id), i18n._({ id: "Could not push. Try again.", message: "Could not push. Try again." }))} onPullRequest={() => void run(() => codeApi.pullRequest(id), i18n._({ id: "Could not open the pull request. Try again.", message: "Could not open the pull request. Try again." }))} /> },
-    { id: "files", label: i18n._({ id: "Files", message: "Files" }), content: <FilesTab activity={activity} /> },
+    { id: "files", label: i18n._({ id: "Files", message: "Files" }), content: <FilesTab session={session} activity={activity} /> },
     { id: "terminal", label: i18n._({ id: "Terminal", message: "Terminal" }), content: <TerminalTab activity={activity} /> },
     { id: "plan", label: i18n._({ id: "Plan", message: "Plan" }), content: <PlanTab activity={activity} /> },
   ];
