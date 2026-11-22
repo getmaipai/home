@@ -70,6 +70,7 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
   const detailsId = `app-needs-${app.id}`;
   const summaryContent = <>
     <p className="text-sm text-muted-foreground">{summary}</p>
+    {app.activity ? <p data-slot="app-activity" className="text-body text-muted-foreground">{app.activity}</p> : null}
     <div data-status-strip className="w-full min-w-0 overflow-hidden"><UptimeStrip data={appStripData(app)} summary={appStripSummary(app)} /></div>
   </>;
   const details = app.needs?.length ? <AppNeeds appId={app.id} needs={app.needs} /> : null;

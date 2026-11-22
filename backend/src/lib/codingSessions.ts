@@ -2,7 +2,7 @@
 // spec `coding-session`. Its `tier` is the person's stored wish: it survives a restart, and every turn clamps it again and writes the corrected value
 // back (`correctStoredTier`). `model_id` is provenance written from the agent's reply, never a choice, and Home never maps a tier to a model (rule E).
 // Turns, the queue, the Max lease and the agent live in lib/codingTurns.ts. Rule 6a: nothing here puts a title, repository or path in a log or a job.
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import { CodingSession } from "@maipai/spec/gen/ts/coding-session.js";
 import { db } from "@/db";
@@ -14,6 +14,7 @@ import { listGitConnections } from "@/lib/gitConnections";
 import { authorizeTier, isTier, readSlot, type Tier, type TierChoice } from "@/lib/tiers";
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import { appendLogLine } from "@/lib/log";
+import { trigger } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
 
 type Row = typeof codingSessions.$inferSelect;
@@ -195,3 +196,28 @@ export function sessionTierForKey(personId: string, sessionId: string, keyTier: 
   if (readSlot("coding", tier).model === "off") return { ok: false, status: 403, code: "tier_not_offered", message: TIER_NOT_OFFERED_LINE };
   return { ok: true, tier };
 }
+
+/** CODE-NOTIFY-01: how many sessions are working or waiting on the person right now (a count, for the Status row). */
+export function countActiveSessions(): number {
+  return db.select({ id: codingSessions.id }).from(codingSessions).where(and(isNull(codingSessions.deletedAt), inArray(codingSessions.state, ["queued", "starting", "working", "needs_you"]))).all().length;
+}
+
+/** CODE-NOTIFY-01: a deleted session still in Trash with this many days left (or fewer) is "about to expire". */
+export const EXPIRY_WARNING_DAYS = 3;
+const warnedExpiry = new Set<string>();
+/** One `coding.workspace_expiring` notification per trashed session and trash date (kept in memory: a restart may repeat one, never lose one). Returns how many were sent. Ids only in the log (rule 6a). */
+export function notifyExpiringWorkspaces(now = new Date()): number {
+  const soon = new Date(now.getTime() + EXPIRY_WARNING_DAYS * 86_400_000).toISOString();
+  const rows = db.select().from(codingSessions).where(and(isNotNull(codingSessions.deletedAt), isNotNull(codingSessions.trashUntil), gt(codingSessions.trashUntil, now.toISOString()), lte(codingSessions.trashUntil, soon))).all();
+  let sent = 0;
+  for (const row of rows) {
+    const key = `${row.id}:${row.trashUntil}`;
+    if (warnedExpiry.has(key)) continue;
+    warnedExpiry.add(key);
+    void trigger("coding.workspace_expiring", {}, { personId: row.personId });
+    appendLogLine(`coding workspace_expiring session=${row.id} person=${row.personId}`);
+    sent++;
+  }
+  return sent;
+}
+export function __resetExpiryWarningsForTests(): void { warnedExpiry.clear(); }

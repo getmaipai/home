@@ -7,6 +7,7 @@
 // the data is the package's own recipe through `runPlugin`, and the blocks leave through
 // `filterAnswerBlocks` exactly as a chat turn's do.
 import { mayUse } from "@/lib/filter/pass";
+import { codingPausedByAdmin } from "@/lib/codingPause";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -306,7 +307,7 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
 export const CODE_APP_ID = "code";
 /** Whether this household offers Code at all: Coding on, not paused, no piece missing. A person's own `use:code` is checked by the pass. */
 export function codeAppOffered(): boolean {
-  return getHouseholdSettingValue("coding.enabled") === true && getHouseholdSettingValue("coding.paused") !== true && !missingCodingPiece();
+  return getHouseholdSettingValue("coding.enabled") === true && !codingPausedByAdmin() && !missingCodingPiece();
 }
 
 // ---- Who may see an app --------------------------------------------------------------------

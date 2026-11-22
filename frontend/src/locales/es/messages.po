@@ -1396,8 +1396,8 @@ msgid "{names}. "
 msgstr "{names}. "
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusApps.tsx:81
-#: src/shell/pages/status/StatusApps.tsx:94
+#: src/shell/pages/status/StatusApps.tsx:82
+#: src/shell/pages/status/StatusApps.tsx:95
 #: src/shell/pages/status/StatusComponents.tsx:136
 #, needs-review
 msgid "{percent}% uptime"
@@ -3642,6 +3642,11 @@ msgid "setting.companions.dock.label"
 msgstr "Compañía ambiental"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:254
+msgid "failure.coding.paused_by_admin"
+msgstr "Un administrador pausó la programación por ahora."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/notificationCopy.ts:14
 #, needs-review
 msgid "notification.jobs.admin_stopped"
@@ -4012,7 +4017,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:260
 #: src/shell/pages/PackageAppPage.tsx:199
-#: src/shell/pages/status/StatusApps.tsx:114
+#: src/shell/pages/status/StatusApps.tsx:115
 #: src/shell/phoneMenuLinks.tsx:31
 #, needs-review
 msgid "Apps"
@@ -4723,7 +4728,7 @@ msgid "area.Behaviour"
 msgstr "Comportamiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/status/StatusApps.tsx:122
+#: src/shell/pages/status/StatusApps.tsx:123
 #, needs-review
 msgid "Behind the scenes"
 msgstr "Detrás de cámaras"
@@ -6140,7 +6145,7 @@ msgid "Check that the engine is running, then try again."
 msgstr "Asegúrate de que el motor esté funcionando e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:395
+#: ../backend/src/lib/failureCopy.ts:406
 #, needs-review
 msgid "failure.advice.unreachable.next_step"
 msgstr "Comprueba que el Stack de MaiPai se ejecuta en Reparaciones."
@@ -7366,6 +7371,11 @@ msgid "Coding engine"
 msgstr "Motor de Coding"
 
 #. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:256
+msgid "failure.coding.restarting"
+msgstr "La programación se está preparando. Vuelve en un momento."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:145
 #, needs-review
 msgid "Coding is on"
@@ -7376,6 +7386,11 @@ msgstr "Coding está activo"
 #, needs-review
 msgid "Coding is waiting for its helper to start. The Status page shows what is happening."
 msgstr "Coding espera a que su asistente inicie. La página de estado muestra lo que sucede."
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:255
+msgid "failure.coding.not_installed"
+msgstr "La programación aún no está instalada. Pregunta a un administrador."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:479
@@ -8799,7 +8814,7 @@ msgid "Could not reach Home. Check your connection and try again."
 msgstr "No pudimos llegar a Home. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:406
+#: ../backend/src/lib/failureCopy.ts:417
 #, needs-review
 msgid "failure.tool.unavailable.verb"
 msgstr "no pudo llegar a su servicio"
@@ -11733,7 +11748,7 @@ msgid "FAIL hop {id}: {detail} — Fix: {fix}"
 msgstr "Fallo salto {id}: {detail}. Solución: {fix}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:409
+#: ../backend/src/lib/failureCopy.ts:420
 #, needs-review
 msgid "failure.tool.errored.verb"
 msgstr "falló"
@@ -12421,7 +12436,7 @@ msgid "Forward 30 seconds"
 msgstr "Avanzar 30 segundos"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:408
+#: ../backend/src/lib/failureCopy.ts:419
 #, needs-review
 msgid "failure.tool.found_nothing.verb"
 msgstr "no encontró nada"
@@ -12449,7 +12464,7 @@ msgid "Free memory"
 msgstr "Memoria libre"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:402
 #, needs-review
 msgid "failure.advice.memory.next_step"
 msgstr "Libera algo de memoria e inténtalo de nuevo."
@@ -12524,7 +12539,7 @@ msgid "Free up space"
 msgstr "Liberar espacio"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.advice.disk.next_step"
 msgstr ""
 
@@ -13208,7 +13223,7 @@ msgid "setting.content.filters.option_label.gore"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:410
+#: ../backend/src/lib/failureCopy.ts:421
 #, needs-review
 msgid "failure.tool.bad_arguments.verb"
 msgstr "recibió una solicitud que no podía usar"
@@ -13403,7 +13418,7 @@ msgstr "Ocultar personalizar"
 
 #. js-lingui-explicit-id
 #: src/shell/components/SearchTestResultBody.tsx:23
-#: src/shell/pages/status/StatusApps.tsx:98
+#: src/shell/pages/status/StatusApps.tsx:99
 #, needs-review
 msgid "Hide details"
 msgstr "Ocultar detalles"
@@ -13968,13 +13983,13 @@ msgid "Home could not make that voiceover. Try again."
 msgstr "Home no pudo crear ese doblaje. Vuelve a intentarlo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:395
+#: ../backend/src/lib/failureCopy.ts:406
 #, needs-review
 msgid "failure.advice.unreachable.cause"
 msgstr "Home no pudo llegar al motor de chat."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:396
+#: ../backend/src/lib/failureCopy.ts:407
 #, needs-review
 msgid "failure.advice.engine_computer.cause"
 msgstr "Home no pudo llegar al ordenador del motor."
@@ -15154,13 +15169,13 @@ msgid "failure.voice.microphone_blocked.minor"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:467
+#: ../backend/src/lib/failureCopy.ts:478
 #, needs-review
 msgid "failure.ask_form.unreachable"
 msgstr "No pude enviar el formulario. Revisa tu conexión y envía el formulario de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:468
+#: ../backend/src/lib/failureCopy.ts:479
 #, needs-review
 msgid "failure.ask_form.other"
 msgstr "No pude enviar el formulario. Envíalo de nuevo en un momento."
@@ -15190,19 +15205,19 @@ msgid "failure.context_too_large.adult"
 msgstr "No pude retener todo eso en mi cabeza a la vez. Envíalo de nuevo y lo intentaré otra vez."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:428
+#: ../backend/src/lib/failureCopy.ts:439
 #, needs-review
 msgid "failure.partial.slow"
 msgstr "Tuve que parar ahí porque la IA dejó de responder. Pídeme que continúe si quieres el resto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:429
+#: ../backend/src/lib/failureCopy.ts:440
 #, needs-review
 msgid "failure.partial.other"
 msgstr "Tuve que parar ahí porque la IA dejó de funcionar. Pídeme que continúe si quieres el resto."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:427
+#: ../backend/src/lib/failureCopy.ts:438
 msgid "failure.partial.minor"
 msgstr ""
 
@@ -22468,7 +22483,7 @@ msgid "setting.backup.max_total_gb.help"
 msgstr "Cuando el almacenamiento total de copias de seguridad supera esto, se eliminan primero las copias más antiguas. Se comprueba tras el calendario habitual de siete diarios, cuatro semanales y tres mensuales. 0 significa sin límite extra."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:466
+#: ../backend/src/lib/failureCopy.ts:477
 #, needs-review
 msgid "failure.ask_form.invalid"
 msgstr "Una respuesta no encajaba. Revisa cada campo y envía el formulario de nuevo."
@@ -26134,13 +26149,13 @@ msgid "Retry"
 msgstr "Reintentar"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:406
+#: ../backend/src/lib/failureCopy.ts:417
 #, needs-review
 msgid "failure.tool.unavailable.next_step"
 msgstr "Inténtalo de nuevo cuando el servicio vuelva. Si sigue caído, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:396
+#: ../backend/src/lib/failureCopy.ts:407
 #, needs-review
 msgid "failure.advice.engine_computer.next_step"
 msgstr "Inténtalo de nuevo cuando vuelva la conexión. Si sigue caído, revisa Reparaciones."
@@ -26152,37 +26167,37 @@ msgid "Retry with current companion"
 msgstr "Reintenta con la compañía actual"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:397
+#: ../backend/src/lib/failureCopy.ts:408
 #, needs-review
 msgid "failure.advice.context_too_large.next_step"
 msgstr "Inténtalo con menos texto o empieza un chat nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:410
+#: ../backend/src/lib/failureCopy.ts:421
 #, needs-review
 msgid "failure.tool.bad_arguments.next_step"
 msgstr "Inténtalo de nuevo; el modelo puede redactar la solicitud de otra manera."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:407
+#: ../backend/src/lib/failureCopy.ts:418
 #, needs-review
 msgid "failure.tool.timed_out.next_step"
 msgstr "Inténtalo de nuevo; el servicio tardó mucho en responder."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:405
 #, needs-review
 msgid "failure.advice.slow.next_step"
 msgstr "Inténtalo de nuevo. Si sigue pasando, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:398
+#: ../backend/src/lib/failureCopy.ts:409
 #, needs-review
 msgid "failure.advice.other.next_step"
 msgstr "Inténtalo de nuevo. Si sigue pasando, revisa Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:409
+#: ../backend/src/lib/failureCopy.ts:420
 #, needs-review
 msgid "failure.tool.errored.next_step"
 msgstr "Inténtalo de nuevo. Si sigue pasando, revisa Reparaciones."
@@ -28402,7 +28417,7 @@ msgstr "Mostrar conversaciones"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:143
-#: src/shell/pages/status/StatusApps.tsx:98
+#: src/shell/pages/status/StatusApps.tsx:99
 #, needs-review
 msgid "Show details"
 msgstr "Mostrar detalles"
@@ -29885,7 +29900,7 @@ msgid "api.error.totp_restart_sign_in"
 msgstr "Vuelve a iniciar sesión con tu PIN o passkey."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:393
+#: ../backend/src/lib/failureCopy.ts:404
 #, needs-review
 msgid "failure.advice.stopped.next_step"
 msgstr "Inicia el motor de chat en Reparaciones."
@@ -31375,7 +31390,7 @@ msgid "api.error.list_missing"
 msgstr "Esa lista ya no está. Actualiza tus listas e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:451
+#: ../backend/src/lib/failureCopy.ts:462
 #, needs-review
 msgid "failure.prompt_limit.too_big.adult"
 msgstr "Ese mensaje es más grande de lo que puedo leer de una vez en este ordenador, así que no pude responderlo."
@@ -31397,7 +31412,7 @@ msgid "That message is not waiting for Max any more."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:452
+#: ../backend/src/lib/failureCopy.ts:463
 msgid "failure.prompt_limit.too_big.minor"
 msgstr ""
 
@@ -31752,7 +31767,7 @@ msgid "settings.attention.install.failed"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:465
+#: ../backend/src/lib/failureCopy.ts:476
 #, needs-review
 msgid "failure.ask_form.field"
 msgstr "La respuesta para \"{label}\" no encajaba. Corrige ese campo y envía el formulario de nuevo."
@@ -31828,19 +31843,19 @@ msgid "The character could not be made ready. Try again."
 msgstr "No se pudo preparar al personaje. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:394
+#: ../backend/src/lib/failureCopy.ts:405
 #, needs-review
 msgid "failure.advice.slow.cause"
 msgstr "El motor de chat dejó de responder antes de que terminara la respuesta."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:401
 #, needs-review
 msgid "failure.advice.busy.cause"
 msgstr "El motor de chat aún estaba arrancando o ocupado, así que la respuesta nunca empezó."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:393
+#: ../backend/src/lib/failureCopy.ts:404
 #, needs-review
 msgid "failure.advice.stopped.cause"
 msgstr "El motor de chat estaba detenido, así que la respuesta nunca empezó."
@@ -31855,6 +31870,11 @@ msgstr "La vitrina de Chat es para propietarios y administradores."
 #: src/apps/settings/AutoLocksSection.tsx:37
 msgid "The cleanup could not be saved. Look again and try once more."
 msgstr ""
+
+#. js-lingui-explicit-id
+#: ../backend/src/lib/failureCopy.ts:257
+msgid "failure.coding.offline"
+msgstr "El motor de programación no responde. Pregunta a un administrador."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:44
@@ -31884,7 +31904,7 @@ msgid "setting.companions.enabled.help"
 msgstr "Las compañías que conservas en Tus cosas."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:391
+#: ../backend/src/lib/failureCopy.ts:402
 #, needs-review
 msgid "failure.advice.memory.cause"
 msgstr "El ordenador tenía poca memoria para ejecutar el motor de chat."
@@ -32571,13 +32591,13 @@ msgid "The remix could not start. Check your connection and try again."
 msgstr "El remix no pudo empezar. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:398
+#: ../backend/src/lib/failureCopy.ts:409
 #, needs-review
 msgid "failure.advice.other.cause"
 msgstr "La respuesta falló y el motor no dijo por qué."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:397
+#: ../backend/src/lib/failureCopy.ts:408
 #, needs-review
 msgid "failure.advice.context_too_large.cause"
 msgstr "La solicitud era demasiado grande para la ventana de contexto del motor de chat."
@@ -33075,7 +33095,7 @@ msgid "api.error.list_restore_none"
 msgstr "No queda nada para restaurar. Actualiza la lista e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:392
+#: ../backend/src/lib/failureCopy.ts:403
 msgid "failure.advice.disk.cause"
 msgstr ""
 
@@ -33202,13 +33222,13 @@ msgid "This cannot be undone. The file is gone from the Library; a copy that a c
 msgstr "No se puede deshacer. El archivo desaparece de la Biblioteca. Una copia que un chat aún muestre se queda en ese chat."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:447
+#: ../backend/src/lib/failureCopy.ts:458
 #, needs-review
 msgid "failure.prompt_limit.carry_offer.adult"
 msgstr "Este chat se ha vuelto demasiado largo para recordarlo junto con ese mensaje. Empieza un chat nuevo con Nuevo chat: traeré un resumen de este y lo usaré desde tu próximo mensaje allí."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:448
+#: ../backend/src/lib/failureCopy.ts:459
 msgid "failure.prompt_limit.carry_offer.minor"
 msgstr ""
 
@@ -33344,7 +33364,7 @@ msgid "api.error.file_belongs_to_item"
 msgstr "Este archivo pertenece a otro elemento. Borra ese elemento en su lugar."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:464
+#: ../backend/src/lib/failureCopy.ts:475
 #, needs-review
 msgid "failure.ask_form.stale"
 msgstr "Este formulario expiró o ya se envió. Pregúntame de nuevo para obtener un formulario nuevo."
@@ -33704,7 +33724,7 @@ msgid "Time remaining"
 msgstr "Tiempo restante"
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:407
+#: ../backend/src/lib/failureCopy.ts:418
 #, needs-review
 msgid "failure.tool.timed_out.verb"
 msgstr "excedió el tiempo de espera"
@@ -34167,7 +34187,7 @@ msgid "api.next.internal"
 msgstr "Inténtalo de nuevo. Si sigue pasando, abre Reparaciones."
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:408
+#: ../backend/src/lib/failureCopy.ts:419
 #, needs-review
 msgid "failure.tool.found_nothing.next_step"
 msgstr "Prueba a preguntar de otra manera."
@@ -35878,7 +35898,7 @@ msgid "vs {branch}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: ../backend/src/lib/failureCopy.ts:390
+#: ../backend/src/lib/failureCopy.ts:401
 #, needs-review
 msgid "failure.advice.busy.next_step"
 msgstr "Espera un momento e inténtalo de nuevo."

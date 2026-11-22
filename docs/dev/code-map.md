@@ -559,8 +559,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
 | `backend/src/lib/codingGatewayAddress.ts` | DEFAULT_SANDBOX_GATEWAY_HOST, sandboxGatewayUrl |
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
+| `backend/src/lib/codingHealthIssue.ts` | syncCodingHealthIssue |
 | `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
 | `backend/src/lib/codingOpencode.ts` | MAX_ARG_CHARS, GATEWAY_MODEL, openCodeConfig, mapOpenCodeEvent, MAX_ROUNDS, createOpenCodeAgent |
+| `backend/src/lib/codingPause.ts` | codingPausedByAdmin |
 | `backend/src/lib/codingPullRequest.ts` | __setPullRequestDepsForTests, createCodingPullRequest |
 | `backend/src/lib/codingRedact.ts` | REDACTED, redactCredentials, redactDeep |
 | `backend/src/lib/codingRuntime.ts` | mintSessionKeyFor, startCodingRuntime |

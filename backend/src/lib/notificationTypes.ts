@@ -455,6 +455,12 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  // CODE-NOTIFY-01 (docs/design/code-app-refresh-2026-11-21.md section 3): the three Code notifications. `person` audience: a session belongs to
+  // its owner. The line never names the session, repository or message (rule 6a: those stay in the person's own record); the page it opens does.
+  // The Telegram toggles are the spec's `notifications.coding.*.telegram` keys.
+  { id: "coding.needs_you", level: "time_sensitive", audience: "person", template: "A coding session is waiting for your answer.", configurable: true, defaultChannels: ["in_app"], toast: true },
+  { id: "coding.session_done", level: "passive", audience: "person", template: "A coding session finished its work.", configurable: true, defaultChannels: ["in_app"], toast: true },
+  { id: "coding.workspace_expiring", level: "time_sensitive", audience: "person", template: "A deleted coding session will be removed soon. Restore it from Trash to keep it.", configurable: true, defaultChannels: ["in_app"], toast: true },
   // The design record's own "a failed step fails honestly... offers
   // retry" - the notification side of that: the person is told it didn't
   // finish, in plain words, the same moment the failed artifact (post.ts)

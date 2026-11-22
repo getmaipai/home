@@ -16,6 +16,8 @@ import { listCodingEvents } from "@/lib/codingEvents";
 import { sessionChanges, sessionFile, sessionTree } from "@/lib/codingWorkspaceView";
 import { pushCodingSession } from "@/lib/codingShare";
 import { createCodingPullRequest } from "@/lib/codingPullRequest";
+import { codingConcern } from "@/lib/roleHealth";
+import { codingNotice } from "@/lib/failureCopy";
 import type { PersonRow } from "@/types";
 
 export const codingSessionsRoutes = apiRouter();
@@ -27,14 +29,17 @@ const Tier = z.enum(["standard", "boost", "max"]);
 const sessionIdParam = z.object({ id: z.string().regex(/^csess-[a-z0-9]{6,}$/) });
 
 /** One session plus what it waits for: the queue line, the held requests and the message queue (design 3.3 and 3.4). */
-function view(person: PersonRow, id: string) {
+async function view(person: PersonRow, id: string) {
   const session = getCodingSession(person, id);
   if (!session) return null;
   const turn = activeTurnOf(id);
-  return { session, waiting: turn ? { turn_id: turn, line: turnQueueLine(person, turn), offers_standard: offersUseStandard(turn) } : null, requests: pendingRequestsFor(person.id, id), queued_messages: queuedMessageIds(person, id) };
+  const concern = await codingConcern();
+  return { session, coding_notice: concern.cause ? codingNotice(concern.cause) : null, waiting: turn ? { turn_id: turn, line: turnQueueLine(person, turn), offers_standard: offersUseStandard(turn) } : null, requests: pendingRequestsFor(person.id, id), queued_messages: queuedMessageIds(person, id) };
 }
 const ViewSchema = z.object({
   session: CodingSession,
+  /** CODE-NOTIFY-01: the one composer line while the coding engine cannot take a message (null when it can). */
+  coding_notice: z.string().nullable(),
   waiting: z.object({ turn_id: z.string(), line: z.string().nullable(), offers_standard: z.boolean() }).nullable(),
   requests: z.array(z.object({ request_id: z.string(), effect: z.string() })),
   queued_messages: z.array(z.string()),
@@ -74,9 +79,9 @@ const getR = createRoute({
   request: { params: sessionIdParam },
   responses: { 200: { content: { "application/json": { schema: ViewSchema } }, description: "The session." }, ...errorResponses(errors) },
 });
-codingSessionsRoutes.openapi(getR, (c) => {
+codingSessionsRoutes.openapi(getR, async (c) => {
   const refusal = codingSessionRefusal(c.get("person")); if (refusal) return c.json({ error: refusal }, 403);
-  const v = view(c.get("person"), c.req.valid("param").id);
+  const v = await view(c.get("person"), c.req.valid("param").id);
   return v ? c.json(v, 200) : c.json({ error: "That session was not found. It may have been deleted." }, 404);
 });
 

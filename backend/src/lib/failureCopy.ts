@@ -247,6 +247,17 @@ const CAUSE_NOTICE_MESSAGES: Record<"restarting" | "memory" | "not_installed" | 
   },
 };
 
+/** CODE-NOTIFY-01 (RULES.md S6): the one line under the Code composer while the coding engine cannot take a message. One line for every band, no resource words,
+ * no figures; the household's Status page and Repairs carry the detail. */
+export type CodingCause = "paused_by_admin" | "not_installed" | "restarting" | "offline";
+const CODING_NOTICE: Record<CodingCause, { id: string; message: string }> = {
+  paused_by_admin: /*i18n*/ { id: "failure.coding.paused_by_admin", message: "An admin paused coding for now." },
+  not_installed: /*i18n*/ { id: "failure.coding.not_installed", message: "Coding isn't installed yet. Ask an admin." },
+  restarting: /*i18n*/ { id: "failure.coding.restarting", message: "Coding is getting ready. Back soon." },
+  offline: /*i18n*/ { id: "failure.coding.offline", message: "The coding engine isn't answering. Ask an admin." },
+};
+export function codingNotice(cause: CodingCause): string { return CODING_NOTICE[cause].message; }
+
 function noticeOf(messages: ComposerNoticeMessages): ComposerNotice {
   return { adult: messages.adult.message, teen: messages.teen.message, child: messages.child.message, repairs_link: messages.repairs_link?.message ?? null, ...(messages.more ? { more: messages.more.message } : {}) };
 }

@@ -3,7 +3,7 @@
 import { createStackSandbox } from "@/lib/codingSandbox";
 import { createOpenCodeAgent } from "@/lib/codingOpencode";
 import { setCodingRuntime } from "@/lib/codingTurns";
-import { settleSessionsAtStartup } from "@/lib/codingSessions";
+import { notifyExpiringWorkspaces, settleSessionsAtStartup } from "@/lib/codingSessions";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
 import { getStackClient } from "@/lib/stackEngine";
 import { createSessionKey } from "@/lib/apiKeys";
@@ -26,6 +26,9 @@ export function mintSessionKeyFor(input: { personId: string; sessionId: string; 
 
 export function startCodingRuntime(): void {
   settleSessionsAtStartup();
+  const sweep = (): void => { try { notifyExpiringWorkspaces(); } catch { /* a courtesy sweep never stops startup */ } };
+  sweep();
+  setInterval(sweep, 60 * 60 * 1000).unref();
   const sandbox = createStackSandbox(() => getStackClient());
   const agent = createOpenCodeAgent({ sandbox, gatewayUrl, canMintKeys: () => true, sessionKey: async (who) => mintSessionKeyFor(who) });
   setCodingRuntime({ agent, sandbox, lease: getChatLease });

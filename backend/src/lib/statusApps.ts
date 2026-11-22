@@ -3,7 +3,9 @@ export type AppState = "operational" | "degraded" | "down" | "waiting_for_intern
 export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
 import { serviceDetail, serviceState } from "@/lib/serviceHealth";
 import { serviceComponent } from "@/lib/serviceComponent";
-import { roleHealth, STACK_REFUSAL_KEY } from "@/lib/roleHealth";
+import { codingConcern, roleHealth, STACK_REFUSAL_KEY, type CodingConcern } from "@/lib/roleHealth";
+import { countActiveSessions } from "@/lib/codingSessions";
+import { syncCodingHealthIssue } from "@/lib/codingHealthIssue";
 import { stackOfflineSeverity } from "@/lib/stackEngine";
 import { getSidecar } from "@/lib/sidecars";
 export type StatusApp = { id: string; name: string; needs: AppNeed[] };
@@ -180,10 +182,23 @@ export function appResponse(app: StatusApp, events: StatusEventLike[], showNeeds
   };
 }
 
+/** CODE-NOTIFY-01 (rule 6a): the Code row's one extra line, counts and states only: sessions working, the coding model busy, idle or unloaded, and the engine's planned memory in whole gigabytes. Null for every other app. */
+export function codingActivityLine(sessions: number, concern: Pick<CodingConcern, "model" | "memory_bytes">): string {
+  const parts = [sessions === 1 ? "1 session working" : `${sessions} sessions working`];
+  if (concern.model !== "unknown") parts.push(`the coding model is ${concern.model === "unloaded" ? "not loaded" : concern.model}`);
+  if (concern.memory_bytes) parts.push(`it plans to use ${Math.max(1, Math.round(concern.memory_bytes / 1_073_741_824))} GB of memory`);
+  const line = parts.join("; ");
+  return `${line.charAt(0).toUpperCase()}${line.slice(1)}.`;
+}
+
 export async function appResponseWithLiveRoleHealth(app: StatusApp, events: StatusEventLike[], showNeeds: boolean, now = new Date()) {
   const response = appResponse(app, events, showNeeds, now);
   const paused = new Set<string>();
+  const isCode = app.id === "code";
+  const coding = isCode ? await codingConcern() : null;
+  if (coding) await syncCodingHealthIssue(coding);
   const needs = await Promise.all(currentNeedStates(app, events).map(async (need) => {
+    if (coding && need.kind === "engine" && need.id === "coding") return { ...need, state: coding.availability === "unavailable" ? "down" as const : coding.availability === "starting" ? "degraded" as const : "operational" as const };
     const role = need.kind === "engine" ? ({ chat: "chat", understanding: "embed", memory: "background", voice: "voice" } as Record<string, "chat" | "embed" | "background" | "voice">)[need.id] : undefined;
     if (!role) return need;
     const health = await roleHealth(role);
@@ -207,7 +222,7 @@ export async function appResponseWithLiveRoleHealth(app: StatusApp, events: Stat
   // starting, so the app will be back on its own; an optional part that is
   // down is not a pause. The header pill reads this, never the reason text.
   const pausedApp = state === "degraded" && needs.some((need) => need.required && need.kind === "engine" && need.state === "degraded");
-  return { ...response, state, paused: pausedApp, reason: pausedRequired ? `${app.name} is paused.` : appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
+  return { ...response, state, ...(coding ? { activity: codingActivityLine(countActiveSessions(), coding) } : {}), paused: pausedApp, reason: pausedRequired ? `${app.name} is paused.` : appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
 }
 
 export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed & { state: NeedState }>): string | null {

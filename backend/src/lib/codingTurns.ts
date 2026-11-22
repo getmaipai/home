@@ -19,6 +19,7 @@ import type { Tier } from "@/lib/tiers";
 import { revokeSessionKeys } from "@/lib/apiKeys";
 import { addCheckpoint, CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
 import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
+import { trigger } from "@/lib/notifications";
 import { readChangeCounts } from "@/lib/codingChanges";
 import { appendCodingMessage } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
@@ -198,7 +199,11 @@ const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown 
     if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn, `reason=${why}`); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error" }] }); }
     settle(turn, turn.abort.signal.aborted ? "cancelled" : "failed");
   } finally { if (timer) clearTimeout(timer); }
-  if (turn.state === "done") advanceQueue(turn.sessionId, turn.personId); else clearQueue(turn.sessionId);
+  if (turn.state === "done") {
+    // CODE-NOTIFY-01: "finished its work" means nothing is left in the message queue; a person who typed ahead is not pinged between messages.
+    if (!(messageQueues.get(turn.sessionId)?.length)) void trigger("coding.session_done", {}, { personId: turn.personId });
+    advanceQueue(turn.sessionId, turn.personId);
+  } else clearQueue(turn.sessionId);
   refreshHouseholdQueue();
 }
 

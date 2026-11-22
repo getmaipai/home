@@ -9,7 +9,7 @@
 // search share one definition (principle 4).
 
 const OUTSIDE_CHANNEL_EVENTS = [
-  "approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available",
+  "approvals.requested", "backups.target_failing", "coding.needs_you", "coding.session_done", "coding.workspace_expiring", "engines.problem", "engines.update_applied", "engines.update_available",
   "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated",
   "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available",
   "remind.due", "alarm.due", "timer.done",

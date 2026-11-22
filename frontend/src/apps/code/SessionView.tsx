@@ -84,7 +84,7 @@ export function SessionView({ id }: { id: string }) {
   }
 
   const useStandard = waiting?.offers_standard ? [{ label: i18n._({ id: "Use Standard for this message", message: "Use Standard for this message" }), onSelect: () => void run(() => codeApi.useStandard(id, waiting.turn_id), i18n._({ id: "That message is not waiting for Max any more.", message: "That message is not waiting for Max any more." })) }] : [];
-  const statusLine = waiting?.line ?? stateWord(session.state);
+  const statusLine = waiting?.line ?? view.data.coding_notice ?? stateWord(session.state);
   const tabs = [
     { id: "changes", label: i18n._({ id: "Changes", message: "Changes" }), content: <ChangesTab session={session} activity={activity} busy={busy} onUndo={(cid) => void run(() => codeApi.undo(id, cid), i18n._({ id: "Could not undo that. Try again.", message: "Could not undo that. Try again." }))} onPush={() => void run(() => codeApi.push(id), i18n._({ id: "Could not push. Try again.", message: "Could not push. Try again." }))} onPullRequest={() => void run(() => codeApi.pullRequest(id), i18n._({ id: "Could not open the pull request. Try again.", message: "Could not open the pull request. Try again." }))} /> },
     { id: "files", label: i18n._({ id: "Files", message: "Files" }), content: <FilesTab session={session} activity={activity} /> },

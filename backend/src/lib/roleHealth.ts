@@ -22,6 +22,8 @@ export type MakingRole = "image" | "video" | "music" | "voices";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
+import { codingPausedByAdmin } from "@/lib/codingPause";
+import type { CodingCause } from "@/lib/failureCopy";
 import { maintenanceActive } from "@/lib/maintenanceFlag";
 export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "disk" | "never_fits" | "not_installed" | "mode_change" | "reduced_swap" | "tier_reduced" | "gpu" | "upgrading"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
@@ -256,4 +258,26 @@ export function identifyHealthEntry(): IdentifyHealthEntry {
   else if (last?.status === "not_ready") line = readiness.line;
   else if (last?.status === "failed") line = last.reason === "too_long" || last.reason === "too_big" ? "The clip was too long or too big." : "Could not name the song from that clip.";
   return { kind: ready ? "none" : "failed", pid: null, alive: ready, availability: ready ? "ready" : "unavailable", reason: ready ? null : "not_installed", identify_state: readiness.state, identify_line: identifyLine, identify_last: last && line ? { at: last.at, status: last.status, line } : null };
+}
+
+
+/** CODE-NOTIFY-01: the `coding` concern. What the Code app's composer line, the Status row and Repairs read about the coding engine, in one place.
+ * `model` is the engine's own state (busy while it serves a request, idle while loaded, unloaded while installed but not in memory); `memory_bytes` is the Stack's
+ * planned size for it. Facts only, no names: the Stack's pack names the model (rules E1 to E8), and nothing here carries a session or a message (rule 6a). */
+export type CodingModelState = "busy" | "idle" | "unloaded" | "unknown";
+export interface CodingConcern { availability: "ready" | "starting" | "unavailable"; cause?: CodingCause; model: CodingModelState; memory_bytes: number | null }
+export async function codingConcern(): Promise<CodingConcern> {
+  if (codingPausedByAdmin()) return { availability: "unavailable", cause: "paused_by_admin", model: "unknown", memory_bytes: null };
+  let roles: Awaited<ReturnType<typeof sharedStackRoles>>["roles"];
+  try { roles = (await sharedStackRoles()).roles; } catch { return { availability: "starting", cause: "restarting", model: "unknown", memory_bytes: null }; }
+  const row = roles.find((item) => item.id === "coding");
+  if (!row || row.state.state === "notInstalled") return { availability: "unavailable", cause: "not_installed", model: "unknown", memory_bytes: null };
+  let memory: number | null = null;
+  try { memory = (await sharedCodingMode()).memory.plan_bytes; } catch { /* the figure is a courtesy */ }
+  const state = row.coding?.state;
+  if (state === "offline" || row.state.state === "offline") return { availability: "unavailable", cause: "offline", model: "unloaded", memory_bytes: memory };
+  if (state === "loading") return { availability: "starting", cause: "restarting", model: "unloaded", memory_bytes: memory };
+  if (state === "busy") return { availability: "ready", model: "busy", memory_bytes: memory };
+  const loaded = state === "ready" || row.state.state === "loaded" || row.state.state === "ready";
+  return { availability: "ready", model: loaded ? "idle" : "unloaded", memory_bytes: memory };
 }

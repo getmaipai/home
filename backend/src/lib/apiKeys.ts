@@ -54,12 +54,13 @@ function usable(row: KeyRow): "revoked" | "expired" | null {
   return Date.parse(row.expiresAt) <= Date.now() ? "expired" : null;
 }
 /** Why a person may not use a coding key right now. "ok" is the only admission; the rest name the plain reply the gateway gives. */
+import { codingPausedByAdmin } from "@/lib/codingPause";
 export type CodeAdmission = "ok" | "not_allowed" | "keys_off" | "coding_off" | "coding_paused" | "piece_missing";
 /** The person's controls read NOW, every call: nothing is cached on the key, so a key never widens after a controls change. */
 export function codeAdmission(person: PersonRow): CodeAdmission {
   if (person.deletedAt || !person.enabled || person.memorializedAt || person.role === "guest") return "not_allowed";
   if (getHouseholdSettingValue("coding.enabled") !== true) return "coding_off";
-  if (getHouseholdSettingValue("coding.paused") === true) return "coding_paused";
+  if (codingPausedByAdmin()) return "coding_paused";
   if (!mayUse(person, "code")) return "not_allowed"; // ACCESS-UI-01: the pass holds `use:code` (adult default, explicit allow, deny wins, timed grants)
   if (missingCodingPiece()) return "piece_missing"; // CODE-STACK-01 H1: the engine or model is not installed; keys are held suspended until it is.
   return getPersonSettingValue(person, "coding.person.api_keys") === true ? "ok" : "keys_off";

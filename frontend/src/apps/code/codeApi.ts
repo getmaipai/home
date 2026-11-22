@@ -19,6 +19,7 @@ export interface CodeSession {
 
 export interface CodeView {
   session: CodeSession;
+  coding_notice: string | null;
   waiting: { turn_id: string; line: string | null; offers_standard: boolean } | null;
   requests: { request_id: string; effect: string }[];
   queued_messages: string[];

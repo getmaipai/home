@@ -20,6 +20,9 @@
   "homepage": "https://github.com/getmaipai/home",
   "requires": [],
   "optional": [],
+  "needs": [
+    { "kind": "engine", "id": "coding", "name": "Coding engine", "purpose": "Run coding sessions", "required": true }
+  ],
   "platforms": [
     "home"
   ],

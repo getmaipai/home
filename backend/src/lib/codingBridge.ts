@@ -15,6 +15,7 @@ import { newCodingRequestId } from "@/lib/id";
 import { appendCodingMessage, replaceCodingMessageParts, type CodingPart } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
 import { addCheckpoint, CodingSessionError, getSessionRow, requireCodingAccess, updateSession } from "@/lib/codingSessions";
+import { trigger } from "@/lib/notifications";
 import type { PersonRow } from "@/types";
 
 /** What the agent reports while it works. The OpenCode adapter (later) maps its own event stream onto these. */
@@ -136,6 +137,7 @@ export function createTurnHost(input: { sessionId: string; personId: string; sig
       const requestId = newCodingRequestId();
       write({ type: "approval", request_id: requestId, effect: request.effect, status: "pending" });
       updateSession(sessionId, { state: "needs_you" });
+      void trigger("coding.needs_you", {}, { personId }); // CODE-NOTIFY-01: no session name, repository or request in the line (rule 6a)
       return await new Promise<PermissionAnswer>((resolve) => {
         const held: Pending = { requestId, sessionId, personId, effect: request.effect, detail: request.detail, messageId: messageId!, parts, resolve };
         pending.set(requestId, held);

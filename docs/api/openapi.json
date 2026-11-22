@@ -19193,6 +19193,9 @@
                         "type": "string",
                         "nullable": true
                       },
+                      "activity": {
+                        "type": "string"
+                      },
                       "paused": {
                         "type": "boolean"
                       },
@@ -57785,6 +57788,10 @@
                       "additionalProperties": false,
                       "description": "CODE-SPEC-01 and CODE-TIER-01 (Home docs/design/local-coding-2026-10-17.md section 4.2, code-session-tiers-2026-11-21.md section 3.1). One Code app session, person scope and owner only. `tier` is the person's stored choice and holds across turns and restarts; each turn still clamps it to what the person may run, and Home writes the corrected value back. `model_id` is provenance, never a choice: Home writes the model that answered the last turn from the Stack's reply and never maps a tier to a model. The transcript is the session's message list in the chat message-part shape and is stored like a conversation, not in this record."
                     },
+                    "coding_notice": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "waiting": {
                       "type": "object",
                       "nullable": true,
@@ -57833,6 +57840,7 @@
                   },
                   "required": [
                     "session",
+                    "coding_notice",
                     "waiting",
                     "requests",
                     "queued_messages"
