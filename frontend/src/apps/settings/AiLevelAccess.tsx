@@ -36,6 +36,8 @@ export function AiLevelAccess({ client }: { client: StackClient }) {
   // A tiered category lists its levels; a one-model category (Video, Music) has one Stack level, but Home still keeps who may use Boost and Max there.
   const features = ACCESS_FEATURES.flatMap((feature) => {
     const category = choices.data?.categories.find((item) => item.id === feature.id);
+    // CODE-FIX-03: the Stack may not list Coding as a tiered category; Home still keeps who may use its Boost and Max, so Coding shows from its own slot levels.
+    if (!category && feature.id === "coding" && choices.data) return [{ ...feature, label: i18n._({ id: "Coding", message: "Coding" }), levels: (SLOT_LEVELS_READ.coding ?? ["standard"]).map((tier) => ({ tier: tier as SlotTier, off: false })) }];
     if (!category) return [];
     const levels = category.tiered ? category.tiers.map((row) => ({ tier: row.tier as SlotTier, off: row.chosen_by === "off" })) : (SLOT_LEVELS_READ[feature.category] ?? ["standard"]).map((tier) => ({ tier: tier as SlotTier, off: false }));
     return [{ ...feature, label: category.label, levels }];

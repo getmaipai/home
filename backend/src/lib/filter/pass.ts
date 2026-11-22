@@ -90,6 +90,9 @@ function buildFrom(person: PassPerson): Pass {
   const access = new Set<string>();
   if (scalar(ACCESS_THINKING_KEY, person.id, band) === true) access.add("thinking");
   for (const work of listOf(scalar(ACCESS_TIER_BOOST_KEY, person.id, band))) access.add(`tier.boost:${work}`);
+  // CODE-FIX-03: the pinned spec's `access.tier.boost` list has no `coding` option yet, so coding Boost follows the person's Chat Boost item (an admin's per-person Boost list
+  // for Chat is therefore also their coding Boost) until the spec lists `coding` there; once it does, the stored list above decides on its own.
+  if (access.has("tier.boost:chat")) access.add("tier.boost:coding");
   for (const work of listOf(scalar(ACCESS_TIER_MAX_KEY, person.id, band))) if (maxAllowed(band, work)) access.add(`tier.max:${work}`);
   if (person.role === "owner" || person.role === "admin") access.add("tier.max:*");
 

@@ -11,12 +11,13 @@ export type SlotDrafts = Partial<Record<SlotTier, SlotDraft>>;
 export interface OptionDef { id: string; type: "boolean" | "integer" | "number"; min?: number; max?: number; default: boolean | number; label: string; minors: boolean }
 
 /** The Stack's feature id to Home's slot role and the spec's category: only these have levels Home keeps access for. */
-export const ACCESS_FEATURES: ReadonlyArray<{ id: "chat" | "pictures" | "video" | "music" | "voice"; role: string; category: string }> = [
+export const ACCESS_FEATURES: ReadonlyArray<{ id: "chat" | "pictures" | "video" | "music" | "voice" | "coding"; role: string; category: string }> = [
   { id: "chat", role: "chat", category: "chat" },
   { id: "pictures", role: "image", category: "image" },
   { id: "video", role: "video", category: "video" },
   { id: "music", role: "music", category: "music" },
   { id: "voice", role: "tts", category: "voice" },
+  { id: "coding", role: "coding", category: "coding" },
 ];
 /** The household switches that gate who a made-content level is for (the old "Adult gate" block of the details sheet). */
 export const GATE_KEYS: Record<string, string[]> = { pictures: ["generation.adults", "generation.kids"], video: ["generation.video.adult_adapters"], music: ["generation.music.enabled"] };

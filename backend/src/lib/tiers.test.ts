@@ -5,6 +5,7 @@ import { createGrant } from "@/lib/grants";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { maxOffered, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE, tierArgument, authorizeTier, allowedQuality, clampTier, readSlot, slotKey, slotOptionsFor, type TierCategory, type TierDeps } from "@/lib/tiers";
 import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
+import { offeredCodingTiers } from "@/lib/codingSessions";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
 import { writeChoiceSetting } from "@/lib/aiChoicesState";
 import type { AgeBand } from "@/lib/ageBand";
@@ -192,19 +193,28 @@ describe("Max on a card (TIER-HOME-03)", () => {
   });
 });
 
-describe("the coding slots (CODE-TIER-02, minimal)", () => {
+describe("the coding slots (CODE-FIX-03)", () => {
   beforeEach(() => resetDb());
-  test("Standard is the Stack's recommended coding model; Boost and Max are off until a slot is set", () => {
-    expect(readSlot("coding", "standard").model).toBe("recommended");
-    expect(readSlot("coding", "boost").model).toBe("off");
-    expect(readSlot("coding", "max").model).toBe("off");
-    expect(readSlot("chat", "boost").model).toBe("recommended");
+  test("every coding level defaults to the Stack's recommended model, not off", () => {
+    for (const tier of ["standard", "boost", "max"] as const) expect(readSlot("coding", tier).model).toBe("recommended");
   });
-  test("an admin's coding slot is read as stored, and a request above the offered tier runs at Standard", () => {
+  test("an admin is authorized for coding Boost and Max, and a slot set to off still lowers", () => {
     const owner = addPerson("person-owner001", "owner");
-    expect(authorizeTier({ person: owner, category: "coding", requested: "max" }).tier).toBe("standard");
-    expect(setHouseholdSettingValue(slotKey("coding", "boost"), { model: "recommended", options: {} }).ok).toBe(true);
-    expect(readSlot("coding", "boost").model).toBe("recommended");
+    expect(authorizeTier({ person: owner, category: "coding", requested: "max" }).tier).toBe("max");
+    expect(authorizeTier({ person: owner, category: "coding", requested: "boost" }).tier).toBe("boost");
+    expect(setHouseholdSettingValue(slotKey("coding", "max"), { model: "off", options: {} }).ok).toBe(true);
+    expect(authorizeTier({ person: owner, category: "coding", requested: "max" })).toEqual({ tier: "boost", note: "slot_off" });
+  });
+  test("offeredCodingTiers lists Boost and Max for an admin and only the granted tiers for a member", () => {
+    const owner = addPerson("person-owner001", "owner");
+    expect(offeredCodingTiers(owner).tiers).toEqual(["standard", "boost", "max"]);
+    const member = addPerson("person-adult001", "adult");
+    expect(offeredCodingTiers(member).tiers).not.toContain("max");
+    createGrant({ id: owner.id, role: "owner" }, { person: member.id, action: "tier.max:coding", effect: "allow" });
+    expect(offeredCodingTiers(member).tiers).toContain("max");
+  });
+  test("an adult member's pass holds coding Boost by the role default", () => {
+    const member = addPerson("person-adult001", "adult");
+    expect(offeredCodingTiers(member).tiers).toContain("boost");
   });
 });
-

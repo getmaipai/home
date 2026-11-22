@@ -22,6 +22,7 @@ export const SLOT_LEVELS_READ: Readonly<Record<string, readonly SlotLevel[]>> = 
   video: ["standard", "boost", "max"],
   music: ["standard", "boost", "max"],
   voice: ["standard"],
+  coding: ["standard", "boost", "max"],
 };
 
 /** Categories whose Max slot has a recommended maker of its own, named here (the Stack picks it, so the slot's `recommended` is a real choice, not "no model yet"). */

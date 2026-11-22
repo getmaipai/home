@@ -7,7 +7,7 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 export const CONTENT_KINDS = ["chat", "web", "news", "library", "made"] as const;
 export type ContentKindId = (typeof CONTENT_KINDS)[number];
 export const CEILING_LEVELS = ["G", "PG", "PG-13", "R", "X"] as const;
-export const ACCESS_WORKS = ["chat", "image", "video", "music", "voice"] as const;
+export const ACCESS_WORKS = ["chat", "image", "video", "music", "voice", "coding"] as const;
 
 export const CONTENT_CEILING_KEY = "content.ceiling";
 export const CONTENT_UNRATED_KEY = "content.unrated";

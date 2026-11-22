@@ -55,9 +55,9 @@ describe("the Code package", () => {
 });
 
 describe("GET /api/code/sessions/tiers", () => {
-  test("an owner is offered Standard and Max (Boost needs its own grant), and a new session starts on the last tier used", async () => {
+  test("an owner is offered Standard, Boost and Max, and a new session starts on the last tier used", async () => {
     const first = await (await client.get("/api/code/sessions/tiers")).json() as { tiers: string[]; last: string };
-    expect(first).toEqual({ tiers: ["standard", "max"], last: "standard" });
+    expect(first).toEqual({ tiers: ["standard", "boost", "max"], last: "standard" });
     await client.post("/api/code/sessions", input({ tier: "max" }));
     expect(((await (await client.get("/api/code/sessions/tiers")).json()) as { last: string }).last).toBe("max");
   });
@@ -69,7 +69,7 @@ describe("GET /api/code/sessions/tiers", () => {
   });
   test("a tier whose slot is switched off is absent", async () => {
     setHouseholdSettingValue("engines.coding.tier.max", { model: "off", options: {} });
-    expect(((await (await client.get("/api/code/sessions/tiers")).json()) as { tiers: string[] }).tiers).toEqual(["standard"]);
+    expect(((await (await client.get("/api/code/sessions/tiers")).json()) as { tiers: string[] }).tiers).toEqual(["standard", "boost"]);
   });
   test("Coding off gives the household's copy", async () => {
     setHouseholdSettingValue("coding.enabled", false);

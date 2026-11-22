@@ -33,13 +33,16 @@ export interface SlotRecord { model: string; options: Record<string, TierOptionV
 
 /** The slot's stored record with the tier's default `who`; an unreadable value reads as the default slot, never as a reason to allow more. */
 export function readSlot(category: TierCategory, tier: Tier | "reduced"): SlotRecord {
-  // CODE-TIER-02 (minimal, 2026-11-21): the Stack serves one coding model, so Standard is "recommended" (the Stack's installed coding model) and a coding Boost or
-  // Max is off until a slot is set (the bench has not justified a second model). A slot an admin sets is read as stored.
-  const unmeasured = category === "coding" && tier !== "standard";
-  const fallback: SlotRecord = { model: tier === "reduced" || unmeasured ? "off" : "recommended", options: {}, who: vocab.who_default[tier] as TierWho };
+  // CODE-FIX-03: coding Boost and Max default to the Stack's recommended model like every other category (the "unmeasured, off" default is gone). A household that
+  // wants a level off sets its slot to `off` in Settings, AI and models; who may use it is the pass (the Boost and Max access items) and the slot's Who.
+  const fallback: SlotRecord = { model: tier === "reduced" ? "off" : "recommended", options: {}, who: vocab.who_default[tier] as TierWho };
+  // The pinned spec still registers coding Boost and Max as `off` (its "until the benchmark justifies them" default), so a slot nobody stored reads as `recommended` here;
+  // a slot an admin stored (including `off`) is read as stored below.
   // STACK-MODELS-HOME-01: the model a household chose lives in the Stack; Home reads its cached answer. Who may use the level and its options stay Home's.
   const chosen = stackSlotModel(category, tier);
   const withStackModel = (record: SlotRecord): SlotRecord => (chosen === null ? record : { ...record, model: chosen });
+  const codingDefault = category === "coding" && (tier === "boost" || tier === "max") && getHouseholdSettingSource(slotKey(category, tier)) === undefined;
+  if (codingDefault) return withStackModel(fallback);
   try {
     const parsed = TierSlot.safeParse(getHouseholdSettingValue(slotKey(category, tier)));
     if (!parsed.success || checkTierSlotOptions(category, parsed.data.options).length > 0) return withStackModel(fallback);

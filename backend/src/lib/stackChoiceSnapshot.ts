@@ -7,7 +7,7 @@ import { ensureChoicesMigrated, readMigrationRecord } from "@/lib/stackChoicesMi
 import { isStackConfigured } from "@/lib/stackEngine";
 
 /** Home's category names to the Stack's. Coding is left out: its Boost and Max are off until measured (CODE-TIER-02), a rule of Home's own. */
-const STACK_CATEGORY: Record<string, string> = { chat: "chat", image: "pictures", video: "video", music: "music", voice: "voice" };
+const STACK_CATEGORY: Record<string, string> = { chat: "chat", image: "pictures", video: "video", music: "music", voice: "voice", coding: "coding" };
 type Level = "reduced" | "standard" | "boost" | "max";
 
 interface Row { tier: Level; chosen: string | null; chosen_by: "household" | "recommended" | "off" | "none" }
