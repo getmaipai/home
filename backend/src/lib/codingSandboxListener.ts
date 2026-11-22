@@ -37,17 +37,21 @@ let server: { stop(force?: boolean): void } | null = null;
 /** index.ts gives the listener the app's fetch once; nothing is bound until a Code turn needs it. */
 export function configureSandboxListener(fetch: SandboxFetch): void { handler = fetch; }
 
-/** Binds the bridge listener if it is not up. False when it cannot be (no bridge address yet, port taken, not configured): the turn then fails with gateway_unreachable. */
-export async function ensureSandboxListener(): Promise<boolean> {
+/** Binds the bridge listener if it is not up. A rebind right after a release can find the port still closing, and the bridge address can lag a sandbox start, so it retries for about 5 s. False when it still cannot be (no bridge address, not configured): the turn then fails with gateway_unreachable. */
+export async function ensureSandboxListener(attempts = 25, waitMs = 200): Promise<boolean> {
   if (server) return true;
   const bridge = sandboxBridgeAddress(); const port = sandboxBridgePort();
   if (!handler || !bridge || !port) return false;
-  try {
-    const guarded = guardSandboxRequest(bridge, handler, (request, srv) => (srv as { requestIP?: (r: Request) => { address: string } | null } | null)?.requestIP?.(request)?.address);
-    server = Bun.serve({ hostname: bridge, port, fetch: guarded as never, idleTimeout: 120 });
-    appendLogLine(`coding sandbox_listener_up port=${port}`);
-    return true;
-  } catch { server = null; appendLogLine("coding sandbox_listener_failed"); return false; }
+  const guarded = guardSandboxRequest(bridge, handler, (request, srv) => (srv as { requestIP?: (r: Request) => { address: string } | null } | null)?.requestIP?.(request)?.address);
+  for (let i = 0; i < attempts; i++) {
+    if (server) return true;
+    try {
+      server = Bun.serve({ hostname: bridge, port, fetch: guarded as never, idleTimeout: 120 });
+      appendLogLine(`coding sandbox_listener_up port=${port} try=${i + 1}`);
+      return true;
+    } catch (e) { server = null; if (i === attempts - 1) appendLogLine(`coding sandbox_listener_failed ${String((e as Error)?.message ?? e).slice(0, 120)}`); else await Bun.sleep(waitMs); }
+  }
+  return false;
 }
 /** Stops the listener (Coding turned off, Home stopping, or a turn found it dead so the next one rebinds). */
 export function stopSandboxListener(): void { try { server?.stop(true); } catch { /* already gone */ } server = null; }

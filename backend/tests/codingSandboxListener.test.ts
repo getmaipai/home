@@ -47,6 +47,15 @@ describe("the real listener", () => {
   test("an address that is not on this machine cannot be bound: the turn gets false, not a throw", async () => {
     process.env.MAIPAI_SANDBOX_GATEWAY_URL = "http://192.0.2.77:38999/code/v1";
     configureSandboxListener(ok);
-    expect(await ensureSandboxListener()).toBe(false);
+    expect(await ensureSandboxListener(2, 10)).toBe(false);
+  });
+  test("a rebind that finds the port still closing succeeds once it frees (the live sandbox_listener_failed after a release)", async () => {
+    const port = 38000 + Math.floor(Math.random() * 1000);
+    process.env.MAIPAI_SANDBOX_GATEWAY_URL = `http://127.0.0.1:${port}/code/v1`;
+    configureSandboxListener(ok);
+    const holder = Bun.serve({ hostname: "127.0.0.1", port, fetch: () => new Response("busy") });
+    setTimeout(() => holder.stop(true), 300);
+    expect(await ensureSandboxListener(25, 100)).toBe(true);
+    stopSandboxListener();
   });
 });
