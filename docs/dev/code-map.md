@@ -188,10 +188,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
 | `frontend/src/apps/clock/WorldClocksTab.tsx` | WorldClocksTab |
 | `frontend/src/apps/code/CodePage.tsx` | sessionIdOf, CodePage |
+| `frontend/src/apps/code/Composer.tsx` | ContextRing, Composer |
 | `frontend/src/apps/code/NewSession.tsx` | CODE_TIERS_KEY, CODE_SESSIONS_KEY, tierOptions, NewSession |
 | `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, sessionItems, CodeSidebar |
 | `frontend/src/apps/code/SessionTabs.tsx` | ChangesTab, FilesTab, TerminalTab, PlanTab |
-| `frontend/src/apps/code/SessionView.tsx` | SessionView |
+| `frontend/src/apps/code/SessionView.tsx` | CODE_DENSITY, SessionView |
 | `frontend/src/apps/code/Transcript.tsx` | Transcript |
 | `frontend/src/apps/code/layout.tsx` | Stack |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
@@ -557,6 +558,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
 | `backend/src/lib/codingBridge.ts` | OUTPUT_KEEP, isSessionTainted, markSessionTainted, startTaint, pendingRequestsFor, answerHostRequest |
 | `backend/src/lib/codingChanges.ts` | parseChangeCounts, readChangeCounts |
+| `backend/src/lib/codingContext.ts` | __resetCodingWindowCacheForTests, sessionContext |
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
 | `backend/src/lib/codingGatewayAddress.ts` | DEFAULT_SANDBOX_GATEWAY_HOST, sandboxGatewayPort, sandboxGatewayUrl |
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
@@ -573,6 +575,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingShare.ts` | setSecretScanner, codingWorkspaceRoot, __setWorkspaceRootForTests, codingWorkspace, handWorkspaceToEngine, __setShareRemoteForTests |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
 | `backend/src/lib/codingTurns.ts` | CodingTurnError, setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, messageBudgetMs, DEFAULT_MAX_SESSIONS |
+| `backend/src/lib/codingUpload.ts` | UPLOAD_MAX_BYTES, UPLOAD_MAX_FILES, uploadToWorkspace |
 | `backend/src/lib/codingWorkspaceView.ts` | FILE_VIEW_CAP, sessionChanges, sessionTree, sessionFile |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |

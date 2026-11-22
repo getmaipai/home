@@ -57,3 +57,32 @@ test("the live line says what the agent is doing, and the header never shows a r
   expect(elapsedWords(65_000)).toBe("1 min 05 s");
   expect(elapsedWords(4_000)).toBe("4 s");
 });
+
+import { contextFraction, contextInk, groupSessions, stopWords, tokenWords } from "./codeTranscript";
+test("a failed turn is explained in plain words by its reason code, each with a next step", () => {
+  expect(stopWords("error", "feature_missing")).toContain("too old");
+  expect(stopWords("error", "lock_not_ready")).toContain("sandbox is not ready");
+  expect(stopWords("error", "unavailable")).toContain("could not reach");
+  expect(stopWords("error", "model_not_loaded")).toContain("not loaded");
+  expect(stopWords("error", "budget_spent")).toContain("budget");
+  expect(stopWords("error", "not_allowed")).toContain("access changed");
+  expect(stopWords("error", "gateway_unreachable")).toContain("coding gateway");
+  expect(stopWords("error", "agent_exit")).toContain("quit unexpectedly");
+  expect(stopWords("user")).toContain("You stopped");
+  expect(stopWords("error", "zzz")).not.toContain("Stopped by a problem");
+  for (const w of [stopWords("error"), stopWords("wall_clock"), stopWords("denied")]) expect(w.length).toBeGreaterThan(30);
+});
+test("the context ring goes calm, then warning, then critical, and says nothing it cannot know", () => {
+  expect(contextInk(contextFraction(100, 1000))).toContain("done");
+  expect(contextInk(contextFraction(700, 1000))).toContain("attention");
+  expect(contextInk(contextFraction(900, 1000))).toContain("problem");
+  expect(contextFraction(5, null)).toBeNull();
+  expect(contextFraction(5000, 1000)).toBe(1);
+  expect(tokenWords(208_000)).toBe("208K");
+  expect(tokenWords(1_000_000)).toBe("1.0M");
+});
+test("sessions split into Today and Previous", () => {
+  const now = Date.parse("2026-11-21T15:00:00");
+  const g = groupSessions([{ last_activity_at: "2026-11-21T09:00:00" }, { last_activity_at: "2026-11-19T09:00:00" }], now);
+  expect([g.today.length, g.previous.length]).toEqual([1, 1]);
+});

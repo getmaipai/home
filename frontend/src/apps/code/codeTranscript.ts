@@ -60,7 +60,7 @@ export const stateWord = (state: CodeState): string => ({
   idle: i18n._({ id: "Ready", message: "Ready" }),
   paused: i18n._({ id: "Paused", message: "Paused" }),
   done: i18n._({ id: "Done", message: "Done" }),
-  failed: i18n._({ id: "Stopped by a problem", message: "Stopped by a problem" }),
+  failed: i18n._({ id: "The agent stopped", message: "The agent stopped" }),
   archived: i18n._({ id: "Archived", message: "Archived" }),
 })[state];
 
@@ -128,4 +128,38 @@ export function repoLine(repo: { kind: string; full_name?: string; work_branch: 
   if (repo.kind === "none") return i18n._({ id: "Scratch folder", message: "Scratch folder" });
   if (repo.kind === "hub_folder") return repo.path ? i18n._({ id: "Folder {path}", message: "Folder {path}", values: { path: repo.path } }) : i18n._({ id: "Home folder", message: "Home folder" });
   return `${repo.full_name ?? i18n._({ id: "Repository", message: "Repository" })} · ${repo.work_branch}`;
+}
+
+/** Why a turn stopped, in plain words with the next step. `code` is the reason code the hub kept (never error text); `reason` is the part's own kind. */
+export function stopWords(reason: "user" | "wall_clock" | "error" | "denied", code?: string): string {
+  if (reason === "user") return i18n._({ id: "You stopped this. Nothing more is running. Send a message to carry on.", message: "You stopped this. Nothing more is running. Send a message to carry on." });
+  if (reason === "denied") return i18n._({ id: "Stopped because you said no. Send a message to carry on another way.", message: "Stopped because you said no. Send a message to carry on another way." });
+  if (reason === "wall_clock") return i18n._({ id: "This step used up its time. Send a message to carry on, or break the task into smaller parts.", message: "This step used up its time. Send a message to carry on, or break the task into smaller parts." });
+  const c = (code ?? "").toLowerCase();
+  if (c === "feature_missing" || c.includes("old")) return i18n._({ id: "The coding engine is too old for this. Ask an admin to update it in Settings, then send your message again.", message: "The coding engine is too old for this. Ask an admin to update it in Settings, then send your message again." });
+  if (c === "lock_not_ready" || c.includes("sandbox")) return i18n._({ id: "The sandbox is not ready yet. Wait a minute, then send your message again.", message: "The sandbox is not ready yet. Wait a minute, then send your message again." });
+  if (c === "gateway_unreachable") return i18n._({ id: "The sandbox could not reach the coding gateway. Ask an admin to check Settings, Coding, then send your message again.", message: "The sandbox could not reach the coding gateway. Ask an admin to check Settings, Coding, then send your message again." });
+  if (c === "agent_exit") return i18n._({ id: "The coding agent quit unexpectedly. Send your message again.", message: "The coding agent quit unexpectedly. Send your message again." });
+  if (c === "unavailable" || c.includes("unreach")) return i18n._({ id: "Home could not reach the AI engine. Check that it is running, then send your message again.", message: "Home could not reach the AI engine. Check that it is running, then send your message again." });
+  if (c.includes("model") || c.includes("load")) return i18n._({ id: "The coding model is not loaded. Give it a minute to start, then send your message again.", message: "The coding model is not loaded. Give it a minute to start, then send your message again." });
+  if (c.includes("budget") || c.includes("quota") || c.includes("limit")) return i18n._({ id: "This session ran out of its budget. Start a new session to carry on.", message: "This session ran out of its budget. Start a new session to carry on." });
+  if (c.includes("not_allowed") || c.includes("access") || c.includes("forbidden")) return i18n._({ id: "Your coding access changed, so this stopped. Ask an admin to check your Coding access in Settings.", message: "Your coding access changed, so this stopped. Ask an admin to check your Coding access in Settings." });
+  return i18n._({ id: "The agent stopped because of a problem on this computer. Send your message again, or ask an admin to check Settings, Coding.", message: "The agent stopped because of a problem on this computer. Send your message again, or ask an admin to check Settings, Coding." });
+}
+
+/** How full the context is, as a fraction; null when the window is not known. */
+export const contextFraction = (used: number, window: number | null): number | null => window && window > 0 ? Math.min(1, used / window) : null;
+/** calm, then warning, then critical as the window fills; tokens of the kit's status palette. */
+export function contextInk(fraction: number | null): string {
+  if (fraction === null || fraction < 0.6) return "var(--status-done-ink)";
+  return fraction < 0.85 ? "var(--status-attention-ink)" : "var(--tint-problem-border)";
+}
+export const tokenWords = (n: number): string => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 || n % 1000 === 0 ? 0 : 1)}K` : String(n);
+
+/** The sessions rail's two groups. */
+export function groupSessions<T extends { last_activity_at: string }>(rows: readonly T[], now = Date.now()): { today: T[]; previous: T[] } {
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  const today: T[] = []; const previous: T[] = [];
+  for (const row of rows) (Date.parse(row.last_activity_at) >= start.getTime() ? today : previous).push(row);
+  return { today, previous };
 }

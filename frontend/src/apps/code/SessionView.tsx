@@ -15,18 +15,21 @@ import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { TierChip, TierSegment, type TierId } from "@maipai/ui/src/elements/tier-segment";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
 import { errorLine } from "@/lib/hubReachability";
 import { ApiError } from "@/lib/api";
 import { codeApi, type CodeTier } from "./codeApi";
-import { activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWord, tierWord } from "./codeTranscript";
+import { stopWords, activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWord, tierWord } from "./codeTranscript";
 import { CODE_SESSIONS_KEY, CODE_TIERS_KEY, tierOptions } from "./NewSession";
 import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
 import { Stack } from "./layout";
+import { Composer } from "./Composer";
 import { Transcript, type LocalNotice } from "./Transcript";
 
 const TerminalIcon = getIcon("terminal");
+
+/** The Code app sets its own tighter type size and spacing by token, the way the references (an editor, a terminal) read: small, even, quiet. */
+export const CODE_DENSITY = { ["--font-size-body" as string]: "12.5px", ["--spacing" as string]: "calc(0.25rem * 0.8)" } as const;
 
 export function SessionView({ id }: { id: string }) {
   const navigate = useNavigate();
@@ -35,7 +38,6 @@ export function SessionView({ id }: { id: string }) {
   const view = useQuery({ queryKey: ["code-session", id], queryFn: () => codeApi.view(id), retry: false, refetchInterval: (q) => q.state.data && isBusy(q.state.data.session.state) ? 1000 : 6000 });
   const messages = useQuery({ queryKey: ["code-messages", id], queryFn: () => codeApi.messages(id), retry: false, refetchInterval: view.data && isBusy(view.data.session.state) ? 1000 : false });
   const tiers = useQuery({ queryKey: CODE_TIERS_KEY, queryFn: codeApi.tiers, retry: false });
-  const [text, setText] = useState("");
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
   const [notices, setNotices] = useState<LocalNotice[]>([]);
@@ -45,8 +47,9 @@ export function SessionView({ id }: { id: string }) {
   const [pinned, setPinned] = useState(true);
   const end = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(() => Date.now());
+  const context = useQuery({ queryKey: ["code-context", id], queryFn: () => codeApi.context(id), retry: false, refetchInterval: (q) => q.state.data && view.data && isBusy(view.data.session.state) ? 4000 : 20000 });
   const ready = useQuery({ queryKey: ["code-ready"], queryFn: codeApi.ready, retry: false, enabled: false });
-  const list = messages.data ?? [];
+  const list = (messages.data ?? []).filter((m) => !m.parts.every((p) => p.type === "usage"));
   const session = view.data?.session;
   const state = session?.state;
   const lastParts = list[list.length - 1]?.parts.length ?? 0;
@@ -55,6 +58,7 @@ export function SessionView({ id }: { id: string }) {
   const busyNow = state ? isBusy(state) : false;
   useEffect(() => { if (!busyNow) return; setNow(Date.now()); const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [busyNow]);
   const lastPart = list[list.length - 1]?.parts[list[list.length - 1]!.parts.length - 1];
+  const stoppedCode = lastPart?.type === "stopped" ? lastPart.code : undefined;
   const failed = state === "failed" || (!busyNow && lastPart?.type === "stopped" && lastPart.reason === "error");
   const { refetch: checkReady } = ready;
   useEffect(() => { if (failed) void checkReady(); }, [failed, checkReady]);
@@ -87,17 +91,10 @@ export function SessionView({ id }: { id: string }) {
     }, i18n._({ id: "You cannot use that level for coding. Pick another level.", message: "You cannot use that level for coding. Pick another level." }));
   }
 
-  async function send() {
-    const message = text.trim();
-    if (!message) return;
-    setText("");
-    await run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }));
-  }
-
   const useStandard = waiting?.offers_standard ? [{ label: i18n._({ id: "Use Standard for this message", message: "Use Standard for this message" }), onSelect: () => void run(() => codeApi.useStandard(id, waiting.turn_id), i18n._({ id: "That message is not waiting for Max any more.", message: "That message is not waiting for Max any more." })) }] : [];
   const statusLine = waiting?.line ?? view.data.coding_notice ?? stateWord(session.state);
   const tabs = [
-    { id: "changes", label: i18n._({ id: "Changes", message: "Changes" }), content: <ChangesTab session={session} activity={activity} busy={busy} onUndo={(cid) => void run(() => codeApi.undo(id, cid), i18n._({ id: "Could not undo that. Try again.", message: "Could not undo that. Try again." }))} onPush={() => void run(() => codeApi.push(id), i18n._({ id: "Could not push. Try again.", message: "Could not push. Try again." }))} onPullRequest={() => void run(() => codeApi.pullRequest(id), i18n._({ id: "Could not open the pull request. Try again.", message: "Could not open the pull request. Try again." }))} /> },
+    { id: "changes", label: i18n._({ id: "Changes", message: "Changes" }), content: <ChangesTab session={session} context={context.data} activity={activity} busy={busy} onUndo={(cid) => void run(() => codeApi.undo(id, cid), i18n._({ id: "Could not undo that. Try again.", message: "Could not undo that. Try again." }))} onPush={() => void run(() => codeApi.push(id), i18n._({ id: "Could not push. Try again.", message: "Could not push. Try again." }))} onPullRequest={() => void run(() => codeApi.pullRequest(id), i18n._({ id: "Could not open the pull request. Try again.", message: "Could not open the pull request. Try again." }))} /> },
     { id: "files", label: i18n._({ id: "Files", message: "Files" }), content: <FilesTab session={session} activity={activity} /> },
     { id: "terminal", label: i18n._({ id: "Terminal", message: "Terminal" }), content: <TerminalTab activity={activity} /> },
     { id: "plan", label: i18n._({ id: "Plan", message: "Plan" }), content: <PlanTab activity={activity} /> },
@@ -107,7 +104,7 @@ export function SessionView({ id }: { id: string }) {
   const subtitle = repoLine(session.repo);
 
   return (
-    <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1">
+    <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1" style={CODE_DENSITY}>
       <Stack gap="none" className="min-h-0 min-w-0 flex-1">
         <ChatHeader name={session.title} media={<TerminalIcon aria-hidden className="size-6" />} {...(phone ? { onMenu: () => navigate("/apps/code") } : {})}
           actions={<>
@@ -120,22 +117,18 @@ export function SessionView({ id }: { id: string }) {
           </div>} />
         <p className="truncate px-4 pb-1 text-body text-muted-foreground" data-slot="code-subtitle">{subtitle}</p>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {list.length === 0 ? <p className="p-6 text-center text-body text-muted-foreground">{i18n._({ id: "Nothing yet. Tell the agent what to do.", message: "Nothing yet. Tell the agent what to do." })}</p> : <Transcript messages={list} notices={notices} onAnswer={(rid, answer) => void run(() => codeApi.answer(id, rid, answer), i18n._({ id: "Could not send your answer. Try again.", message: "Could not send your answer. Try again." }))} />}
+          {list.length === 0 ? <p className="p-6 text-center text-body text-muted-foreground">{i18n._({ id: "Nothing yet. Tell the agent what to do.", message: "Nothing yet. Tell the agent what to do." })}</p> : <Transcript messages={list} notices={notices} quietFailure={failed} onAnswer={(rid, answer) => void run(() => codeApi.answer(id, rid, answer), i18n._({ id: "Could not send your answer. Try again.", message: "Could not send your answer. Try again." }))} />}
           {busyNow ? <div className="mx-auto w-full max-w-3xl px-4 pb-3" data-slot="code-live"><ThinkingIndicator label={stageOf(session.state, waiting?.line, list)} elapsed={elapsedWords(now - Date.parse([...list].reverse().find((m) => m.role === "user")?.created_at ?? new Date(now).toISOString()))} /></div> : null}
           {failed ? <div className="mx-auto w-full max-w-3xl px-4 pb-3" data-slot="code-failed"><StatusCard kind="problem" title={i18n._({ id: "The agent stopped", message: "The agent stopped" })}
-            line={ready.data && !ready.data.ready && ready.data.first_missing ? `${ready.data.first_missing.say} ${i18n._({ id: "Who can fix this: {who}.", message: "Who can fix this: {who}.", values: { who: ready.data.first_missing.who } })}` : i18n._({ id: "Home could not finish this message. Send it again, or ask an admin to check Settings, Coding.", message: "Home could not finish this message. Send it again, or ask an admin to check Settings, Coding." })} /></div> : null}
+            line={`${stopWords("error", stoppedCode)}${ready.data && !ready.data.ready && ready.data.first_missing ? ` ${ready.data.first_missing.say} ${i18n._({ id: "Who can fix this: {who}.", message: "Who can fix this: {who}.", values: { who: ready.data.first_missing.who } })}` : ""}`} /></div> : null}
           <div ref={end} />
         </div>
         <div className={`mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 ${phone ? "pb-32" : "pb-3"}`}>
           {useStandard.length > 0 ? <div data-slot="code-held"><PendingActions actions={useStandard} /></div> : null}
           {queued.length > 0 ? <div><MessageQueue running={statusLine} queued={queued.map((qid, index) => ({ id: qid, text: i18n._({ id: "Message {n} is waiting", message: "Message {n} is waiting", values: { n: index + 1 } }) }))} onCancel={(qid) => void run(() => codeApi.cancelQueued(id, qid), i18n._({ id: "That message is not waiting any more.", message: "That message is not waiting any more." }))} /></div> : null}
           {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
-          <Stack as="form" onSubmit={(event) => { event.preventDefault(); void send(); }}>
-            <Textarea value={text} rows={3} onChange={(event) => setText(event.target.value)} aria-label={i18n._({ id: "Message to the agent", message: "Message to the agent" })} placeholder={i18n._({ id: "Message the agent", message: "Message the agent" })}
-              onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void send(); } }} />
-            <Stack row className="justify-end"><Button type="submit" disabled={!text.trim() || busy}>{i18n._({ id: "Send", message: "Send" })}</Button></Stack>
-          </Stack>
-          <p role="status" data-slot="code-status" className="text-body text-muted-foreground">{statusLine}</p>
+          <Composer session={session} tiers={tiers.data?.tiers ?? ["standard"]} onTier={(next) => void changeTier(next)} maxNext={maxNext} context={context.data} statusLine={statusLine} disabled={busy}
+            onSend={(message) => run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }))} onProblem={setProblem} />
         </div>
       </Stack>
       {pane}

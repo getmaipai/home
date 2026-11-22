@@ -46,7 +46,7 @@ describe("events become message parts and audit lines", () => {
     const a = owner(); const s = createCodingSession(a, input());
     const sent = submitTurn(a, s.id, "fix it"); await settled(); rig.agent.finishAll(); await turnFinished(sent.turn_id);
     const messages = listCodingMessages(a.id, s.id);
-    expect(messages.map((m) => m.role)).toEqual(["user", "agent"]);
+    expect(messages.map((m) => m.role)).toEqual(["user", "agent", "system"]);
     const parts = messages[1]!.parts;
     expect(parts.map((p) => p.type)).toEqual(["text", "plan", "tool", "tool"]);
     expect((parts[1] as { items: { done: boolean }[] }).items[0]!.done).toBe(true);

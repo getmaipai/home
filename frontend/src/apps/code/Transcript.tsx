@@ -6,16 +6,9 @@ import { LightMarkdown } from "@maipai/ui/src/elements/light-markdown";
 import { TerminalBlock } from "@maipai/ui/src/elements/terminal-block";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { CodeMessage, CodePart } from "./codeApi";
-import { approvalWords, outputLines } from "./codeTranscript";
+import { approvalWords, outputLines, stopWords } from "./codeTranscript";
 
 const ShieldIcon = getIcon("shield-check");
-
-const stopWords = (reason: "user" | "wall_clock" | "error" | "denied"): string => ({
-  user: i18n._({ id: "Stopped. Nothing more is running.", message: "Stopped. Nothing more is running." }),
-  wall_clock: i18n._({ id: "Stopped: this step took too long. Send a message to carry on.", message: "Stopped: this step took too long. Send a message to carry on." }),
-  error: i18n._({ id: "Stopped by a problem. Send a message to try again.", message: "Stopped by a problem. Send a message to try again." }),
-  denied: i18n._({ id: "Stopped because you said no. Send a message to carry on another way.", message: "Stopped because you said no. Send a message to carry on another way." }),
-})[reason];
 
 function partNode(part: CodePart, onAnswer: (requestId: string, answer: "allow" | "deny") => void) {
   switch (part.type) {
@@ -30,21 +23,22 @@ function partNode(part: CodePart, onAnswer: (requestId: string, answer: "allow" 
         statusLabels={{ done: i18n._({ id: "You said yes", message: "You said yes" }), denied: i18n._({ id: "You said no", message: "You said no" }) }}
         {...(part.status === "pending" ? { onAllowOnce: () => onAnswer(part.request_id, "allow"), onDeny: () => onAnswer(part.request_id, "deny") } : {})} /></div>;
     }
-    case "stopped": return <p role="status" className="text-body text-muted-foreground">{stopWords(part.reason)}</p>;
+    case "stopped": return <p role="status" className="text-body text-muted-foreground">{stopWords(part.reason, part.code)}</p>;
+    case "usage": return null;
     case "notice": return <p className="text-body text-muted-foreground">{part.text}</p>;
   }
 }
 
 export interface LocalNotice { afterSeq: number; text: string }
 
-export function Transcript({ messages, notices, onAnswer }: { messages: readonly CodeMessage[]; notices: readonly LocalNotice[]; onAnswer: (requestId: string, answer: "allow" | "deny") => void }) {
+export function Transcript({ messages, notices, quietFailure = false, onAnswer }: { messages: readonly CodeMessage[]; notices: readonly LocalNotice[]; /** The latest failure is explained by the card under the transcript, so its line is not repeated. */ quietFailure?: boolean; onAnswer: (requestId: string, answer: "allow" | "deny") => void }) {
   const noticeAt = (seq: number) => notices.filter((n) => n.afterSeq === seq).map((n, i) => <p key={`n${seq}-${i}`} role="status" className="text-center text-body text-muted-foreground">{n.text}</p>);
-  return <ol data-slot="code-transcript" aria-label={i18n._({ id: "Conversation", message: "Conversation" })} className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-4">
+  return <ol data-slot="code-transcript" aria-label={i18n._({ id: "Conversation", message: "Conversation" })} className="mx-auto flex w-full max-w-3xl flex-col divide-y divide-border/40 px-3 py-2">
     {noticeAt(0)}
-    {messages.map((message) => <li key={message.id} className="flex flex-col gap-2">
+    {messages.map((message) => <li key={message.id} className="flex flex-col gap-1.5 py-2.5">
       {message.role === "user"
-        ? <div className="ms-auto max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-body whitespace-pre-wrap">{message.parts.map((p) => p.type === "text" ? p.text : "").join("")}</div>
-        : message.parts.map((part, index) => <div key={index}>{partNode(part, onAnswer)}</div>)}
+        ? <div className="ms-auto max-w-[85%] rounded-lg bg-muted px-3 py-1.5 text-body whitespace-pre-wrap">{message.parts.map((p) => p.type === "text" ? p.text : "").join("")}</div>
+        : message.parts.map((part, index) => quietFailure && message === messages[messages.length - 1] && part.type === "stopped" && part.reason === "error" ? null : <div key={index}>{partNode(part, onAnswer)}</div>)}
       {noticeAt(message.seq)}
     </li>)}
   </ol>;

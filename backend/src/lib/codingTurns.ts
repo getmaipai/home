@@ -211,6 +211,7 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
       updateSession(row.id, { state: "idle", lastActivityAt: new Date().toISOString(), ...(modelId ? { modelId } : {}),
         usage: { input_tokens: row.usage.input_tokens + (result.usage?.input_tokens ?? 0), output_tokens: row.usage.output_tokens + (result.usage?.output_tokens ?? 0) } });
     }
+    if (result.usage && (result.usage.input_tokens > 0 || result.usage.output_tokens > 0)) appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "system", parts: [{ type: "usage", input: result.usage.input_tokens, output: result.usage.output_tokens }] });
     await recordChanges(rt, turn.sessionId);
     log("turn_done", turn, `in=${result.usage?.input_tokens ?? 0} out=${result.usage?.output_tokens ?? 0}`);
     settle(turn, "done");
@@ -218,7 +219,7 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
     // Reason code only: the error text can hold a path or a repository name (rule 6a).
 const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown }).name ?? "error").replace(/[^A-Za-z0-9_]/g, "").slice(0, 40) || "error";
     updateSession(turn.sessionId, { state: turn.abort.signal.aborted ? "idle" : "failed", lastActivityAt: new Date().toISOString() });
-    if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn, `reason=${why}`); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error" }] }); }
+    if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn, `reason=${why}`); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error", code: why }] }); }
     settle(turn, turn.abort.signal.aborted ? "cancelled" : "failed");
   } finally {
     if (timer) clearTimeout(timer);

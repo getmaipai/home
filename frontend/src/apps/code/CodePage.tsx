@@ -10,7 +10,7 @@ import { ApiError, type Roster } from "@/lib/api";
 import { errorLine } from "@/lib/hubReachability";
 import { NewSession } from "./NewSession";
 import { CodeSidebar, sessionMeta, useCodeSessions } from "./SessionList";
-import { SessionView } from "./SessionView";
+import { SessionView, CODE_DENSITY } from "./SessionView";
 
 /** The session id in /apps/code/<id>, or undefined on the index. */
 export const sessionIdOf = (pathname: string): string | undefined => /^\/apps\/code\/(csess-[a-z0-9]+)\/?$/.exec(pathname)?.[1];
@@ -28,13 +28,13 @@ export function CodePage({ person: _person }: { person: Roster }) {
   const rows = sessions.data ?? [];
   if (phone) {
     if (id) return <div className="flex min-h-0 flex-1 flex-col" data-workspace-fill=""><SessionView id={id} /></div>;
-    return <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-workspace-fill="" data-slot="code-sessions-page">
+    return <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-workspace-fill="" data-slot="code-sessions-page" style={CODE_DENSITY}>
       <NewSession />
       {rows.length > 0 ? <List label={i18n._({ id: "Sessions", message: "Sessions" })} items={rows} getKey={(s) => s.id} onSelect={(s) => navigate(`/apps/code/${s.id}`)} getLabel={(s) => s.title}
         renderItem={(s) => <span className="flex min-w-0 flex-col"><span className="truncate text-body font-medium">{s.title}</span><span className="truncate text-body text-muted-foreground">{sessionMeta(s)}</span></span>} /> : null}
     </div>;
   }
-  return <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="code-frame">
+  return <div className="flex min-h-0 min-w-0 flex-1" data-workspace-fill="" data-slot="code-frame" style={CODE_DENSITY}>
     <CodeSidebar sessions={rows} currentId={id} />
     {id ? <SessionView key={id} id={id} /> : <div className="flex min-h-0 min-w-0 flex-1 items-start overflow-y-auto pt-10"><NewSession /></div>}
   </div>;
