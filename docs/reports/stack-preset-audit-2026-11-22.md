@@ -25,7 +25,7 @@ Order is the Stack's own order. "Recommended" is what the Stack picks when nobod
 | Chat | Qwen3 4B, Qwen3.8 27B, Qwen3 8B, Qwen3.6 35B A3B, Qwen3.8 27B (Huihui), Qwen3.6 35B A3B (Huihui), Qwen3.8 Flash Next 177B (Huihui) | Reduced: Qwen3 4B. Standard: Qwen3 8B. Boost: Qwen3.8 27B. Max: Flash Next 177B | The uncensored 27B was a part (and the model Splash serves for chat) with no row in the list, so no picker could offer it. Added as a Standard pick, never recommended. Its label also matched the plain 27B, so it is now "Qwen3.8 27B (Huihui)". Ornith 122B is gone from the Stack and from Home. Flash Next 177B is offered and is the Max pick. |
 | Coding | Qwen3.8 27B (19 GB) | Qwen3.8 27B | Correct as one model. Description now says Max follows Max chat (Flash Next on 128 GB). No separate Max coding row, because a second place to choose the same model would break one definition. |
 | Pictures | FLUX 3 Image Klein, MiniMax H3-Image, ERNIE-Image-Turbo, FLUX.2 Klein 4B, Z-Image-Turbo, Qwen-Image 20B | Standard: FLUX 3 (was MiniMax H3-Image). Boost: MiniMax H3-Image. Max: Qwen-Image 20B | Jesse's 2026-11-17 rule is FLUX 3 for the Stack and new installs. The part table already ranked FLUX 3 first, but the level table (written 2026-11-16) put MiniMax first, so the two disagreed. Level table fixed. MiniMax stays one choice away and stays the Boost pick. |
-| Video | LTX-2.5 with sound (hidden), MiniMax H3, LTX-2.5 Max with sound, SAM 2.1 masks | Standard: MiniMax H3. Boost: none. Max: LTX-2.5 Max | Not changed. Rule says LTX-2.5 is the default for new installs, but the Stack holds plain LTX-2.5 off every level behind MODEL-VET-01. Lifting that gate is a quality decision (see open items). |
+| Video | LTX-2.5 with sound, MiniMax H3, LTX-2.5 Max with sound, SAM 2.1 masks | Standard: LTX-2.5. Boost: LTX-2.5. Max: LTX-2.5 Max | Changed the same day on Jesse's word (LTX was vetted): plain LTX-2.5 left the MODEL-VET-01 hold and is now the default for new installs, ahead of MiniMax H3. A 64 GB computer now also gets LTX-2.5 at Boost when it fits. Decision and date are in `backend/src/lib/tiers.ts` and the Stack changelog. |
 | Music | ACE-Step 1.5 | ACE-Step 1.5 | XL Turbo and XL SFT exist as parts but are not on a level. Matches the lineup note ("XL builds optional"). Not changed. |
 | Voice | Chatterbox Turbo, Pocket TTS, VoxCPM2, VoxCPM2 (smaller), Chatterbox Nano | Standard: Chatterbox Turbo. Reduced: Chatterbox Nano | Correct. Fish Audio Drama 3 (kept by Jesse for Max and film work) is a part but not a voice choice, as before. |
 | Speech to text | Moonshine Tiny, Parakeet TDT 0.6B v2 | Parakeet | Correct. Dropping Moonshine Tiny is a household choice, left to his Settings. |
@@ -39,7 +39,8 @@ Retired and not listed: Ornith 1.5 122B and its draft (retired 2026-11-21), Muse
 
 ## What changed
 
-Stack (`getmaipai/stack`, commit 66c063a on GitHub `main`):
+Stack (`getmaipai/stack`, commits 66c063a and 54cbffb on GitHub `main`):
+- Video: LTX-2.5 is the recommended Standard and Boost model (commit 54cbffb).
 - Pictures: FLUX 3 is the recommended Standard model on a 64 GB computer or bigger.
 - Chat: Qwen3.8 27B (Huihui) is a Standard pick on 64 and 128 GB, never recommended, never planned automatically.
 - Coding description says its Max level uses the Max chat model.
@@ -62,13 +63,11 @@ Chat sheet with no Home edit, which is the proof.
 
 ## Open items (not done here)
 
-1. **Plain LTX-2.5 as the video default.** Jesse's rule says LTX-2.5 for new installs. The Stack keeps it off every level until
-   MODEL-VET-01 finishes. Needs his word to lift the gate.
-2. **Setup wizard plan cards** (`shared/aiChoices.ts`) still hold hand-kept names and sentences (for example "Muse Glimmer 30B picture
+1. **Setup wizard plan cards** (`shared/aiChoices.ts`) still hold hand-kept names and sentences (for example "Muse Glimmer 30B picture
    reader", "Hey Jarvis wake word", "LTX 2.5 Ingredients adapter 0.9"). It is the first-run screen, not Settings, and is its own task.
-3. **"Model per job" card** on Advanced shows `engines.<role>.choice` keys ("Options are not available here", always auto). It comes from
+2. **"Model per job" card** on Advanced shows `engines.<role>.choice` keys ("Options are not available here", always auto). It comes from
    the settings spec in `commons`, so it needs a spec change first. Home's capability code still reads those keys.
-4. **Style (LoRA) pages** name the base video model a style was trained on. That is a file compatibility fact, not a choice, but the names
+3. **Style (LoRA) pages** name the base video model a style was trained on. That is a file compatibility fact, not a choice, but the names
    are typed in Home.
-5. **Two older frontend tests already fail on `main`** (child and teen "nobody gains a key" snapshots) and one lint (CompanionsPage font
+4. **Two older frontend tests already fail on `main`** (child and teen "nobody gains a key" snapshots) and one lint (CompanionsPage font
    size). Not touched.
