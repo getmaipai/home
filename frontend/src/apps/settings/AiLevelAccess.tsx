@@ -49,7 +49,7 @@ export function AiLevelAccess({ client }: { client: StackClient }) {
     <ItemGroup variant="card" aria-label={i18n._({ id: "Who can use each level", message: "Who can use each level" })} data-testid="ai-level-access">
       {features.map((feature) => <Item key={feature.id} data-testid={`ai-access-feature-${feature.id}`}>
         <ItemContent><ItemTitle>{feature.label}</ItemTitle></ItemContent>
-        <ItemActions><Button type="button" variant="outline" size="sm" aria-label={i18n._({ id: "Who can use each {feature} level", message: "Who can use each {feature} level", values: { feature: feature.label } })} onClick={() => begin(feature.id)}>{i18n._({ id: "Who can use each level", message: "Who can use each level" })}</Button></ItemActions>
+        <ItemActions><Button type="button" variant="outline" size="sm" aria-label={i18n._({ id: "Who can use each {feature} level", message: "Who can use each {feature} level", values: { feature: feature.label } })} onClick={() => begin(feature.id)}>{i18n._({ id: "Set access", message: "Set access" })}</Button></ItemActions>
       </Item>)}
     </ItemGroup>
     <Sheet open={open !== null} onOpenChange={(next) => { if (!next) setOpenId(null); }}>
@@ -59,7 +59,7 @@ export function AiLevelAccess({ client }: { client: StackClient }) {
           {open.levels.filter((level) => drafts[level.tier]).map((level) => <LevelAccess key={level.tier} tier={level.tier} off={level.off} draft={drafts[level.tier]!} defs={defs}
             onWho={(who) => setDrafts((old) => ({ ...old, [level.tier]: { ...old[level.tier]!, who } }))}
             onOption={(id, value) => setDrafts((old) => ({ ...old, [level.tier]: { ...old[level.tier]!, options: { ...old[level.tier]!.options, [id]: value } } }))} />)}
-          {gateKeys.length ? <section aria-label={i18n._({ id: "Adult gate", message: "Adult gate" })}><SettingsRenderer scope="household" scopeValue="household" includeKeys={gateKeys} titleOverrides={{ "household.media_pictures": i18n._({ id: "Adult gate", message: "Adult gate" }), "household.media_videos": i18n._({ id: "Adult gate", message: "Adult gate" }), "household.media_music": i18n._({ id: "Adult gate", message: "Adult gate" }) }} /></section> : null}
+          {gateKeys.length ? <section aria-label={i18n._({ id: "Adult gate", message: "Adult gate" })}><SettingsRenderer scope="household" scopeValue="household" includeKeys={gateKeys} titleOverrides={{ "household.media_pictures": i18n._({ id: "Adult gate", message: "Adult gate" }), "household.media_videos": i18n._({ id: "Adult gate", message: "Adult gate" }), "household.media_music": i18n._({ id: "Adult gate", message: "Adult gate" }), "household.media_kids": i18n._({ id: "Children", message: "Children" }) }} /></section> : null}
         </div>
         <div className="flex justify-end gap-2 p-4">
           <Button type="button" variant="outline" onClick={() => setOpenId(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>

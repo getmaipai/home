@@ -141,7 +141,9 @@ export default defineConfig({
     // A kit module Home imports by its bare path and that itself imports a `@/kit/*` alias (the kit's language module, `format`, ...): the
     // dependency optimizer would pre-bundle it on its own, where only the kit alias plugin below can resolve that alias, so it fails.
     // Excluded, it goes through the plugin like every other kit file and shares Home's one `@lingui/core`.
-    exclude: kitModulesNeedingTheAlias(),
+    // STACK-MODELS-HOME-01: also `StackClient`. Home's adapter throws its `StackClientError`, and the shared page tests it with `instanceof` against the copy its own
+    // relative import loads; pre-bundled, the adapter's copy was a second class and every Stack sentence was replaced by the generic one (dev server only).
+    exclude: [...kitModulesNeedingTheAlias(), "@maipai/ui/src/stack/StackClient"],
     // @maipai/ui is a file: dependency (a linked package), which Vite leaves out of
     // pre-bundling, so its CommonJS dependencies (use-sync-external-store and friends)
     // reach the browser raw and fail as ESM. Pre-bundling the kit fixes the dev server;
