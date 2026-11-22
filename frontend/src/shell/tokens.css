@@ -318,6 +318,7 @@ html:not(.light) body {
 }
 [data-slot="chat-rail"],
 [data-chat-column-mobile] {
+  --aui-thread-list-project-chevron-display: none;
   --aui-thread-list-project-items-indent: 1.5rem;
   --aui-thread-list-project-note-font-size: 0.84375rem;
   --aui-thread-list-project-note-padding-x: 0.5625rem;

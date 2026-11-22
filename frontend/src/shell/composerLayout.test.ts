@@ -70,8 +70,8 @@ describe("chat history projects match the chat rows (COMPACT-03)", () => {
     expect(tokens).toContain("--aui-thread-list-row-font-size: 0.84375rem;");
     expect(tokens).toContain("--aui-thread-list-row-padding-x: 0.5625rem;");
   });
-  test("the per-row chevron stays visible (a closed project must look openable), and chats nest under the project name", () => {
-    expect(tokens).not.toContain("--aui-thread-list-project-chevron-display");
+  test("no per-row chevron (projects start open), and chats nest under the project name", () => {
+    expect(tokens).toContain("--aui-thread-list-project-chevron-display: none;");
     expect(tokens).toContain("--aui-thread-list-project-items-indent: 1.5rem;");
     expect(tokens).toContain("--aui-thread-list-project-show-more-height: 2.25rem;");
     expect(tokens).toContain("--aui-assistant-action-bar-min-height: 1.75rem;");

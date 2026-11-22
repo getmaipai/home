@@ -5,6 +5,7 @@ import type { AssistantRuntime } from "@assistant-ui/react";
 import { toast } from "sonner";
 import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
 import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
+import { useNavigate } from "react-router-dom";
 import { api, type ChatFolderView, type Roster } from "@/lib/api";
 import { pendingChatFolderId, setPendingChatFolder, takeCreatedChatFolder } from "@/apps/chat/chatThreadListAdapter";
 
@@ -24,7 +25,8 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
   const getThreadsSnapshot = useCallback(() => threads.getState(), [threads]);
   const threadList = useSyncExternalStore(subscribeThreads, getThreadsSnapshot, getThreadsSnapshot);
   const queryClient = useQueryClient();
-  const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(), enabled: !temporary });
+  const navigate = useNavigate();
+  const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(undefined, { scope: "all" }), enabled: !temporary });
   const refresh = () => queryClient.invalidateQueries({ queryKey: chatFoldersQueryKey(person.id) });
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -68,6 +70,8 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
       folders: folders.map((folder) => ({ id: folder.id, name: folder.name, icon: folder.icon, color: folder.color, pinned: folder.pinned })),
       canManage,
       canMove: true,
+      defaultOpen: true,
+      onSeeAll: () => navigate("/chat/projects"),
       onCreate: canManage
         ? async (name) => {
             try {
@@ -113,7 +117,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only closes over stable values
-  }, [temporary, person.role, folders, runtime, threads, onNewChatStarted]);
+  }, [temporary, person.role, folders, runtime, threads, onNewChatStarted, navigate]);
 
   const value: ProjectSettingsValue | null = editing ? {
     name: editing.name,
