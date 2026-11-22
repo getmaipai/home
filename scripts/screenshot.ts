@@ -49,6 +49,7 @@
 import { chromium, firefox, webkit, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
 import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
 import { findClippedStrips, findOverflowingPanels } from "./panelOverflow";
+import { seedChoicesView } from "../frontend/node_modules/@maipai/ui/src/stack/fakeStackData";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
 // spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout
@@ -891,6 +892,9 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
     const body = (await response.json()) as Record<string, unknown>;
     await route.fulfill({ response, json: { ...body, computerName: "Bramble hub" } });
   });
+  // STACK-MODELS-HOME-01: the AI and models page reads the Stack's choices. The capture hub has no Stack, so the kit's seeded answer (a 64 GB demo computer) stands in for it.
+  await context.route("**/api/ai/stack/choices", (route) => route.fulfill({ status: 200, json: seedChoicesView() }));
+  await context.route("**/api/ai/stack/migration", (route) => route.fulfill({ status: 200, json: { done: true, done_at: "2026-11-22T00:00:00.000Z", accepted: 0, refused: [], dismissed: true } }));
   return context;
 }
 

@@ -83,24 +83,6 @@
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     }
   },
-  "apps/settings/ModelsSection.tsx": {
-    "ChatModelCard": {
-      "ed": "ED-021",
-      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
-    },
-    "CheckModelCard": {
-      "ed": "ED-021",
-      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
-    },
-    "PlannedRoleCard": {
-      "ed": "ED-021",
-      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
-    },
-    "FitVerdictBadge": {
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
   "dev/ElementsAdoptionPanel.tsx": {
     "ElementsAdoptionPanel": {
       "ed": "ED-039",

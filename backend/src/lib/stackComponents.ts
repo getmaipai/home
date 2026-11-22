@@ -49,7 +49,7 @@ export async function listStackComponents(): Promise<StackComponentList> {
 }
 
 /** LICENCE-ACK-01: a part whose licence the household record covers installs with no click: the Stack still gets the notice id it requires. Null when nothing is covered or the list cannot be read. */
-async function coveredConsent(id: string): Promise<{ acceptedLicence: string; acceptedBy?: string } | null> {
+export async function coveredConsent(id: string): Promise<{ acceptedLicence: string; acceptedBy?: string } | null> {
   const ack = currentLicenceAck();
   if (!ack) return null;
   try {

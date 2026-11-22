@@ -210,16 +210,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/reminders/ListMenu.tsx` | ListMenu |
 | `frontend/src/apps/reminders/RemindersPage.tsx` | RemindersPage |
 | `frontend/src/apps/reminders/SmartListView.tsx` | SmartListView |
-| `frontend/src/apps/settings/AddChatModel.tsx` | AddChatModel |
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceBox.tsx` | AddVoiceBox |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
 | `frontend/src/apps/settings/AdminGatedContent.tsx` | AdminGatedContent |
-| `frontend/src/apps/settings/AiGlance.tsx` | AiGlance |
 | `frontend/src/apps/settings/AiJobCardView.tsx` | AiAlwaysOnView |
-| `frontend/src/apps/settings/AiJobSummary.tsx` | summarize, AiJobSummary |
-| `frontend/src/apps/settings/AiModelDialog.tsx` | AiModelChoices |
-| `frontend/src/apps/settings/AiSlotDialog.tsx` | AiSlotChoices |
+| `frontend/src/apps/settings/AiLevelAccess.tsx` | AiLevelAccess |
+| `frontend/src/apps/settings/AiMigrationNotice.tsx` | AiMigrationNotice |
+| `frontend/src/apps/settings/AiModelsPage.tsx` | AiModelsPage |
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AutoLocksSection.tsx` | AutoLocksSection |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
@@ -231,17 +229,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
 | `frontend/src/apps/settings/FeatureAccess.tsx` | FeatureAccess, PersonFeatures |
-| `frontend/src/apps/settings/FeatureModelChooser.tsx` | FeatureModelChooser |
-| `frontend/src/apps/settings/FeatureModelLine.tsx` | Dot, priorityTag, FeatureModelLine |
 | `frontend/src/apps/settings/FreeUpMemory.tsx` | FreeUpMemory |
-| `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HelperStatusRow.tsx` | HelperStatusRow |
 | `frontend/src/apps/settings/HostTuneSettings.tsx` | HostTuneSettings |
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | isTestFirmware, checkinFacts, HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
-| `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
-| `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
 | `frontend/src/apps/settings/PeopleAccess.tsx` | PeopleAccess |
 | `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
 | `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
@@ -459,7 +452,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, COMPANION_BAND_LINE, canMakeCompanion, canHaveTemporaryChat, mayUseClipVoices, rolesById |
 | `backend/src/lib/accessView.ts` | personAccessView |
 | `backend/src/lib/activity.ts` | ACTIVITY_SEEN_KEY, pictureActivityItem, activityDot, activitySeenAt, markActivitySeen, activityForViewer |
-| `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/addressFallback.ts` | ADDRESS_ATTEMPT_MS, ipv4First, isConnectFailure, fetchTryingEachAddress |
@@ -470,7 +462,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, writeChoiceSetting, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
-| `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
 | `backend/src/lib/alarmActions.ts` | ALARM_ACTION_NAMES, resolveAlarm, runAlarmAction |
 | `backend/src/lib/alarmCalls.ts` | alarmFoldFor, isAlarmActionCall, isListAction, LIST_CALL_PREFIX, LIST_WORDS_MAX, LIST_ITEMS_MAX |
 | `backend/src/lib/alarmChat.ts` | daysPhrase, clockText, whenText, jobLabel, handleAlarmChat |
@@ -653,7 +644,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/failureCopy.ts` | formatMessage, VOICE_FAILURE_COPY, voiceFailureMessage, voiceFailureLine, SPATIAL_FAILURE_COPY, isSpatialFailureCode |
 | `backend/src/lib/familyActivity.ts` | familyActivityPath, trackFamilyTurn, __resetFamilyActivityForTests |
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
-| `backend/src/lib/featureModels.ts` | featureModels, isOrderedFeature, setFeatureOrder |
 | `backend/src/lib/ffmpegPath.ts` | findFfmpeg |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
@@ -1286,9 +1276,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/linkRepairs.ts` | STACK_LINK_ISSUE_SOURCE, STACK_LINK_ISSUE_KEY, STACK_LINK_REPEAT_WINDOW_MS, STACK_LINK_RECOVERY_MS, STACK_LINK_OUTAGE_MS, StackLinkRepairs |
 | `backend/src/lib/stack/stackFetch.ts` | homeTokenProblemCopy, __resetStackFetchForTests, stackFetch |
 | `backend/src/lib/stack/types.ts` | StackVoiceSchema, ROLE_IDS |
+| `backend/src/lib/stackChoiceSnapshot.ts` | stackSlotModel, setStackChoiceSnapshot, __resetChoiceSnapshotForTests, refreshStackChoiceSnapshot, startStackChoiceSync |
+| `backend/src/lib/stackChoicesForward.ts` | StackChoicesError, __setChoicesFetchForTests, forwardToStack, refusalStatus |
+| `backend/src/lib/stackChoicesMigration.ts` | HOME_FEATURE_SWITCHES, collectHomeValues, readMigrationRecord, dismissMigrationNotice, ensureChoicesMigrated |
 | `backend/src/lib/stackCodingPieces.ts` | CodingPieceError, CODING_ON_REFUSAL, __setCodingStackForTests, missingFrom, missingCodingPiece, __setMissingCodingPieceForTests |
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
-| `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent, listTierCandidates |
+| `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, coveredConsent, installStackComponent, uninstallStackComponent |
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, isStackRoleEnabled, getHomeOwnedRoles |
 | `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues, syncHostGuardIssue |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |

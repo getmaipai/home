@@ -80,6 +80,7 @@ import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceMode
 import { migrateRobotsSwitch } from "@/lib/robotsSwitchMigration";
 import { backfillSoundOnlyClips } from "@/lib/videos/soundStampBackfill";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
+import { startStackChoiceSync } from "@/lib/stackChoiceSnapshot";
 import { migrateMediaSettings } from "@/lib/settingsMediaMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
@@ -298,6 +299,8 @@ migrateRobotsSwitch();
 try { backfillSoundOnlyClips(); } catch (error) { console.error(`[clip-audience-lock] the one-time fix did not run (${error instanceof Error ? error.name : "error"})`); }
 migrateTierSlots();
 migrateMediaSettings();
+// STACK-MODELS-HOME-01: Home's old model values move to the Stack once (retried until it answers); the pipeline reads the Stack's answer from a cache.
+startStackChoiceSync();
 void noticeGuestsWithoutControls().catch((err: unknown) => console.error(`[boot] guest controls notice failed: ${(err as Error).message}`));
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);

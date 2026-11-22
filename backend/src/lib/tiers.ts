@@ -14,6 +14,7 @@ import { getHouseholdSettingSource, getHouseholdSettingValue, setHouseholdSettin
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { peekPictureEngineStatus } from "@/lib/pictures/ready";
+import { stackSlotModel } from "@/lib/stackChoiceSnapshot";
 
 export type Tier = "standard" | "boost" | "max";
 export type TierCategory = "chat" | "image" | "video" | "music" | "voice" | "coding";
@@ -36,12 +37,15 @@ export function readSlot(category: TierCategory, tier: Tier | "reduced"): SlotRe
   // Max is off until a slot is set (the bench has not justified a second model). A slot an admin sets is read as stored.
   const unmeasured = category === "coding" && tier !== "standard";
   const fallback: SlotRecord = { model: tier === "reduced" || unmeasured ? "off" : "recommended", options: {}, who: vocab.who_default[tier] as TierWho };
+  // STACK-MODELS-HOME-01: the model a household chose lives in the Stack; Home reads its cached answer. Who may use the level and its options stay Home's.
+  const chosen = stackSlotModel(category, tier);
+  const withStackModel = (record: SlotRecord): SlotRecord => (chosen === null ? record : { ...record, model: chosen });
   try {
     const parsed = TierSlot.safeParse(getHouseholdSettingValue(slotKey(category, tier)));
-    if (!parsed.success || checkTierSlotOptions(category, parsed.data.options).length > 0) return fallback;
-    return { model: parsed.data.model, options: parsed.data.options, who: parsed.data.who ?? fallback.who };
+    if (!parsed.success || checkTierSlotOptions(category, parsed.data.options).length > 0) return withStackModel(fallback);
+    return withStackModel({ model: parsed.data.model, options: parsed.data.options, who: parsed.data.who ?? fallback.who });
   } catch {
-    return fallback;
+    return withStackModel(fallback);
   }
 }
 

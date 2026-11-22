@@ -21,9 +21,6 @@ function open(person: Roster, url: string) {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
     const json = (body: unknown) => Promise.resolve(Response.json(body));
-    if (path.endsWith("/api/ai/overview")) return json({ features: [{ id:"chat", name:"Chat", used_by:["chat"], levels:[{tier:"reduced",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"standard",state:"ready",word:"Ready",model_label:"Qwen",size_bytes_missing:null,detail:null,action:null},{tier:"boost",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"same",word:"Same as Standard",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4},{id:"pictures",name:"Pictures",used_by:["the Pictures app"],levels:[{tier:"reduced",state:"waits",word:"Waits for Standard",model_label:null,size_bytes_missing:null,detail:null,action:null},{tier:"standard",state:"missing",word:"Missing",model_label:"MiniMax H3-Image",size_bytes_missing:100,detail:null,action:{kind:"download",label:"Download",job:"pictures",level:"standard"}},{tier:"boost",state:"ready",word:"Ready",model_label:"MiniMax H3-Image",size_bytes_missing:null,detail:null,action:null},{tier:"max",state:"off",word:"Off",model_label:null,size_bytes_missing:null,detail:null,action:null}],ready_count:1,level_count:4}], helpers:[], attention:{items:[{id:"pictures-standard",kind:"missing",title:"Pictures standard",line:"MiniMax H3-Image is needed for this level.",action:{kind:"download",label:"Download",job:"pictures",level:"standard"}}],download_all:{bytes:100,count:1}},right_now:{engine:"ready",waiting:0,memory_free_bytes:1e9,models_bytes:1e9,disk_free_bytes:1e9} });
-    if (path.endsWith("/api/ai/tiers/pictures")) return json({profile:"test",room_bytes:1e9,levels:[{tier:"standard",cap_bytes:1e9,recommended:"minimax-h3-image",candidates:[{id:"minimax-h3-image",label:"MiniMax H3-Image",family:"minimax",peak_bytes:1e9,verified:true,fits:true,refusal:null}]},{tier:"boost",cap_bytes:1e9,recommended:"minimax-h3-image",candidates:[{id:"minimax-h3-image",label:"MiniMax H3-Image",family:"minimax",peak_bytes:1e9,verified:true,fits:true,refusal:null}]},{tier:"max",cap_bytes:1e9,recommended:null,candidates:[]}] });
-    if (path.endsWith("/api/ai/choices")) return json({ stack: "ok", message: null, tier: "p128", free_disk_bytes: 1e12, installed_bytes: 4e10, cards: [], alwaysOn: { text: "Always on: Home itself.", bytes: 1, rowIds: [] }, recommended: null, unused_bytes: 0 });
     if (path.endsWith("/api/engine-link/credentials")) return json({ paired: false });
     if (path.endsWith("/api/engines/health")) return json({ configured: false, health: [] });
     if (path.endsWith("/api/engines")) return json({ configured: false, roles: [], engines: [], budget: null });
@@ -54,7 +51,8 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
   test("Features is the first tab and shows feature cards without attention", async () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=overview");
     expect(await view.findByRole("tab", { name: "Features" })).toBeTruthy();
-    expect((await view.findAllByTestId("ai-feature-card")).length).toBeGreaterThan(0);
+    // STACK-MODELS-HOME-01: the shared page draws one card per feature from the Stack's choices (the kit's seeded Stack stands in here).
+    expect(await view.findByTestId("feature-chat")).toBeTruthy();
     expect(view.queryByRole("heading", { name: "Needs attention" })).toBeNull();
     expect(view.queryByText("Install the AI for this computer")).toBeNull();
     expect(view.queryByText("Engine computer link")).toBeNull();
@@ -80,7 +78,7 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
   test("Advanced keeps the model and storage sections the Models tab used to hold", async () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
     expect(await view.findByText("Hugging Face token (for voice cloning)")).toBeTruthy();
-    expect(await view.findByRole("button", { name: "Free up space" })).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Free up space" })).toBeNull();
     expect(view.queryByText("Models and storage")).toBeNull();
     expect(view.queryByText("This computer: Apple Silicon, 24 GB memory.")).toBeNull();
   });

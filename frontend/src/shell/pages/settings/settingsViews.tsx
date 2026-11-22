@@ -18,13 +18,10 @@ import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearance
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
-import { AiGlance } from "@/apps/settings/AiGlance";
+import { AiModelsPage } from "@/apps/settings/AiModelsPage";
 import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
 import { PerformanceSettings } from "@/apps/settings/PerformanceSettings";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
-import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
-import { Button } from "@maipai/ui/src/ui/button";
-import { useState } from "react";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { VoiceEngineSection } from "@/apps/settings/VoiceEngineSection";
 import { PeopleAccess } from "@/apps/settings/PeopleAccess";
@@ -105,14 +102,10 @@ function HomeVoiceCatalogSettings() { useTabItem(i18n._({ id: "Voices", message:
 function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   const show = (id: string) => tab === id || (tab === undefined && id === "overview");
   return <>
-    {show("overview") ? <AiGlance person={person} onPersonChange={() => undefined} tab={tab} /> : null}
+    {show("overview") ? <AiModelsPage person={person} onPersonChange={() => undefined} tab={tab} /> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <><VoiceEngineSection /><HuggingFaceTokenSection /><AiStorageTidy /></> : null}
+    {show("advanced") ? <><VoiceEngineSection /><HuggingFaceTokenSection /></> : null}
   </>;
-}
-function AiStorageTidy() {
-  const [open, setOpen] = useState(false);
-  return <section className="flex flex-col gap-2"><h2 className="text-section font-semibold">{i18n._({ id: "Storage", message: "Storage" })}</h2><Button type="button" variant="outline" onClick={() => setOpen(true)}>{i18n._({ id: "Free up space", message: "Free up space" })}</Button><FreeUpSpaceDialog open={open} onOpenChange={setOpen} /></section>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <PeopleAccess person={person} />; }
@@ -133,7 +126,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
   "home.engine_admin": HomeEngineAdminSettings,
-  "ai.glance": AiGlance,
+  "ai.glance": AiModelsPage,
   "ai.always_on": AiAlwaysOnView,
   "ai.performance": PerformanceSettings,
   "home.users_admin": HomeUsersAdminSettings,

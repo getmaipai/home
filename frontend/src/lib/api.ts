@@ -1075,21 +1075,6 @@ export type HealthChecks = {
 
 export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
-export type AiOverviewAction = { kind: "download" | "fix" | "open"; label: string; job?: string; level?: string };
-export type AiOverviewState = "ready" | "missing" | "problem" | "off" | "unset" | "waits" | "same";
-export type AiLevelOption = { id: string; label: string; installed: boolean; size_bytes: number | null; good_at: string | null; suggested: boolean };
-export type AiOverviewLevel = { tier: "reduced" | "standard" | "boost" | "max"; state: AiOverviewState; word: string; model_label: string | null; automatic: boolean; model_id: string | null; can_choose: boolean; options: AiLevelOption[]; size_bytes_missing: number | null; detail: string | null; action: AiOverviewAction | null };
-export type AiOverviewFeature = { id: string; name: string; used_by: string[]; levels: AiOverviewLevel[]; ready_count: number; level_count: number };
-export type AiOverviewHelper = { id: string; name: string; parent: string; component_id: string | null; size_bytes_missing: number | null; model_label: string | null; used_by: string[]; state: AiOverviewState; action: AiOverviewAction | null };
-/** GET /api/ai/feature-models: the models behind each ordered feature, every name, line and size from the Stack's parts list (rule E1). */
-export type AiFeatureModel = { id: string; label: string; description: string; rank: number; state: "ready" | "missing" | "installing" | "updating" | "failed" | "unsupported"; size_bytes: number; download_bytes: number; percent: number | null; running: boolean; failure: string | null; install_block: string | null; for_minors?: true };
-export type AiFeatureModels = { audience: "adult" | "minor"; features: Array<{ id: "pictures" | "videos" | "music"; ordered: true; order: string[]; models: AiFeatureModel[] }> };
-export type AiOverview = {
-  features: AiOverviewFeature[];
-  helpers: AiOverviewHelper[];
-  attention: { items: Array<{ id: string; kind: "problem" | "missing"; title: string; line: string; action: AiOverviewAction | null }>; download_all: { bytes: number; count: number } | null };
-  right_now: { engine: "ready" | "problem"; waiting: number; memory_free_bytes: number; models_bytes: number; disk_free_bytes: number };
-};
 
 /** UNSEEN-01: the derived access shape an owner or admin sees (role, a level per kind of content, the overrides that set a level, the kinds that show unrated items). */
 export interface PersonAccess { role: string; ceiling: Record<string, string>; overrides: Array<{ key: string; scope: "person" | "household" }>; unrated: string[] }
@@ -1100,15 +1085,7 @@ export type VoiceEngineChoice = "auto" | "voxcpm2" | "voxcpm2-reduced";
 export interface VoiceEngineView { current: VoiceEngineChoice; pending: VoiceEngineChoice | null; available: boolean }
 
 export const api = {
-  aiFeatureModels: () => request<AiFeatureModels>("/api/ai/feature-models"),
-  aiSetFeatureOrder: (feature: string, order: string[]) => request<{ ok: true }>(`/api/ai/feature-models/${encodeURIComponent(feature)}/order`, { method: "PUT", body: JSON.stringify({ order }) }),
-  aiFeaturesOverview: () => request<AiOverview>("/api/ai/overview"),
   installComponent: (id: string) => request<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", body: JSON.stringify({}) }),
-  aiTierCandidates: (job: string) => request<{ levels: Array<{ tier: string; recommended: string | null; candidates: Array<{ id: string; label: string; fits: boolean; refusal: string | null }> }> }>(`/api/ai/tiers/${encodeURIComponent(job)}`),
-  aiInstallLevel: (job: string, tier: string, model: string) => request<{ job: string | null; component: string }>(`/api/ai/level/${encodeURIComponent(job)}/${encodeURIComponent(tier)}/install`, { method: "POST", body: JSON.stringify({ model }) }),
-  aiSaveSlot: (job: string, tier: string, model: string) => request<{ ok: true }>(`/api/ai/slot/${encodeURIComponent(job)}/${encodeURIComponent(tier)}`, { method: "PUT", body: JSON.stringify({ model }) }),
-  aiUnused: () => request<{ items: Array<{ id: string; name: string; bytes: number; reason: string; lastUsedAt: string | null }>; total_bytes: number }>("/api/ai/unused"),
-  aiCleanup: (ids: string[]) => request<{ results: Array<{ id: string; status: "removed" | "kept" | "failed"; freed_bytes: number; message: string }>; freed_bytes: number; kept: number; failed: number }>("/api/ai/cleanup", { method: "POST", body: JSON.stringify({ ids }) }),
   sceneWeatherAlerts: () => request<Array<{ id: string; event: string; severity: string; headline: string; ends: string; dismissed: "none" | "you" | "household" }>>("/api/scene/alerts"),
   lists: () => request<ListRecord[]>("/api/lists"),
   comingUp: () => request<ComingUpItem[]>("/api/coming-up"),
