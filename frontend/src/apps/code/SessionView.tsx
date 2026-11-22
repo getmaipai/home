@@ -10,6 +10,7 @@ import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { PendingActions } from "@maipai/ui/src/elements/pending-actions";
 import { RightPane } from "@maipai/ui/src/elements/right-pane";
+import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { TierChip, TierSegment, type TierId } from "@maipai/ui/src/elements/tier-segment";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
@@ -19,7 +20,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { errorLine } from "@/lib/hubReachability";
 import { ApiError } from "@/lib/api";
 import { codeApi, type CodeTier } from "./codeApi";
-import { activityOf, isBusy, stateWord, tierWord } from "./codeTranscript";
+import { activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWord, tierWord } from "./codeTranscript";
 import { CODE_SESSIONS_KEY, CODE_TIERS_KEY, tierOptions } from "./NewSession";
 import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
 import { Stack } from "./layout";
@@ -31,8 +32,8 @@ export function SessionView({ id }: { id: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const phone = useBreakpoint().tier === "phone";
-  const view = useQuery({ queryKey: ["code-session", id], queryFn: () => codeApi.view(id), retry: false, refetchInterval: (q) => q.state.data && isBusy(q.state.data.session.state) ? 1500 : 6000 });
-  const messages = useQuery({ queryKey: ["code-messages", id], queryFn: () => codeApi.messages(id), retry: false, refetchInterval: view.data && isBusy(view.data.session.state) ? 1500 : false });
+  const view = useQuery({ queryKey: ["code-session", id], queryFn: () => codeApi.view(id), retry: false, refetchInterval: (q) => q.state.data && isBusy(q.state.data.session.state) ? 1000 : 6000 });
+  const messages = useQuery({ queryKey: ["code-messages", id], queryFn: () => codeApi.messages(id), retry: false, refetchInterval: view.data && isBusy(view.data.session.state) ? 1000 : false });
   const tiers = useQuery({ queryKey: CODE_TIERS_KEY, queryFn: codeApi.tiers, retry: false });
   const [text, setText] = useState("");
   const [problem, setProblem] = useState("");
@@ -43,10 +44,20 @@ export function SessionView({ id }: { id: string }) {
   const [paneTab, setPaneTab] = useState("changes");
   const [pinned, setPinned] = useState(true);
   const end = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const ready = useQuery({ queryKey: ["code-ready"], queryFn: codeApi.ready, retry: false, enabled: false });
   const list = messages.data ?? [];
   const session = view.data?.session;
   const state = session?.state;
-  useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [list.length, view.data?.waiting?.line]);
+  const lastParts = list[list.length - 1]?.parts.length ?? 0;
+  const waitingLine = view.data?.waiting?.line;
+  useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [list.length, lastParts, waitingLine]);
+  const busyNow = state ? isBusy(state) : false;
+  useEffect(() => { if (!busyNow) return; setNow(Date.now()); const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [busyNow]);
+  const lastPart = list[list.length - 1]?.parts[list[list.length - 1]!.parts.length - 1];
+  const failed = state === "failed" || (!busyNow && lastPart?.type === "stopped" && lastPart.reason === "error");
+  const { refetch: checkReady } = ready;
+  useEffect(() => { if (failed) void checkReady(); }, [failed, checkReady]);
   useEffect(() => { if (state && !isBusy(state)) setMaxNext(false); }, [state]);
 
   const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["code-session", id] }), queryClient.invalidateQueries({ queryKey: ["code-messages", id] }), queryClient.invalidateQueries({ queryKey: CODE_SESSIONS_KEY })]); };
@@ -93,7 +104,7 @@ export function SessionView({ id }: { id: string }) {
   ];
   const [first, ...rest] = tabs;
   const pane = <RightPane open={paneOpen} onOpenChange={setPaneOpen} pinned={phone ? false : pinned} onPinnedChange={setPinned} companionTab={first!} tabs={rest} activeTab={paneTab} onActiveTabChange={setPaneTab} avatar={null} pinLabel={i18n._({ id: "Keep open", message: "Keep open" })} closeLabel={i18n._({ id: "Close", message: "Close" })} label={i18n._({ id: "Session details", message: "Session details" })} />;
-  const subtitle = [session.repo.full_name ?? i18n._({ id: "No repository", message: "No repository" }), session.repo.work_branch].join(" @ ");
+  const subtitle = repoLine(session.repo);
 
   return (
     <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1">
@@ -110,6 +121,9 @@ export function SessionView({ id }: { id: string }) {
         <p className="truncate px-4 pb-1 text-body text-muted-foreground" data-slot="code-subtitle">{subtitle}</p>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {list.length === 0 ? <p className="p-6 text-center text-body text-muted-foreground">{i18n._({ id: "Nothing yet. Tell the agent what to do.", message: "Nothing yet. Tell the agent what to do." })}</p> : <Transcript messages={list} notices={notices} onAnswer={(rid, answer) => void run(() => codeApi.answer(id, rid, answer), i18n._({ id: "Could not send your answer. Try again.", message: "Could not send your answer. Try again." }))} />}
+          {busyNow ? <div className="mx-auto w-full max-w-3xl px-4 pb-3" data-slot="code-live"><ThinkingIndicator label={stageOf(session.state, waiting?.line, list)} elapsed={elapsedWords(now - Date.parse([...list].reverse().find((m) => m.role === "user")?.created_at ?? new Date(now).toISOString()))} /></div> : null}
+          {failed ? <div className="mx-auto w-full max-w-3xl px-4 pb-3" data-slot="code-failed"><StatusCard kind="problem" title={i18n._({ id: "The agent stopped", message: "The agent stopped" })}
+            line={ready.data && !ready.data.ready && ready.data.first_missing ? `${ready.data.first_missing.say} ${i18n._({ id: "Who can fix this: {who}.", message: "Who can fix this: {who}.", values: { who: ready.data.first_missing.who } })}` : i18n._({ id: "Home could not finish this message. Send it again, or ask an admin to check Settings, Coding.", message: "Home could not finish this message. Send it again, or ask an admin to check Settings, Coding." })} /></div> : null}
           <div ref={end} />
         </div>
         <div className={`mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 ${phone ? "pb-32" : "pb-3"}`}>

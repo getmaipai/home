@@ -7,7 +7,7 @@ export type CodeState = "queued" | "starting" | "working" | "needs_you" | "idle"
 export interface CodeSession {
   id: string;
   title: string;
-  repo: { kind: "github" | "gitea" | "hub_folder" | "none"; full_name?: string; base_branch: string; work_branch: string };
+  repo: { kind: "github" | "gitea" | "hub_folder" | "none"; full_name?: string; path?: string; base_branch: string; work_branch: string };
   mode: "plan" | "ask" | "auto_edit";
   state: CodeState;
   tier?: CodeTier;
@@ -42,6 +42,8 @@ export interface TreeEntry { path: string; name: string; depth: number; kind: "f
 export interface GitConnection { id: string; kind: "github" | "gitea"; host: string; account: string; status: string }
 export interface RepoChoice { connectionId: string; fullName: string; baseBranch: string }
 
+export interface CodeReady { ready: boolean; first_missing: { id: string; say: string; who: string } | null }
+
 export const DEFAULT_ENVIRONMENT_ID = "cenv-default";
 
 const base = "/api/code/sessions";
@@ -59,6 +61,7 @@ export const codeApi = {
   changes: (id: string) => request<CodeChanges>(`${base}/${id}/changes`),
   tree: (id: string) => request<{ entries: TreeEntry[]; truncated: boolean }>(`${base}/${id}/files`),
   file: (id: string, path: string) => request<{ path: string; content: string }>(`${base}/${id}/file?path=${encodeURIComponent(path)}`),
+  ready: () => request<CodeReady>("/api/coding/ready"),
   connections: () => request<{ connections: GitConnection[] }>("/api/settings/git-connections"),
   send: (id: string, text: string) => request<{ turn_id?: string; queued_message_id?: string }>(`${base}/${id}/messages`, json({ text })),
   setTier: (id: string, tier: CodeTier) => request<CodeSession>(`${base}/${id}/tier`, { method: "PUT", body: JSON.stringify({ tier }) }),

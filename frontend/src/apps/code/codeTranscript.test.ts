@@ -43,3 +43,17 @@ test("command output becomes terminal lines, and a cut marker is reported", () =
   expect(outputLines(undefined)).toEqual({ lines: [], truncated: false });
   expect(languageOf("x/y.tsx")).toBe("tsx");
 });
+
+import { elapsedWords, repoLine, stageOf } from "./codeTranscript";
+test("the live line says what the agent is doing, and the header never shows a raw repo string for a scratch session", () => {
+  expect(stageOf("queued", null, [])).toBe("Waiting in line");
+  expect(stageOf("queued", "Waiting for Max. 2 ahead of you.", [])).toContain("Max");
+  expect(stageOf("starting", null, [])).toBe("Starting the sandbox");
+  expect(stageOf("working", null, [])).toBe("Thinking");
+  expect(stageOf("working", null, [msg(1, [{ type: "tool", tool: "command", status: "running", summary: "ls" }])])).toBe("Running a command");
+  expect(stageOf("working", null, [msg(1, [{ type: "tool", tool: "file_write", status: "done", summary: "a.ts" }])])).toBe("Writing a file");
+  expect(repoLine({ kind: "none", work_branch: "maipai/x-abc" })).toBe("Scratch folder");
+  expect(repoLine({ kind: "github", full_name: "willow/app", work_branch: "maipai/fix" })).toBe("willow/app · maipai/fix");
+  expect(elapsedWords(65_000)).toBe("1 min 05 s");
+  expect(elapsedWords(4_000)).toBe("4 s");
+});

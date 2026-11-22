@@ -9,12 +9,13 @@ const realFetch = globalThis.fetch;
 const person = { id: "sage", role: "owner" } as Roster;
 const session = { id: "csess-abc123", title: "Fix the thermostat", repo: { kind: "none", base_branch: "main", work_branch: "code/x" }, mode: "ask", state: "idle", tier: "standard", changes: { files: 0, additions: 0, deletions: 0 }, last_activity_at: "2026-11-21T10:00:00.000Z" };
 let tiers = ["standard", "max"]; let calls: string[] = []; let conns: unknown[] = [];
-let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
+let sessionState = "idle"; let waiting: { turn_id: string; line: string; offers_standard: boolean } | null = null;
 
 beforeEach(() => {
-  tiers = ["standard", "max"]; calls = []; waiting = null; conns = [];
+  tiers = ["standard", "max"]; calls = []; waiting = null; conns = []; sessionState = "idle";
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input); calls.push(`${init?.method ?? "GET"} ${path}`);
+    if (path.endsWith("/api/coding/ready")) return Promise.resolve(Response.json({ ready: false, first_missing: { id: "engine", say: "The coding engine needs an update.", who: "an admin" }, items: [] }));
     if (path.endsWith("/git-connections")) return Promise.resolve(Response.json({ connections: conns }));
     if (path.endsWith("/changes")) return Promise.resolve(Response.json({ available: true, files: [{ path: "src/a.ts", additions: 1, deletions: 0, binary: false }], diff: "diff --git a/src/a.ts b/src/a.ts\n@@ -0,0 +1 @@\n+hello\n", truncated: false }));
     if (path.endsWith("/files")) return Promise.resolve(Response.json({ entries: [{ path: "src", name: "src", depth: 0, kind: "folder" }, { path: "src/a.ts", name: "a.ts", depth: 1, kind: "file" }], truncated: false }));
@@ -22,7 +23,7 @@ beforeEach(() => {
     if (path.endsWith("/tiers")) return Promise.resolve(Response.json({ tiers, last: "standard" }));
     if (path.endsWith("/messages") && (init?.method ?? "GET") === "GET") return Promise.resolve(Response.json([]));
     if (path.includes("/use-standard")) return Promise.resolve(Response.json({ ok: true }));
-    if (path.endsWith("/api/code/sessions/csess-abc123")) return Promise.resolve(Response.json({ session: { ...session, state: waiting ? "queued" : "idle", tier: "max" }, waiting, requests: [], queued_messages: [] }));
+    if (path.endsWith("/api/code/sessions/csess-abc123")) return Promise.resolve(Response.json({ session: { ...session, state: waiting ? "queued" : sessionState, tier: "max" }, waiting, requests: [], queued_messages: [] }));
     if (path.endsWith("/api/code/sessions")) return Promise.resolve(Response.json([session]));
     return Promise.resolve(Response.json({}));
   }) as unknown as typeof fetch;
@@ -77,5 +78,22 @@ describe("the Code app page", () => {
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="code-diff"]')).toBeTruthy());
     expect(calls.some((c) => c.endsWith("/csess-abc123/changes"))).toBe(true);
+  });
+  test("a working session shows the live line with the stage and the time, and a Stop button", async () => {
+    sessionState = "working";
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="code-live"]')).toBeTruthy());
+    expect(document.querySelector('[data-slot="code-live"]')!.textContent).toContain("Thinking");
+    expect(within(document.body).getAllByText("Stop").length).toBeGreaterThan(0);
+  });
+  test("a failed session shows why, from the ready check, in plain words", async () => {
+    sessionState = "failed";
+    open("/apps/code/csess-abc123");
+    expect(await within(document.body).findByText(/The coding engine needs an update\./)).toBeTruthy();
+    expect(document.querySelector('[data-slot="code-failed"]')).toBeTruthy();
+  });
+  test("the header says Scratch folder for a session with no repository", async () => {
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="code-subtitle"]')?.textContent).toBe("Scratch folder"));
   });
 });

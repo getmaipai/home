@@ -103,3 +103,29 @@ export function parseDiff(diff: string): Record<string, DiffLine[]> {
 
 const LANGS: Record<string, string> = { ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", json: "json", py: "python", md: "markdown", css: "css", html: "html", sh: "bash", rs: "rust", go: "go", yml: "yaml", yaml: "yaml" };
 export const languageOf = (path: string): string => LANGS[path.split(".").pop()?.toLowerCase() ?? ""] ?? "text";
+
+/** What the agent is doing right now, in plain words, for the live line under the transcript. */
+export function stageOf(state: CodeState, waitingLine: string | null | undefined, messages: readonly CodeMessage[]): string {
+  if (state === "queued") return waitingLine ?? i18n._({ id: "Waiting in line", message: "Waiting in line" });
+  if (state === "starting") return i18n._({ id: "Starting the sandbox", message: "Starting the sandbox" });
+  if (state === "needs_you") return i18n._({ id: "Waiting for your answer", message: "Waiting for your answer" });
+  const last = [...messages].reverse().find((m) => m.role === "agent");
+  const part = last?.parts[last.parts.length - 1];
+  if (part?.type === "tool" && part.tool === "command") return i18n._({ id: "Running a command", message: "Running a command" });
+  if (part?.type === "tool" && part.tool === "file_write") return i18n._({ id: "Writing a file", message: "Writing a file" });
+  if (part?.type === "tool" && part.tool === "read") return i18n._({ id: "Reading the code", message: "Reading the code" });
+  return i18n._({ id: "Thinking", message: "Thinking" });
+}
+
+/** "12 s" or "1 min 05 s". */
+export function elapsedWords(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
+}
+
+/** The header's second line: a session with no repository says so plainly; one with a repository names it and its branch. No ids. */
+export function repoLine(repo: { kind: string; full_name?: string; work_branch: string; path?: string }): string {
+  if (repo.kind === "none") return i18n._({ id: "Scratch folder", message: "Scratch folder" });
+  if (repo.kind === "hub_folder") return repo.path ? i18n._({ id: "Folder {path}", message: "Folder {path}", values: { path: repo.path } }) : i18n._({ id: "Home folder", message: "Home folder" });
+  return `${repo.full_name ?? i18n._({ id: "Repository", message: "Repository" })} · ${repo.work_branch}`;
+}
