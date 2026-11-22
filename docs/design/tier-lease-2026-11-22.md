@@ -37,10 +37,16 @@ A degrading tier is held only while its holder has a job running or queued on it
 
 Holder: "Max switches off when you stop. It comes back when you type, about 40 seconds." Someone waits: "1 picture is waiting. It runs after this step, about 2 min." with **Keep going**, **Use a lower tier**, **Pause**. Paused: "Paused so a picture can run. Resume". Released while idle: "Max was released for a picture. It switches back when you type." A notification when they are on another page. Waiter: "Waiting for a coding job to finish, about 2 minutes." with, when pinned and past 10 minutes, **Use Standard now**.
 
-## 6. Decisions recorded
+## 6. Rules compliance (architect objections, 2026-11-22)
 
-Release at once when idle and someone waits (owner, 2026-11-22). Boost follows the same rule and a pinned lease gives waiters a bounded wait are taken as the review's recommendation; the owner had not answered those two when this was written and may change them.
+- **Rule 6a:** every line, queue entry and the admin view carries kinds and counts per lease key only, never a person, a title or an id next to activity. A per-person pin is listed in Settings' existing people list, not in an activity view. A locked or adult-only job is counted as "a job"; a child waiter reads the child form.
+- **S6 (no new status surface):** the notice line is a new row of the S6 table (data source `tierLease`) and the away-notification is one type declared in `lib/notificationTypes.ts`, both added in TIER-LEASE-04.
+- **Grants:** "Use a lower tier" and "Use Standard now" go through the existing tier grants and can only lower. `touch`, `pause`, `resume`, `yield` and `release` check the caller is the holder; only an admin sets or clears a pin.
 
-## 7. Build order
+## 7. Decisions recorded
+
+Release at once when idle and someone waits (owner, 2026-11-22). Boost follows the same rule, and a pinned lease gives waiters a bounded wait: both are the review's recommendation, taken when the owner said "build out" on 2026-11-22 without answering those two questions. Either can be reversed in one row.
+
+## 8. Build order
 
 TIER-LEASE-01 to 07 in `docs/BACKLOG.md`. CODE-UX-09 to 11 become the Code client of them.
