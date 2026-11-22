@@ -2650,7 +2650,7 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
     }
   });
 
-  test("Create makes a project and opens its kit settings dialog", async () => {
+  test("+ opens the full project settings dialog at once and Save creates the project with its settings", async () => {
     const original = globalThis.fetch;
     const created = {
       id: "folder-recipes1", name: "Recipes", person: "person-abc123", access: "manage", icon: "folder", color: "neutral", pinned: false,
@@ -2658,14 +2658,14 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, pinned_at: null, archived_at: null,
       last_activity_at: new Date().toISOString(), counts: { chats: 0, files: 0, artifacts: 0 },
     };
-    let exists = false;
+    const calls: Array<{ method: string; body: unknown }> = [];
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/chat-folders") && init?.method === "POST") {
-        exists = true;
+      if (url.includes("/api/chat-folders") && (init?.method === "POST" || init?.method === "PATCH")) {
+        calls.push({ method: init.method, body: JSON.parse(String(init.body)) as unknown });
         return Promise.resolve(Response.json(created, { status: 201 }));
       }
-      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json(exists ? [created] : []));
+      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json(calls.length ? [created] : []));
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
@@ -2673,11 +2673,38 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
       renderAs();
       fireEvent.click(await within(column()).findByRole("button", { name: "New project" }));
       const dialog = await within(document.body).findByRole("dialog");
-      const name = within(dialog).getByPlaceholderText("Project name");
-      fireEvent.change(name, { target: { value: "Recipes" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
-      expect(await within(document.body).findByText("Project settings")).toBeTruthy();
-      expect(within(document.body).getByRole("textbox", { name: "Project name" })).toHaveValue("Recipes");
+      expect(within(dialog).getByText("New project")).toBeTruthy();
+      expect(within(dialog).getByLabelText("Instructions")).toBeTruthy();
+      expect(within(dialog).queryByRole("button", { name: "Delete project" })).toBeNull();
+      expect(calls).toEqual([]);
+      fireEvent.change(within(dialog).getByRole("textbox", { name: "Project name" }), { target: { value: "Recipes" } });
+      fireEvent.change(within(dialog).getByLabelText("Instructions"), { target: { value: "Keep it short." } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(calls).toEqual([{ method: "POST", body: { name: "Recipes" } }, { method: "PATCH", body: { instructions: "Keep it short." } }]));
+      await waitFor(() => expect(within(document.body).queryByRole("dialog")).toBeNull());
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("Cancel in the new project dialog creates nothing", async () => {
+    const original = globalThis.fetch;
+    const writes: string[] = [];
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (init?.method && init.method !== "GET" && url.includes("/api/chat-folders")) writes.push(init.method);
+      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      renderAs();
+      fireEvent.click(await within(column()).findByRole("button", { name: "New project" }));
+      const dialog = await within(document.body).findByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox", { name: "Project name" }), { target: { value: "Nope" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(within(document.body).queryByRole("dialog")).toBeNull());
+      expect(writes).toEqual([]);
     } finally {
       globalThis.fetch = original;
     }

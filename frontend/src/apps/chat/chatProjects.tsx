@@ -29,6 +29,9 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
   const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(undefined, { scope: "all" }), enabled: !temporary });
   const refresh = () => queryClient.invalidateQueries({ queryKey: chatFoldersQueryKey(person.id) });
   const [editingId, setEditingId] = useState<string | null>(null);
+  // "+" opens the same settings dialog as Edit project, on a blank record;
+  // nothing exists until Save, so Cancel creates nothing.
+  const [creating, setCreating] = useState(false);
 
   // A chat "New chat in project" just created: put its project on the
   // thread's own metadata so it lists under the project at once (the hub
@@ -57,6 +60,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
     scopeRef.current = scope;
     setPendingChatFolder(null);
     setEditingId(null);
+    setCreating(false);
   }, [scope]);
 
   const folders: ChatFolderView[] = Array.isArray(foldersQuery.data) ? foldersQuery.data : [];
@@ -72,17 +76,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
       canMove: true,
       defaultOpen: true,
       onSeeAll: () => navigate("/chat/projects"),
-      onCreate: canManage
-        ? async (name) => {
-            try {
-              const created = await api.createChatFolder(name);
-              await refresh();
-              setEditingId(created.id);
-            } catch {
-              toast.error(i18n._({ id: "Could not make that project. Try again.", message: "Could not make that project. Try again." }));
-            }
-          }
-        : undefined,
+      onNew: canManage ? () => setCreating(true) : undefined,
       onDelete: canManage && allManage
         ? async (id) => {
             try {
@@ -128,7 +122,31 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
     memory_mode: editing.memory_mode,
   } : null;
   const canEdit = editing?.access === "manage" || editing?.access === "edit";
-  const settingsDialog = editing && value ? (
+  const newDialog = creating && !temporary && person.role !== "child" ? (
+    <ProjectSettingsDialog
+      open
+      onOpenChange={(open) => { if (!open) setCreating(false); }}
+      value={{ name: "", icon: "", color: "", description: "", instructions: "", memory_mode: "project_only" }}
+      memoryModes={[]}
+      onSave={async (patch) => {
+        try {
+          const { name = "", ...rest } = patch;
+          const made = await api.createChatFolder(name);
+          if (Object.keys(rest).length > 0) await api.updateChatFolder(made.id, rest);
+          await refresh();
+        } catch (error) {
+          toast.error(i18n._({ id: "Could not make that project. Try again.", message: "Could not make that project. Try again." }));
+          throw error;
+        }
+      }}
+      labels={{
+        title: i18n._({ id: "New project", message: "New project" }),
+        summary: i18n._({ id: "Name the project and set its icon and instructions.", message: "Name the project and set its icon and instructions." }),
+        instructionsHelp: "These instructions shape answers in this project.",
+      }}
+    />
+  ) : null;
+  const settingsDialog = newDialog ?? (editing && value ? (
     <ProjectSettingsDialog
       open
       onOpenChange={(open) => { if (!open) setEditingId(null); }}
@@ -160,6 +178,6 @@ export function useChatProjects({ person, temporary, onNewChatStarted, runtime }
         confirmDelete: "Its chats stay.",
       }}
     />
-  ) : null;
+  ) : null);
   return { projects, settingsDialog };
 }
