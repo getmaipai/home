@@ -188,7 +188,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
 | `frontend/src/apps/clock/WorldClocksTab.tsx` | WorldClocksTab |
 | `frontend/src/apps/code/CodePage.tsx` | sessionIdOf, CodePage |
-| `frontend/src/apps/code/CodeThread.tsx` | toThreadMessages, CodeThread |
+| `frontend/src/apps/code/CodeThread.tsx` | toThreadMessages, codeComposerModes, CodeThread |
 | `frontend/src/apps/code/ContextRing.tsx` | ContextRing |
 | `frontend/src/apps/code/NewSession.tsx` | CODE_TIERS_KEY, CODE_SESSIONS_KEY, tierOptions, NewSession |
 | `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, sessionItems, CodeSidebar |
