@@ -2135,7 +2135,7 @@ msgstr "Add a place"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:117
+#: src/shell/pages/settings/settingsViews.tsx:116
 msgid "Add a robot"
 msgstr "Add a robot"
 
@@ -7288,11 +7288,6 @@ msgid "Could not load the synths. Check your connection and try again."
 msgstr "Could not load the synths. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:27
-msgid "Could not load the voice choice."
-msgstr "Could not load the voice choice."
-
-#. js-lingui-explicit-id
 #: src/shell/reader/ReaderArticle.tsx:75
 msgid "Could not load this article."
 msgstr "Could not load this article."
@@ -7647,11 +7642,6 @@ msgstr "Could not save that change."
 #: src/apps/settings/SiteBlocksSection.tsx:38
 msgid "Could not save that change. Check your connection and try again."
 msgstr "Could not save that change. Check your connection and try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:38
-msgid "Could not save that choice."
-msgstr "Could not save that choice."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatProjects.tsx:139
@@ -13832,7 +13822,7 @@ msgid "Keep things as they are"
 msgstr "Keep things as they are"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:156
+#: src/shell/pages/settings/settingsViews.tsx:155
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr "Keep this app in the sidebar so it is one tap away."
 
@@ -14122,7 +14112,7 @@ msgstr "Lan"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:67
+#: src/shell/pages/settings/settingsViews.tsx:66
 msgid "Language"
 msgstr "Language"
 
@@ -19808,7 +19798,7 @@ msgid "Pair"
 msgstr "Pair"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:117
+#: src/shell/pages/settings/settingsViews.tsx:116
 msgid "Pair a robot with this home."
 msgstr "Pair a robot with this home."
 
@@ -20312,11 +20302,6 @@ msgid "Pick one of your own clips to put after this one."
 msgstr "Pick one of your own clips to put after this one."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:46
-msgid "Pick the voice that speaks the replies. Voices you made from recordings keep working. Saving restarts the voice for a moment."
-msgstr "Pick the voice that speaks the replies. Voices you made from recordings keep working. Saving restarts the voice for a moment."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:223
 msgid "Pick up to 8. Words only, never lyrics."
 msgstr "Pick up to 8. Words only, never lyrics."
@@ -20628,7 +20613,7 @@ msgstr "Pin example: {phrase}"
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:71
+#: src/shell/pages/settings/settingsViews.tsx:70
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr "PIN or password"
@@ -21090,7 +21075,7 @@ msgstr "Professional"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:223
-#: src/shell/pages/settings/settingsViews.tsx:61
+#: src/shell/pages/settings/settingsViews.tsx:60
 msgid "Profile"
 msgstr "Profile"
 
@@ -23112,7 +23097,6 @@ msgstr "Saved place"
 #: src/apps/settings/PersonAccessEditor.tsx:57
 #: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
-#: src/apps/settings/VoiceEngineSection.tsx:61
 msgid "Saved."
 msgstr "Saved."
 
@@ -24400,8 +24384,8 @@ msgid "Show in Library"
 msgstr "Show in Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:155
-#: src/shell/pages/settings/settingsViews.tsx:158
+#: src/shell/pages/settings/settingsViews.tsx:154
+#: src/shell/pages/settings/settingsViews.tsx:157
 msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
@@ -24623,7 +24607,7 @@ msgstr "Side chat"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:151
+#: src/shell/pages/settings/settingsViews.tsx:150
 msgid "Sidebar"
 msgstr "Sidebar"
 
@@ -25299,11 +25283,6 @@ msgid "Sounds"
 msgstr "Sounds"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:14
-msgid "Sounds very natural and copies a voice from a recording well. It needs a one-time download."
-msgstr "Sounds very natural and copies a voice from a recording well. It needs a one-time download."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:133
 msgid "Sounds you have saved."
 msgstr "Sounds you have saved."
@@ -25553,7 +25532,6 @@ msgstr "Staged"
 #: src/apps/settings/PerformanceCustomize.tsx:15
 #: src/apps/settings/performanceModel.ts:54
 #: src/apps/settings/ReferenceLibrarySettings.tsx:67
-#: src/apps/settings/VoiceEngineSection.tsx:13
 #: src/shell/library/LibraryViewer.tsx:164
 #: src/shell/pages/musicComposerMode.ts:91
 msgid "Standard"
@@ -26819,7 +26797,6 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/styles/StylesTab.tsx:195
 #: src/apps/settings/styles/StylesTab.tsx:229
 #: src/apps/settings/UsersSection.tsx:166
-#: src/apps/settings/VoiceEngineSection.tsx:47
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
 #: src/shell/AmbientCompanionPane.tsx:181
@@ -28139,11 +28116,6 @@ msgid "The same seed with the same words makes a very similar song."
 msgstr "The same seed with the same words makes a very similar song."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:15
-msgid "The same voice in a smaller size, for a computer that is busy with other work. It needs a one-time download."
-msgstr "The same voice in a smaller size, for a computer that is busy with other work. It needs a one-time download."
-
-#. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:146
 msgid "The sandbox could not reach the coding gateway. Ask an admin to check Settings, Coding, then send your message again."
 msgstr "The sandbox could not reach the coding gateway. Ask an admin to check Settings, Coding, then send your message again."
@@ -28374,11 +28346,6 @@ msgstr "The voice Home and its robots speak with for anyone who has not chosen t
 #: src/apps/settings/VoiceBrowserSection.tsx:94
 msgid "The voice Home speaks with when it talks to {who}."
 msgstr "The voice Home speaks with when it talks to {who}."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:13
-msgid "The voice Home uses now. It is quick, and it can laugh and sigh."
-msgstr "The voice Home uses now. It is quick, and it can laugh and sigh."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:79
@@ -28917,11 +28884,6 @@ msgstr "This song is not available. Go back to Music and choose another."
 #: src/shell/pages/MusicLibrary.tsx:62
 msgid "This song's file is missing. Make it again."
 msgstr "This song's file is missing. Make it again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:48
-msgid "This Stack is too old to offer a choice. Update it in Settings, then Engines."
-msgstr "This Stack is too old to offer a choice. Update it in Settings, then Engines."
 
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:120
@@ -29669,7 +29631,7 @@ msgid "Two computers"
 msgstr "Two computers"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:74
+#: src/shell/pages/settings/settingsViews.tsx:73
 msgid "Two-step sign-in"
 msgstr "Two-step sign-in"
 
@@ -30635,7 +30597,7 @@ msgstr "Vocals, drums, bass and the rest. This takes a minute or two. The rows a
 #: src/shell/pages/CompanionsPage.tsx:367
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:172
+#: src/shell/pages/settings/settingsViews.tsx:171
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr "Voice"
@@ -30694,11 +30656,6 @@ msgstr "Voice cloning will no longer be able to use this token."
 #: src/shell/pages/ChatPage.tsx:1760
 msgid "Voice conversation"
 msgstr "Voice conversation"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:45
-msgid "Voice engine"
-msgstr "Voice engine"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:97
@@ -30769,7 +30726,7 @@ msgstr "Voiceover"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:104
-#: src/shell/pages/settings/settingsViews.tsx:95
+#: src/shell/pages/settings/settingsViews.tsx:94
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 msgid "Voices"
@@ -30802,16 +30759,6 @@ msgstr "Voices with full power."
 #: src/shell/pages/MusicStudioView.tsx:34
 msgid "Volume"
 msgstr "Volume"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:14
-msgid "VoxCPM2 (natural)"
-msgstr "VoxCPM2 (natural)"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/VoiceEngineSection.tsx:15
-msgid "VoxCPM2 (smaller)"
-msgstr "VoxCPM2 (smaller)"
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:46

@@ -1081,9 +1081,6 @@ export interface PersonAccess { role: string; ceiling: Record<string, string>; o
 /** UNSEEN-01: household counts of what the filters held back since the hub started. Counts only. */
 export interface HeldBack { since: string; surfaces: Array<{ surface: "news" | "shelf" | "reference" | "search"; count: number }> }
 
-export type VoiceEngineChoice = "auto" | "voxcpm2" | "voxcpm2-reduced";
-export interface VoiceEngineView { current: VoiceEngineChoice; pending: VoiceEngineChoice | null; available: boolean }
-
 export const api = {
   installComponent: (id: string) => request<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", body: JSON.stringify({}) }),
   sceneWeatherAlerts: () => request<Array<{ id: string; event: string; severity: string; headline: string; ends: string; dismissed: "none" | "you" | "household" }>>("/api/scene/alerts"),
@@ -1482,8 +1479,6 @@ export const api = {
     }),
   removeHfToken: () => request<ResolvedSetting>("/api/voice/hf-token/remove", { method: "POST" }),
   // VOICE-VOXCPM2-01: the admin's voice engine choice; the Stack keeps the value.
-  voiceEngine: () => request<VoiceEngineView>("/api/voice/engine"),
-  setVoiceEngine: (engine: VoiceEngineChoice) => request<VoiceEngineView>("/api/voice/engine", { method: "PUT", body: JSON.stringify({ engine }) }),
   resetSetting: (scope: string, key: string) =>
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",

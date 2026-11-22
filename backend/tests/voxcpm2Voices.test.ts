@@ -69,29 +69,6 @@ async function makeVoice(client: TestClient): Promise<{ id: string }> {
 }
 const listed = async (client: TestClient) => ((await (await client.get("/api/voice/voices")).json()) as { voices: Array<{ id: string; engine?: string }> }).voices;
 
-describe("voice engine choice", () => {
-  test("an owner reads it and saves VoxCPM2 through the Stack's setting; the value comes back in effect", async () => {
-    const h = await household();
-    expect(await (await h.owner.get("/api/voice/engine")).json()).toEqual({ current: "auto", pending: null, available: true });
-    const saved = await h.owner.put("/api/voice/engine", { engine: "voxcpm2-reduced" });
-    expect(saved.status).toBe(200);
-    expect(stackSettingsPut).toEqual([{ "stack.voice.engine": "voxcpm2-reduced" }]);
-    expect(await saved.json()).toEqual({ current: "voxcpm2-reduced", pending: null, available: true });
-  });
-  test("a member who does not manage Home cannot read or change it, and a value outside the three is refused", async () => {
-    const h = await household();
-    expect((await h.adult.get("/api/voice/engine")).status).toBe(403);
-    expect((await h.adult.put("/api/voice/engine", { engine: "voxcpm2" })).status).toBe(403);
-    expect((await h.owner.put("/api/voice/engine", { engine: "pocket" })).status).toBe(400);
-    expect(stackSettingsPut).toEqual([]);
-  });
-  test("an engine the choice does not name (Pocket) reads as Standard", async () => {
-    inEffect = "pocket";
-    const h = await household();
-    expect(((await (await h.owner.get("/api/voice/engine")).json()) as { current: string }).current).toBe("auto");
-  });
-});
-
 describe("clip voices on VoxCPM2", () => {
   test("a clip voice is offered beside either VoxCPM2 size and labelled with that engine, and not beside Pocket", async () => {
     const h = await household();

@@ -88,6 +88,22 @@ describe("the page", () => {
     expect(await view.findByText("Qwen3.8 Flash Next 177B")).toBeTruthy();
   });
 
+  test("a model the Stack starts listing shows up with its name and size and no Home change (one definition, in the Stack)", async () => {
+    const read = fake.readChoices.bind(fake);
+    fake.readChoices = async () => {
+      const view = await read();
+      const chat = view.categories.find((category) => category.id === "chat")!;
+      const base = chat.candidates[0]!;
+      chat.candidates.push({ ...base, id: "zz-brand-new-model", label: "Zed One 9B", summary: "A model added to the Stack after Home shipped.", search_text: "zed one 9b zz-brand-new-model", size_bytes: 9_000_000_000, rank: chat.candidates.length + 1 });
+      chat.order.push("zz-brand-new-model");
+      return view;
+    };
+    const view = open();
+    await view.findByTestId("feature-chat");
+    fireEvent.change(view.getByRole("searchbox", { name: "Search models" }), { target: { value: "zed" } });
+    expect(await view.findByText("Zed One 9B")).toBeTruthy();
+  });
+
   test("a feature switch saves to the Stack through the forwarder", async () => {
     const view = open();
     const video = await view.findByTestId("feature-video");

@@ -7,20 +7,20 @@ import type { ActivityItemView, HomeJobView, InstallStatusView } from "@/lib/api
 
 afterEach(cleanup);
 
-const item = (over: Partial<InstallStatusView["items"][number]> = {}) => ({ id: "j1", model: "muse-glimmer-30b-mlx-4bit", role: "chat", label: "muse-glimmer-30b-mlx-4bit", state: "running", completedBytes: 972_700_000, totalBytes: 19_443_246_692, reason: null, ...over });
+const item = (over: Partial<InstallStatusView["items"][number]> = {}) => ({ id: "j1", model: "qwen3-8-27b-huihui-abliterated-iq4-xs", role: "chat", label: "qwen3-8-27b-huihui-abliterated-iq4-xs", state: "running", completedBytes: 972_700_000, totalBytes: 19_443_246_692, reason: null, ...over });
 const status = (over: Partial<InstallStatusView> = {}): InstallStatusView => ({
   state: "starter_ready", chatReady: true, complete: false, percent: 5, completedBytes: 972_700_000, totalBytes: 19_443_246_692,
   bytesPerSecond: 44_800_000, etaSeconds: 420, problem: null, items: [item()], ...over,
 });
-const job: HomeJobView = { id: "stack:j1", kind: "model_download", state: "running", title: "muse-glimmer-30b-mlx-4bit", actions: ["stop"], progress: { completedBytes: 972_700_000, totalBytes: 19_443_246_692, bytesPerSecond: 44_800_000, items: [{ id: "a.safetensors", label: "a.safetensors", completedBytes: 1, totalBytes: 2, state: "running" }] } };
+const job: HomeJobView = { id: "stack:j1", kind: "model_download", state: "running", title: "qwen3-8-27b-huihui-abliterated-iq4-xs", actions: ["stop"], progress: { completedBytes: 972_700_000, totalBytes: 19_443_246_692, bytesPerSecond: 44_800_000, items: [{ id: "a.safetensors", label: "a.safetensors", completedBytes: 1, totalBytes: 2, state: "running" }] } };
 const show = (admin: boolean, s: InstallStatusView, extra: Partial<Parameters<typeof InstallDock>[0]> = {}) =>
   renderWithQueryClient(<MemoryRouter><InstallDock admin={admin} read={async () => s} readJobs={async () => [job]} {...extra} /></MemoryRouter>);
 
 describe("InstallDock", () => {
   test("says what is installing and why, in plain words, with the percent and time left", async () => {
     const view = show(false, status());
-    await view.findByText((text) => text.replace(/\u00a0/g, " ") === "Installing a faster chat engine for Muse Glimmer (19.4 GB)");
-    expect(view.container.textContent).not.toContain("muse-glimmer-30b-mlx-4bit");
+    await view.findByText((text) => text.replace(/\u00a0/g, " ") === "Downloading a chat model (19.4 GB)");
+    expect(view.container.textContent).not.toContain("qwen3-8-27b-huihui-abliterated-iq4-xs");
     view.getByText("5%");
     view.getByText("about 7 min left · 44.8 MB/s");
   });
@@ -66,8 +66,8 @@ describe("InstallDock", () => {
     fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     const details = await admin.findByTestId("install-dock-details");
-    expect(details.textContent).toContain("Installing a faster chat engine for Muse Glimmer");
-    expect(details.textContent).toContain("Muse Glimmer answers faster");
+    expect(details.textContent).toContain("Downloading a chat model");
+    expect(details.textContent).toContain("A model for chat on this computer");
     expect(admin.getByRole("button", { name: /cancel/i })).toBeTruthy();
     cleanup();
     const plain = show(false, status());

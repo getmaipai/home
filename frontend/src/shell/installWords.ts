@@ -5,6 +5,8 @@ import { formatUnit } from "@/lib/format";
 // announcer all read this; nothing else turns a model id into a sentence. Ids come from the
 // Stack's install plan (GET /stack/v1/install-plan); the Stack's component list carries the same
 // ids, so a part it adds later falls back to its role until a line is added here.
+// MODELS-FROM-STACK-01 (2026-11-22): the lines say what a part does, never which product it is. A model's name, size and description come
+// from the Stack's parts list (it knows each model, Home keeps no name for one), so no rule here carries a product name.
 
 /** Sizes the way the download itself reports them (1 GB = 1,000 MB), so "19.4 GB" matches the file listing. */
 export function plainSize(bytes: number): string {
@@ -20,7 +22,7 @@ export interface InstallWords {
   verb: string;
   /** What it is, in a few plain words: "the picture maker". */
   what: string;
-  /** The product's own name, shown in brackets when it helps a person recognise it. */
+  /** The product's own name, shown in brackets. Rules in this file never set it; a caller that holds the Stack's own label for the part may. */
   product?: string;
   /** Why it matters, one short sentence for the expanded list. */
   benefit: string;
@@ -32,17 +34,12 @@ interface Rule { match: RegExp; words: InstallWords }
 
 // Most specific first.
 const RULES: readonly Rule[] = [
-  { match: /^muse-glimmer.*(mlx|omlx)/i, words: { verb: "Installing", what: "a faster chat engine for Muse Glimmer", benefit: "Muse Glimmer answers faster and uses less memory on this computer." } },
-  { match: /^muse-glimmer.*(mmproj|projector)/i, words: { verb: "Installing", what: "picture reading for Muse Glimmer", benefit: "Chat can look at pictures you send." } },
-  { match: /^muse-glimmer/i, words: { verb: "Downloading", what: "the Muse Glimmer chat model", benefit: "A smarter chat model for everyday questions." } },
   { match: /^qwen3-vl|vision|mmproj/i, words: { verb: "Installing", what: "picture reading", benefit: "Chat can look at pictures you send." } },
-  { match: /^qwen3-1\.7b/i, words: { verb: "Downloading", what: "the starter chat model", product: "Qwen3 1.7B", benefit: "Lets Home chat right away while the bigger model downloads." } },
   { match: /coder|code/i, words: { verb: "Downloading", what: "the coding helper", benefit: "Better help with code and scripts." } },
-  { match: /flux/i, words: { verb: "Downloading", what: "the picture maker", product: "FLUX.2 Klein", benefit: "Home can make pictures from a description." } },
-  { match: /wan2|wan-2|wan\b/i, words: { verb: "Getting", what: "the video model", tail: "ready", product: "Wan2.2", benefit: "Home can make short videos." } },
+  { match: /flux/i, words: { verb: "Downloading", what: "the picture maker", benefit: "Home can make pictures from a description." } },
+  { match: /wan2|wan-2|wan\b/i, words: { verb: "Getting", what: "the video model", tail: "ready", benefit: "Home can make short videos." } },
   { match: /ace-?step|musicgen|music/i, words: { verb: "Downloading", what: "the music maker", benefit: "Home can make music and songs." } },
-  { match: /chatterbox/i, words: { verb: "Installing", what: "voice", product: "Chatterbox", benefit: "Home can read answers aloud in a natural voice." } },
-  { match: /pocket-?tts|kokoro|piper|tts/i, words: { verb: "Installing", what: "voice", benefit: "Home can read answers aloud." } },
+  { match: /chatterbox|voxcpm|pocket-?tts|kokoro|piper|tts/i, words: { verb: "Installing", what: "voice", benefit: "Home can read answers aloud." } },
   { match: /moonshine|whisper|parakeet|silero|stt|vad/i, words: { verb: "Installing", what: "speech listening", benefit: "Home can understand what you say out loud." } },
   { match: /embed|bge|minilm|nomic/i, words: { verb: "Installing", what: "memory search", benefit: "Home can find the right memories and files when you ask." } },
   { match: /ddgs|searx|search/i, words: { verb: "Setting up", what: "web search", benefit: "Home can look things up on the web when you ask." } },
@@ -71,7 +68,7 @@ export function installWords(input: { id?: string | null; role?: string | null }
   return (input.role ? BY_ROLE[input.role] : undefined) ?? GENERIC;
 }
 
-/** "Installing a faster chat engine for Muse Glimmer (19.4 GB)": size is shown from 1 GB up, where it sets expectations. */
+/** "Downloading the picture maker (16 GB)": size is shown from 1 GB up, where it sets expectations. */
 export function installLabel(words: InstallWords, totalBytes?: number | null): string {
   const size = totalBytes && totalBytes >= 1e9 ? plainSize(totalBytes).replace(" ", "\u00a0") : null;
   const inside = [words.product, size].filter(Boolean).join(", ");

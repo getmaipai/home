@@ -23,7 +23,6 @@ import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
 import { PerformanceSettings } from "@/apps/settings/PerformanceSettings";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
-import { VoiceEngineSection } from "@/apps/settings/VoiceEngineSection";
 import { PeopleAccess } from "@/apps/settings/PeopleAccess";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
@@ -104,7 +103,7 @@ function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   return <>
     {show("overview") ? <AiModelsPage person={person} onPersonChange={() => undefined} tab={tab} /> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <><VoiceEngineSection /><HuggingFaceTokenSection /></> : null}
+    {show("advanced") ? <HuggingFaceTokenSection /> : null}
   </>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
