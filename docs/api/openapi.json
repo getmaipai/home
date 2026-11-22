@@ -56161,6 +56161,10 @@
                       },
                       "unread": {
                         "type": "boolean"
+                      },
+                      "failure": {
+                        "type": "string",
+                        "nullable": true
                       }
                     },
                     "required": [
@@ -56180,7 +56184,8 @@
                       "hlc",
                       "pinned_at",
                       "archived_at",
-                      "unread"
+                      "unread",
+                      "failure"
                     ],
                     "additionalProperties": false
                   }
@@ -56594,6 +56599,10 @@
                         },
                         "unread": {
                           "type": "boolean"
+                        },
+                        "failure": {
+                          "type": "string",
+                          "nullable": true
                         }
                       },
                       "required": [
@@ -56613,7 +56622,8 @@
                         "hlc",
                         "pinned_at",
                         "archived_at",
-                        "unread"
+                        "unread",
+                        "failure"
                       ],
                       "additionalProperties": false
                     },
@@ -57962,6 +57972,10 @@
                     },
                     "unread": {
                       "type": "boolean"
+                    },
+                    "failure": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -57981,7 +57995,8 @@
                     "hlc",
                     "pinned_at",
                     "archived_at",
-                    "unread"
+                    "unread",
+                    "failure"
                   ],
                   "additionalProperties": false
                 }
@@ -58374,6 +58389,10 @@
                     },
                     "unread": {
                       "type": "boolean"
+                    },
+                    "failure": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -58393,7 +58412,8 @@
                     "hlc",
                     "pinned_at",
                     "archived_at",
-                    "unread"
+                    "unread",
+                    "failure"
                   ],
                   "additionalProperties": false
                 }
@@ -58786,6 +58806,10 @@
                     },
                     "unread": {
                       "type": "boolean"
+                    },
+                    "failure": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -58805,7 +58829,8 @@
                     "hlc",
                     "pinned_at",
                     "archived_at",
-                    "unread"
+                    "unread",
+                    "failure"
                   ],
                   "additionalProperties": false
                 }
@@ -59180,6 +59205,10 @@
                     },
                     "unread": {
                       "type": "boolean"
+                    },
+                    "failure": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -59199,9 +59228,108 @@
                     "hlc",
                     "pinned_at",
                     "archived_at",
-                    "unread"
+                    "unread",
+                    "failure"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The session is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/code/sessions/{id}/retry": {
+      "post": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "Run the last message again after a turn that stopped on an error",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^csess-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The turn started or queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "turn_id": {
+                      "type": "string"
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "turn_id",
+                    "tier"
+                  ]
                 }
               }
             }

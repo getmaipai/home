@@ -552,6 +552,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingChanges.ts` | parseChangeCounts, readChangeCounts |
 | `backend/src/lib/codingContext.ts` | __resetCodingWindowCacheForTests, sessionContext |
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
+| `backend/src/lib/codingFailureCopy.ts` | CODING_FAILURE_COPY, codingFailureLine |
 | `backend/src/lib/codingGatewayAddress.ts` | DEFAULT_SANDBOX_GATEWAY_HOST, sandboxGatewayPort, sandboxGatewayUrl |
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
 | `backend/src/lib/codingHealthIssue.ts` | syncCodingHealthIssue |
@@ -565,7 +566,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingSandboxListener.ts` | sandboxBridgeAddress, sandboxBridgePort, inBridgeNetwork, guardSandboxRequest, sandboxListenerFailure, configureSandboxListener |
 | `backend/src/lib/codingSessions.ts` | CodingSessionListed, TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess |
 | `backend/src/lib/codingShare.ts` | setSecretScanner, codingWorkspaceRoot, __setWorkspaceRootForTests, codingWorkspace, handWorkspaceToEngine, __setShareRemoteForTests |
-| `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
+| `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages, lastErrorStopCode, lastUserText |
 | `backend/src/lib/codingTurns.ts` | CodingTurnError, setCodingRuntime, DEFAULT_MESSAGE_MINUTES, __setBudgetMsForTests, messageBudgetMs, DEFAULT_MAX_SESSIONS |
 | `backend/src/lib/codingUpload.ts` | UPLOAD_MAX_BYTES, UPLOAD_MAX_FILES, uploadToWorkspace |
 | `backend/src/lib/codingWorkspaceView.ts` | FILE_VIEW_CAP, sessionChanges, sessionTree, sessionFile |
