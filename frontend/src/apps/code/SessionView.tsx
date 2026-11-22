@@ -2,16 +2,12 @@
 // request and queue cards, the composer and its one status line fill the middle; Changes, Files, Terminal and Plan are tabs of the kit right pane
 // (pinned open on a wide screen, a sheet on a phone).
 import { i18n } from "@lingui/core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
-import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
-import { PendingActions } from "@maipai/ui/src/elements/pending-actions";
 import { RightPane } from "@maipai/ui/src/elements/right-pane";
-import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
-import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { TierChip, TierSegment, type TierId } from "@maipai/ui/src/elements/tier-segment";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -23,8 +19,7 @@ import { stopWords, activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWo
 import { CODE_SESSIONS_KEY, CODE_TIERS_KEY, tierOptions } from "./NewSession";
 import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
 import { Stack } from "./layout";
-import { Composer } from "./Composer";
-import { Transcript, type LocalNotice } from "./Transcript";
+import { CodeThread } from "./CodeThread";
 
 const TerminalIcon = getIcon("terminal");
 
@@ -40,21 +35,18 @@ export function SessionView({ id }: { id: string }) {
   const tiers = useQuery({ queryKey: CODE_TIERS_KEY, queryFn: codeApi.tiers, retry: false });
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notices, setNotices] = useState<LocalNotice[]>([]);
+  const [notices, setNotices] = useState<{ text: string }[]>([]);
   const [maxNext, setMaxNext] = useState(false);
   const [paneOpen, setPaneOpen] = useState(!phone);
   const [paneTab, setPaneTab] = useState("changes");
   const [pinned, setPinned] = useState(true);
-  const end = useRef<HTMLDivElement>(null);
+  const tree = useQuery({ queryKey: ["code-tree", id, view.data?.session.last_activity_at], queryFn: () => codeApi.tree(id), retry: false, enabled: view.data !== undefined });
   const [now, setNow] = useState(() => Date.now());
   const context = useQuery({ queryKey: ["code-context", id], queryFn: () => codeApi.context(id), retry: false, refetchInterval: (q) => q.state.data && view.data && isBusy(view.data.session.state) ? 4000 : 20000 });
   const ready = useQuery({ queryKey: ["code-ready"], queryFn: codeApi.ready, retry: false, enabled: false });
   const list = (messages.data ?? []).filter((m) => !m.parts.every((p) => p.type === "usage"));
   const session = view.data?.session;
   const state = session?.state;
-  const lastParts = list[list.length - 1]?.parts.length ?? 0;
-  const waitingLine = view.data?.waiting?.line;
-  useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [list.length, lastParts, waitingLine]);
   const busyNow = state ? isBusy(state) : false;
   useEffect(() => { if (!busyNow) return; setNow(Date.now()); const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [busyNow]);
   const lastPart = list[list.length - 1]?.parts[list[list.length - 1]!.parts.length - 1];
@@ -85,7 +77,7 @@ export function SessionView({ id }: { id: string }) {
     const was = working;
     await run(async () => {
       await codeApi.setTier(id, next);
-      setNotices((current) => [...current, { afterSeq: list[list.length - 1]?.seq ?? 0, text: i18n._({ id: "Switched to {tier}", message: "Switched to {tier}", values: { tier: tierWord(next) } }) }]);
+      setNotices((current) => [...current, { text: i18n._({ id: "Switched to {tier}", message: "Switched to {tier}", values: { tier: tierWord(next) } }) }]);
       setMaxNext(next === "max" && was);
       await queryClient.invalidateQueries({ queryKey: CODE_TIERS_KEY });
     }, i18n._({ id: "You cannot use that level for coding. Pick another level.", message: "You cannot use that level for coding. Pick another level." }));
@@ -116,19 +108,16 @@ export function SessionView({ id }: { id: string }) {
             {maxNext ? <TierChip tier="max" label={i18n._({ id: "Max from the next message", message: "Max from the next message" })} /> : null}
           </div>} />
         <p className="truncate px-4 pb-1 text-body text-muted-foreground" data-slot="code-subtitle">{subtitle}</p>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {list.length === 0 ? <p className="p-6 text-center text-body text-muted-foreground">{i18n._({ id: "Nothing yet. Tell the agent what to do.", message: "Nothing yet. Tell the agent what to do." })}</p> : <Transcript messages={list} notices={notices} quietFailure={failed} onAnswer={(rid, answer) => void run(() => codeApi.answer(id, rid, answer), i18n._({ id: "Could not send your answer. Try again.", message: "Could not send your answer. Try again." }))} />}
-          {busyNow ? <div className="mx-auto w-full max-w-3xl px-4 pb-3" data-slot="code-live"><ThinkingIndicator label={stageOf(session.state, waiting?.line, list)} elapsed={elapsedWords(now - Date.parse([...list].reverse().find((m) => m.role === "user")?.created_at ?? new Date(now).toISOString()))} /></div> : null}
-          {failed ? <div className="mx-auto w-full max-w-3xl px-4 pb-3" data-slot="code-failed"><StatusCard kind="problem" title={i18n._({ id: "The agent stopped", message: "The agent stopped" })}
-            line={`${stopWords("error", stoppedCode)}${ready.data && !ready.data.ready && ready.data.first_missing ? ` ${ready.data.first_missing.say} ${i18n._({ id: "Who can fix this: {who}.", message: "Who can fix this: {who}.", values: { who: ready.data.first_missing.who } })}` : ""}`} /></div> : null}
-          <div ref={end} />
-        </div>
-        <div className={`mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 ${phone ? "pb-32" : "pb-3"}`}>
-          {useStandard.length > 0 ? <div data-slot="code-held"><PendingActions actions={useStandard} /></div> : null}
-          {queued.length > 0 ? <div><MessageQueue running={statusLine} queued={queued.map((qid, index) => ({ id: qid, text: i18n._({ id: "Message {n} is waiting", message: "Message {n} is waiting", values: { n: index + 1 } }) }))} onCancel={(qid) => void run(() => codeApi.cancelQueued(id, qid), i18n._({ id: "That message is not waiting any more.", message: "That message is not waiting any more." }))} /></div> : null}
-          {problem ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={problem} /> : null}
-          <Composer session={session} tiers={tiers.data?.tiers ?? ["standard"]} onTier={(next) => void changeTier(next)} maxNext={maxNext} context={context.data} statusLine={statusLine} disabled={busy}
-            onSend={(message) => run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }))} onProblem={setProblem} />
+        <div className="flex min-h-0 flex-1 flex-col" data-slot="code-thread" style={phone ? { paddingBottom: "5.5rem" } : undefined}>
+          <CodeThread messages={list} tiers={tiers.data?.tiers ?? ["standard"]} tree={tree.data?.entries ?? []} onTier={(next) => void changeTier(next)}
+            onSend={(message) => run(() => codeApi.send(id, message), i18n._({ id: "Could not send that. Try again.", message: "Could not send that. Try again." }))}
+            onStop={() => void run(() => codeApi.stop(id), i18n._({ id: "Could not stop. Try again.", message: "Could not stop. Try again." }))}
+            state={{ session, context: context.data, statusLine, busy: busyNow, problem, notices: notices.map((n) => n.text), held: useStandard,
+              stage: busyNow ? { label: stageOf(session.state, waiting?.line, list), elapsed: elapsedWords(now - Date.parse([...list].reverse().find((m) => m.role === "user")?.created_at ?? new Date(now).toISOString())) } : null,
+              queued: queued.map((qid, index) => ({ id: qid, text: i18n._({ id: "Message {n} is waiting", message: "Message {n} is waiting", values: { n: index + 1 } }) })),
+              failure: failed ? `${stopWords("error", stoppedCode)}${ready.data && !ready.data.ready && ready.data.first_missing ? ` ${ready.data.first_missing.say} ${i18n._({ id: "Who can fix this: {who}.", message: "Who can fix this: {who}.", values: { who: ready.data.first_missing.who } })}` : ""}` : null,
+              onAnswer: (rid, answer) => void run(() => codeApi.answer(id, rid, answer), i18n._({ id: "Could not send your answer. Try again.", message: "Could not send your answer. Try again." })),
+              onCancelQueued: (qid) => void run(() => codeApi.cancelQueued(id, qid), i18n._({ id: "That message is not waiting any more.", message: "That message is not waiting any more." })) }} />
         </div>
       </Stack>
       {pane}

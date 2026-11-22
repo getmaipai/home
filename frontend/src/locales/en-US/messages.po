@@ -1477,12 +1477,12 @@ msgid "{traced, plural, one {# traced turn} other {# traced turns}} in this wind
 msgstr "{traced, plural, one {# traced turn} other {# traced turns}} in this window"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:28
+#: src/apps/code/ContextRing.tsx:11
 msgid "{used} of {window} tokens used"
 msgstr "{used} of {window} tokens used"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:29
+#: src/apps/code/ContextRing.tsx:12
 msgid "{used} tokens used"
 msgstr "{used} tokens used"
 
@@ -2336,11 +2336,6 @@ msgstr "Add an audio or video file with the plus button, then pick the new voice
 #: src/apps/reminders/ListMain.tsx:76
 msgid "Add an item"
 msgstr "Add an item"
-
-#. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:79
-msgid "Add files"
-msgstr "Add files"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleAddFile.tsx:45
@@ -3727,7 +3722,7 @@ msgid "Asking the bare model…"
 msgstr "Asking the bare model…"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:22
+#: src/apps/code/CodeThread.tsx:24
 msgid "Asks before changes"
 msgstr "Asks before changes"
 
@@ -3970,7 +3965,7 @@ msgid "Back to robots"
 msgstr "Back to robots"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:75
+#: src/apps/code/SessionView.tsx:67
 msgid "Back to sessions"
 msgstr "Back to sessions"
 
@@ -5042,7 +5037,7 @@ msgid "Changed"
 msgstr "Changed"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Transcript.tsx:19
+#: src/apps/code/CodeThread.tsx:74
 msgid "Changed {path}"
 msgstr "Changed {path}"
 
@@ -5058,8 +5053,8 @@ msgstr "Changed. Now: {proposed}."
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:42
-#: src/apps/code/SessionView.tsx:97
-#: src/apps/code/SessionView.tsx:112
+#: src/apps/code/SessionView.tsx:89
+#: src/apps/code/SessionView.tsx:104
 msgid "Changes"
 msgstr "Changes"
 
@@ -6392,7 +6387,7 @@ msgid "Clone settings"
 msgstr "Clone settings"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:103
+#: src/apps/code/SessionView.tsx:95
 #: src/apps/settings/EngineLinkCredentialSection.tsx:288
 #: src/apps/settings/FreeUpSpaceDialog.tsx:97
 #: src/apps/settings/StackChanInstallDialog.tsx:153
@@ -6443,6 +6438,7 @@ msgid "setting.robot.face.color.option_label.cloud"
 msgstr "Cloud"
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:137
 #: src/apps/code/SessionList.tsx:35
 msgid "Code"
 msgstr "Code"
@@ -6957,7 +6953,6 @@ msgid "setting.companions.allowed.does"
 msgstr "Controls who can see and use the available companions."
 
 #. js-lingui-explicit-id
-#: src/apps/code/Transcript.tsx:36
 #: src/shell/pages/CompanionsPage.tsx:311
 #: src/shell/pages/CompanionsPage.tsx:317
 msgid "Conversation"
@@ -7053,11 +7048,6 @@ msgstr "Copy your key now"
 #: src/lib/settingCopy.generated.ts:1775
 msgid "setting.tts.voice_id.option_label.cosette"
 msgstr "Cosette"
-
-#. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:56
-msgid "Could not add {name}. Try again."
-msgstr "Could not add {name}. Try again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:110
@@ -7744,7 +7734,7 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr "Could not open the live view of {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:97
+#: src/apps/code/SessionView.tsx:89
 msgid "Could not open the pull request. Try again."
 msgstr "Could not open the pull request. Try again."
 
@@ -7754,7 +7744,7 @@ msgid "Could not open this app. Check your connection and try again."
 msgstr "Could not open this app. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:75
+#: src/apps/code/SessionView.tsx:67
 msgid "Could not open this session. Try again."
 msgstr "Could not open this session. Try again."
 
@@ -7775,7 +7765,7 @@ msgid "Could not post the note."
 msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:97
+#: src/apps/code/SessionView.tsx:89
 msgid "Could not push. Try again."
 msgstr "Could not push. Try again."
 
@@ -8051,12 +8041,12 @@ msgid "Could not send that to {name}. Check that it is switched on, then try aga
 msgstr "Could not send that to {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:131
+#: src/apps/code/SessionView.tsx:113
 msgid "Could not send that. Try again."
 msgstr "Could not send that. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:120
+#: src/apps/code/SessionView.tsx:119
 msgid "Could not send your answer. Try again."
 msgstr "Could not send your answer. Try again."
 
@@ -8131,7 +8121,8 @@ msgid "Could not stop that. Try again."
 msgstr "Could not stop that. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:111
+#: src/apps/code/SessionView.tsx:103
+#: src/apps/code/SessionView.tsx:114
 msgid "Could not stop. Try again."
 msgstr "Could not stop. Try again."
 
@@ -8146,7 +8137,7 @@ msgid "Could not test the connection."
 msgstr "Could not test the connection."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:97
+#: src/apps/code/SessionView.tsx:89
 msgid "Could not undo that. Try again."
 msgstr "Could not undo that. Try again."
 
@@ -9479,11 +9470,6 @@ msgid "Drawing your character..."
 msgstr "Drawing your character..."
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:75
-msgid "Drop files to add them"
-msgstr "Drop files to add them"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:416
 msgid "Drop to add to your Library"
 msgstr "Drop to add to your Library"
@@ -9648,7 +9634,7 @@ msgid "Edit profile"
 msgstr "Edit profile"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:22
+#: src/apps/code/CodeThread.tsx:24
 msgid "Edits without asking"
 msgstr "Edits without asking"
 
@@ -10492,19 +10478,14 @@ msgid "api.error.file_unavailable_to_share"
 msgstr "File unavailable. Ask the owner to share a suitable file."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:98
+#: src/apps/code/SessionView.tsx:90
 msgid "Files"
 msgstr "Files"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:66
+#: src/apps/code/CodeThread.tsx:131
 msgid "Files I added:"
 msgstr "Files I added:"
-
-#. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:71
-msgid "Files in the workspace"
-msgstr "Files in the workspace"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryTrash.tsx:33
@@ -14229,7 +14210,7 @@ msgid "Keep network"
 msgstr "Keep network"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:103
+#: src/apps/code/SessionView.tsx:95
 msgid "Keep open"
 msgstr "Keep open"
 
@@ -15121,9 +15102,9 @@ msgid "setting.coding.api.away.does"
 msgstr "Lets your key connect through your Tailscale when you are out."
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:85
+#: src/apps/code/CodeThread.tsx:136
 #: src/apps/code/NewSession.tsx:71
-#: src/apps/code/SessionView.tsx:115
+#: src/apps/code/SessionView.tsx:107
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
 msgstr "Level"
@@ -16934,8 +16915,7 @@ msgid "setting.access.tier.max.label"
 msgstr "Max for"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:86
-#: src/apps/code/SessionView.tsx:116
+#: src/apps/code/SessionView.tsx:108
 msgid "Max from the next message"
 msgstr "Max from the next message"
 
@@ -17113,7 +17093,7 @@ msgid "Memory used by the whole system."
 msgstr "Memory used by the whole system."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:128
+#: src/apps/code/SessionView.tsx:117
 msgid "Message {n} is waiting"
 msgstr "Message {n} is waiting"
 
@@ -17128,7 +17108,7 @@ msgid "setting.chat.paused_message.label"
 msgstr "Message shown while chat is paused"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:75
+#: src/apps/code/CodeThread.tsx:137
 msgid "Message the agent. Type @ to point at a file."
 msgstr "Message the agent. Type @ to point at a file."
 
@@ -17136,11 +17116,6 @@ msgstr "Message the agent. Type @ to point at a file."
 #: src/lib/settingCopy.generated.ts:1096
 msgid "setting.notifications.telegram.chat_id.help"
 msgstr "Message the household bot once, then paste the chat id it replies with, to receive your notifications on Telegram."
-
-#. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:75
-msgid "Message to the agent"
-msgstr "Message to the agent"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1789
@@ -19326,7 +19301,7 @@ msgid "Nothing was removed."
 msgstr "Nothing was removed."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:120
+#: src/apps/code/CodeThread.tsx:92
 msgid "Nothing yet. Tell the agent what to do."
 msgstr "Nothing yet. Tell the agent what to do."
 
@@ -21426,17 +21401,17 @@ msgstr "Plain-language health and medicine pages from the US National Library of
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:78
-#: src/apps/code/SessionView.tsx:100
+#: src/apps/code/SessionView.tsx:92
 msgid "Plan"
 msgstr "Plan"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:22
+#: src/apps/code/CodeThread.tsx:24
 msgid "Plan first"
 msgstr "Plan first"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Transcript.tsx:16
+#: src/apps/code/CodeThread.tsx:76
 msgid "Plan updated: {done} of {total} steps done."
 msgstr "Plan updated: {done} of {total} steps done."
 
@@ -22551,7 +22526,6 @@ msgstr "Remove {label}?"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:154
-#: src/apps/code/Composer.tsx:70
 #: src/apps/settings/CloseAppsSettings.tsx:65
 #: src/apps/settings/DevicesSection.tsx:147
 #: src/apps/settings/PersonMore.tsx:110
@@ -24585,7 +24559,6 @@ msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr "Semitones, -12 to 12. A negative number lowers the voice."
 
 #. js-lingui-explicit-id
-#: src/apps/code/Composer.tsx:80
 #: src/shell/library/LibraryViewer.tsx:210
 #: src/shell/library/LibraryViewer.tsx:210
 msgid "Send"
@@ -24648,7 +24621,7 @@ msgid "Service, e.g. turn_off"
 msgstr "Service, e.g. turn_off"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:103
+#: src/apps/code/SessionView.tsx:95
 msgid "Session details"
 msgstr "Session details"
 
@@ -26697,7 +26670,7 @@ msgstr "Stone"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:66
-#: src/apps/code/SessionView.tsx:111
+#: src/apps/code/SessionView.tsx:103
 #: src/apps/settings/AddVoiceBox.tsx:69
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/apps/settings/VoiceBrowserSection.tsx:99
@@ -27073,7 +27046,7 @@ msgid "Switch the chat engine only"
 msgstr "Switch the chat engine only"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:88
+#: src/apps/code/SessionView.tsx:80
 msgid "Switched to {tier}"
 msgstr "Switched to {tier}"
 
@@ -27422,7 +27395,7 @@ msgid "Tempo in beats per minute"
 msgstr "Tempo in beats per minute"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:99
+#: src/apps/code/SessionView.tsx:91
 msgid "Terminal"
 msgstr "Terminal"
 
@@ -27587,8 +27560,8 @@ msgstr "That did not send. Try again."
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
+#: src/apps/code/CodeThread.tsx:103
 #: src/apps/code/NewSession.tsx:74
-#: src/apps/code/SessionView.tsx:129
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
 #: src/apps/notifications/NotificationsPage.tsx:114
@@ -27798,12 +27771,12 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr "That message is no longer available. This chat is open at the end."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:128
+#: src/apps/code/SessionView.tsx:120
 msgid "That message is not waiting any more."
 msgstr "That message is not waiting any more."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:94
+#: src/apps/code/SessionView.tsx:86
 msgid "That message is not waiting for Max any more."
 msgstr "That message is not waiting for Max any more."
 
@@ -27909,7 +27882,7 @@ msgid "that session"
 msgstr "that session"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:75
+#: src/apps/code/SessionView.tsx:67
 msgid "That session was not found. It may have been deleted."
 msgstr "That session was not found. It may have been deleted."
 
@@ -28031,8 +28004,8 @@ msgid "The agent is asking first"
 msgstr "The agent is asking first"
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodeThread.tsx:102
 #: src/apps/code/codeTranscript.ts:63
-#: src/apps/code/SessionView.tsx:122
 msgid "The agent stopped"
 msgstr "The agent stopped"
 
@@ -31125,7 +31098,7 @@ msgid "setting.coding.engine.option.splash"
 msgstr "Use Splash, a fast engine for some Apple computers."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:94
+#: src/apps/code/SessionView.tsx:86
 msgid "Use Standard for this message"
 msgstr "Use Standard for this message"
 
@@ -32588,7 +32561,7 @@ msgid "Who can control what"
 msgstr "Who can control what"
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:123
+#: src/apps/code/SessionView.tsx:118
 msgid "Who can fix this: {who}."
 msgstr "Who can fix this: {who}."
 
@@ -33160,7 +33133,7 @@ msgid "You cannot open this profile."
 msgstr "You cannot open this profile."
 
 #. js-lingui-explicit-id
-#: src/apps/code/SessionView.tsx:91
+#: src/apps/code/SessionView.tsx:83
 msgid "You cannot use that level for coding. Pick another level."
 msgstr "You cannot use that level for coding. Pick another level."
 
@@ -33240,12 +33213,12 @@ msgid "You need Chrome or Edge on a computer, Home opened at its https address, 
 msgstr "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable."
 
 #. js-lingui-explicit-id
-#: src/apps/code/Transcript.tsx:23
+#: src/apps/code/CodeThread.tsx:81
 msgid "You said no"
 msgstr "You said no"
 
 #. js-lingui-explicit-id
-#: src/apps/code/Transcript.tsx:23
+#: src/apps/code/CodeThread.tsx:81
 msgid "You said yes"
 msgstr "You said yes"
 

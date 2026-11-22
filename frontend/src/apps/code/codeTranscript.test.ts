@@ -86,3 +86,15 @@ test("sessions split into Today and Previous", () => {
   const g = groupSessions([{ last_activity_at: "2026-11-21T09:00:00" }, { last_activity_at: "2026-11-19T09:00:00" }], now);
   expect([g.today.length, g.previous.length]).toEqual([1, 1]);
 });
+
+import { toThreadMessages } from "./CodeThread";
+test("the hub's transcript becomes thread messages: text, commands with output, requests, and no usage rows", () => {
+  const out = toThreadMessages([
+    { id: "u1", seq: 1, role: "user", parts: [{ type: "text", text: "go" }], created_at: "2026-11-21T10:00:00.000Z" },
+    msg(2, [{ type: "text", text: "ok" }, { type: "tool", tool: "command", status: "done", summary: "ls", exit_code: 0, output: "a\n" }, { type: "approval", request_id: "creq-1", effect: "push", status: "pending" }, { type: "stopped", reason: "error", code: "x" }]),
+    { id: "s1", seq: 3, role: "system", parts: [{ type: "usage", input: 1, output: 2 }], created_at: "2026-11-21T10:00:00.000Z" },
+  ], false, true);
+  expect(out.map((m) => m.role)).toEqual(["user", "assistant"]);
+  const parts = out[1]!.content as { type: string; toolName?: string }[];
+  expect(parts.map((p) => p.toolName ?? p.type)).toEqual(["text", "command", "approval"]);
+});

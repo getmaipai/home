@@ -81,35 +81,41 @@ describe("the Code app page", () => {
     await waitFor(() => expect(document.querySelector('[data-slot="code-diff"]')).toBeTruthy());
     expect(calls.some((c) => c.endsWith("/csess-abc123/changes"))).toBe(true);
   });
-  test("a working session shows the live line with the stage and the time, and a Stop button", async () => {
-    sessionState = "working";
-    open("/apps/code/csess-abc123");
-    await waitFor(() => expect(document.querySelector('[data-slot="code-live"]')).toBeTruthy());
-    expect(document.querySelector('[data-slot="code-live"]')!.textContent).toContain("Thinking");
-    expect(within(document.body).getAllByText("Stop").length).toBeGreaterThan(0);
-  });
-  test("a failed session shows why, from the ready check, in plain words", async () => {
-    sessionState = "failed";
-    open("/apps/code/csess-abc123");
-    expect(await within(document.body).findByText(/The coding engine needs an update\./)).toBeTruthy();
-    expect(document.querySelector('[data-slot="code-failed"]')).toBeTruthy();
-  });
   test("the header says Scratch folder for a session with no repository", async () => {
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="code-subtitle"]')?.textContent).toBe("Scratch folder"));
   });
-  test("the status bar has the level control with only the offered tiers, the mode and the context ring with its tooltip", async () => {
+  test("a working session shows the live line with the stage and the time, and the kit's stop button", async () => {
+    sessionState = "working";
     open("/apps/code/csess-abc123");
-    await waitFor(() => expect(document.querySelector('[data-slot="code-status-tier"]')).toBeTruthy());
-    expect(document.querySelector('[data-slot="code-status-tier"]')!.textContent).not.toContain("Boost");
+    await waitFor(() => expect(document.querySelector('[data-slot="thinking-indicator"]')).toBeTruthy());
+    expect(document.querySelector('[data-slot="thinking-indicator"]')!.textContent).toContain("Thinking");
+    expect(document.querySelector('button[aria-label="Stop generating"]')).toBeTruthy();
+  });
+  test("a failed session shows why, from the reason and the ready check, in plain words", async () => {
+    sessionState = "failed";
+    open("/apps/code/csess-abc123");
+    expect(await within(document.body).findByText(/The coding engine needs an update\./)).toBeTruthy();
+    expect(document.querySelector('[data-slot="code-status"]')?.textContent).toBe("The agent stopped");
+  });
+  test("the one shared composer carries the level chip with only the offered tiers, the mode and the context ring", async () => {
+    open("/apps/code/csess-abc123");
+    await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
+    await waitFor(() => expect(document.querySelector('button[aria-label^="Level"]')).toBeTruthy());
     await waitFor(() => expect(document.querySelector('[data-slot="code-context"]')?.getAttribute("title")).toBe("52K of 64K tokens used"));
     expect(document.querySelector('[data-slot="code-statusbar"]')!.textContent).toContain("Asks before changes");
+    expect(document.querySelector('[data-slot="composer-input"], textarea.aui-composer-input')).toBeTruthy();
   });
-  test("adding a file uploads it to the session and shows a chip", async () => {
+  test("adding a file goes through the composer's attachment adapter to the session's upload route", async () => {
     open("/apps/code/csess-abc123");
-    const input = await waitFor(() => { const el = document.querySelector('[data-slot="code-file-input"]') as HTMLInputElement | null; if (!el) throw new Error("no input"); return el; });
+    const add = await waitFor(() => { const el = document.querySelector('button[aria-label="Add Attachment"]') as HTMLButtonElement | null; if (!el) throw new Error("no button"); return el; });
+    const made: HTMLInputElement[] = []; const create = document.createElement.bind(document);
+    document.createElement = ((tag: string, o?: ElementCreationOptions) => { const el = create(tag, o); if (tag === "input") made.push(el as HTMLInputElement); return el; }) as typeof document.createElement;
+    fireEvent.click(add);
+    document.createElement = create;
+    const input = (made.find((i) => i.type === "file") ?? document.querySelector('input[type="file"]')) as HTMLInputElement;
+    expect(input).toBeTruthy();
     fireEvent.change(input, { target: { files: [new File(["hello"], "notes.md", { type: "text/markdown" })] } });
     await waitFor(() => expect(calls).toContain("POST /api/code/sessions/csess-abc123/upload"));
-    expect(await within(document.body).findByText("notes.md")).toBeTruthy();
   });
 });

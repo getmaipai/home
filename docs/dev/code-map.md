@@ -188,12 +188,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/clock/TimersTab.tsx` | TimersTab |
 | `frontend/src/apps/clock/WorldClocksTab.tsx` | WorldClocksTab |
 | `frontend/src/apps/code/CodePage.tsx` | sessionIdOf, CodePage |
-| `frontend/src/apps/code/Composer.tsx` | ContextRing, Composer |
+| `frontend/src/apps/code/CodeThread.tsx` | toThreadMessages, CodeThread |
+| `frontend/src/apps/code/ContextRing.tsx` | ContextRing |
 | `frontend/src/apps/code/NewSession.tsx` | CODE_TIERS_KEY, CODE_SESSIONS_KEY, tierOptions, NewSession |
 | `frontend/src/apps/code/SessionList.tsx` | sessionMeta, useCodeSessions, sessionItems, CodeSidebar |
 | `frontend/src/apps/code/SessionTabs.tsx` | ChangesTab, FilesTab, TerminalTab, PlanTab |
 | `frontend/src/apps/code/SessionView.tsx` | CODE_DENSITY, SessionView |
-| `frontend/src/apps/code/Transcript.tsx` | Transcript |
 | `frontend/src/apps/code/layout.tsx` | Stack |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |

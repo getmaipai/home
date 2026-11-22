@@ -13,7 +13,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { errorLine } from "@/lib/hubReachability";
 import { codeApi, type CodeContext, type CodeSession } from "./codeApi";
-import { ContextRing } from "./Composer";
+import { ContextRing } from "./ContextRing";
 import { Stack } from "./layout";
 import { fileTreeOf, languageOf, parseDiff, repoLine, type SessionActivity } from "./codeTranscript";
 
