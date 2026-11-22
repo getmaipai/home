@@ -547,6 +547,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
 | `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
+| `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, getSessionRow, createCodingSession |
+| `backend/src/lib/codingTurns.ts` | setCodingRuntime, DEFAULT_MAX_SESSIONS, __setSessionCapForTests, householdSessionCap, personSessionCap, __setCodingRetryMsForTests |
 | `backend/src/lib/comingUp.ts` | listComingUp, createTimer, extendTimer, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, __setCompanionArtStatusReadersForTests, promptHash, resolveCompanionStillFromCatalog |
@@ -717,7 +719,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hubShutdown.ts` | SHUTDOWN_DEADLINE_MS, shutdownEngines, __resetHubShutdownForTests |
 | `backend/src/lib/i18nServer.ts` | notificationLanguage, renderNotification, renderNotificationFor, spokenNotificationLine |
 | `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
-| `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newGitConnectionId, newBiometricPrintId, newJobId, newConversationTurnId |
+| `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newGitConnectionId, newCodingSessionId, newBiometricPrintId, newJobId |
 | `backend/src/lib/imageApp.ts` | imageAppData |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, BEST_NEEDS_DOWNLOAD |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
