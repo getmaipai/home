@@ -13,6 +13,7 @@ import { mkdir } from "node:fs/promises";
 import { StackError } from "@/lib/stack/errors";
 import type { StackClient } from "@/lib/stack/client";
 import { appendLogLine } from "@/lib/log";
+import { sandboxGatewayUrl } from "@/lib/codingGatewayAddress";
 import { codingWorkspace } from "@/lib/codingShare";
 import { db } from "@/db";
 import { codingSessions } from "@/db/schema";
@@ -32,6 +33,10 @@ export interface ExecSandbox extends CodingSandbox {
 }
 
 /** The Stack's sandbox id for a session. The session id already fits the Stack's pattern (lowercase letters, digits, dashes, 6 to 40 long). */
+/** Home's own gateway port, sent at create so the Stack's network lock lets the machine reach /code/v1 with no per-machine STACK_SANDBOX_ALLOWED_PORTS. */
+export function gatewayPortBody(url: string = sandboxGatewayUrl()): { gateway_ports?: number[] } {
+  try { const port = Number(new URL(url).port); return Number.isInteger(port) && port > 0 && port < 65536 ? { gateway_ports: [port] } : {}; } catch { return {}; }
+}
 export const sandboxIdOf = (sessionId: string): string => sessionId;
 const base = (id: string) => `/stack/v1/sandboxes/${encodeURIComponent(id)}`;
 
@@ -76,7 +81,7 @@ export function createStackSandbox(getClient: () => Pick<StackClient, "sandboxCa
       else await existing.body?.cancel().catch(() => undefined);
       const workspace = codingWorkspace(row.personId, sessionId);
       await mkdir(workspace, { recursive: true });
-      const created = await call("POST", "/stack/v1/sandboxes", { id, workspace, network: { policy: "none", hosts: [] } });
+      const created = await call("POST", "/stack/v1/sandboxes", { id, workspace, network: { policy: "none", hosts: [] }, ...gatewayPortBody() });
       if (created.status !== 201) await refuse(created, "create");
       const info = await new Response(created.body).json() as { state?: string };
       if (info.state !== "running") throw new SandboxClientError("lock_not_ready", "The sandbox did not report that it is running behind its network lock, so nothing was started. Try again.");

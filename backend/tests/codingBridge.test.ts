@@ -154,6 +154,13 @@ describe("Stop, the wall-clock budget and the message queue", () => {
     rig.agent.finishAll(); await settled();
     expect(queuedMessageIds(a, s.id)).toEqual([]);
   });
+  test("Undo recomputes the Changes count from the sandbox after the restore", async () => {
+    rig = startRig(); const a = owner(); const s = createCodingSession(a, input());
+    addCheckpoint(s.id, { id: "ckpt-1", label: "Before your message", files: 3 });
+    (rig.sandbox.sandbox as unknown as { exec: unknown }).exec = async function* () { yield { stream: "stdout" as const, text: "2\t1\tsrc/a.ts\n" }; yield { exit: 0 }; };
+    await undoToCheckpoint(a, s.id, "ckpt-1");
+    expect(getCodingSession(a, s.id)!.changes).toEqual({ files: 1, additions: 2, deletions: 1 });
+  });
   test("Undo on a receipt restores the checkpoint and records it", async () => {
     rig = startRig(); const a = owner(); const s = createCodingSession(a, input());
     addCheckpoint(s.id, { id: "ckpt-1", label: "Before your message", files: 3 });

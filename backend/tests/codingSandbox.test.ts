@@ -50,7 +50,7 @@ describe("create, reuse, stop, delete", () => {
     const stack = fakeStack(); const a = owner(); const s = createCodingSession(a, input());
     await sandboxOn(stack).start({ sessionId: s.id, environmentId: "cenv-abcdef12" });
     expect(stack.calls).toEqual(["GET /stack/v1/sandboxes/" + s.id, "POST /stack/v1/sandboxes"]);
-    expect(stack.bodies[1]).toEqual({ id: s.id, workspace: codingWorkspace(a.id, s.id), network: { policy: "none", hosts: [] } });
+    expect(stack.bodies[1]).toEqual({ id: s.id, workspace: codingWorkspace(a.id, s.id), network: { policy: "none", hosts: [] }, gateway_ports: [expect.any(Number)] });
     expect(existsSync(codingWorkspace(a.id, s.id))).toBe(true);
   });
   test("a running machine is reused; a stopped one is removed and made again", async () => {
@@ -120,5 +120,14 @@ describe.skipIf(process.env.MAIPAI_REAL_SANDBOX !== "1")("a real sandbox (opt-in
     await sbx.start({ sessionId: s.id, environmentId: "x" });
     expect((await collect(sbx.exec({ sessionId: s.id, argv: ["echo", "ok"], signal: new AbortController().signal }))).some((c) => "exit" in c && c.exit === 0)).toBe(true);
     await sbx.destroy(s.id);
+  });
+});
+
+import { gatewayPortBody } from "@/lib/codingSandbox";
+import { describe as d2, expect as e2, test as t2 } from "bun:test";
+d2("gateway port at create", () => {
+  t2("Home's gateway port travels with the create request", () => {
+    e2(gatewayPortBody("http://192.0.2.1:3000/code/v1")).toEqual({ gateway_ports: [3000] });
+    e2(gatewayPortBody("not a url")).toEqual({});
   });
 });

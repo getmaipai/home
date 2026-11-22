@@ -322,6 +322,7 @@ export async function undoToCheckpoint(person: PersonRow, sessionId: string, che
   const known = (getSessionRow(person.id, sessionId)?.checkpoints ?? []).some((c) => c.id === checkpointId);
   if (!/^[A-Za-z0-9_.-]{1,80}$/.test(checkpointId) || !known) throw new CodingSessionError("bad_input", "That checkpoint is not valid. Pick one from the session's history.");
   await runtime.sandbox.restoreCheckpoint({ sessionId, checkpointId });
+  await recordChanges(runtime, sessionId); // the files changed under the count
   recordCodingEvent({ sessionId, personId: person.id, kind: "checkpoint_restored", detail: { checkpoint_id: checkpointId } });
   appendLogLine(`coding checkpoint_restored session=${sessionId} person=${person.id}`);
 }
