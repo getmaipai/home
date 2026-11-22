@@ -25,17 +25,22 @@ export function useComposerFocus(rootRef: RefObject<HTMLElement | null>, entryKe
   useEffect(() => {
     if (!fine) return;
     const composer = () => rootRef.current?.querySelector<HTMLElement>("textarea.aui-composer-input") ?? null;
+    // An arrival (New chat from a project menu included) still owes the composer its focus until one focus lands: the menu
+    // that started it is open for a beat and hands focus back to its trigger as it closes.
+    let arrivalOwed = true;
     const focusComposer = (afterClose: boolean) => {
       const field = composer();
-      if (!field || field === document.activeElement || (field as HTMLTextAreaElement).disabled) return;
+      if (!field || (field as HTMLTextAreaElement).disabled) return;
+      if (field === document.activeElement) { arrivalOwed = false; return; }
       if (typingElsewhere(field)) return;
       if (document.querySelector(OPEN_LAYERS)) return;
-      if (afterClose) {
+      if (afterClose && !arrivalOwed) {
         const active = document.activeElement;
         const home = active === document.body || active === null || (active instanceof HTMLElement && !!field.closest("[data-slot='aui_composer-shell']")?.contains(active));
         if (!home) return;
       }
       field.focus({ preventScroll: true });
+      arrivalOwed = false;
     };
     const timers = new Set<number>();
     const later = (fn: () => void, ms: number) => {
@@ -46,14 +51,22 @@ export function useComposerFocus(rootRef: RefObject<HTMLElement | null>, entryKe
     focusComposer(false);
     later(() => focusComposer(false), 120);
     later(() => focusComposer(false), 350);
+    later(() => { arrivalOwed = false; }, 6000);
     // A menu or dialog closing hands focus back to its trigger a tick later; the composer wins from there.
     const observer = new MutationObserver((records) => {
       const closed = records.some((record) => Array.from(record.removedNodes).some((node) => node instanceof Element && (node.matches(OPEN_LAYERS) || node.querySelector(OPEN_LAYERS))));
-      if (closed) later(() => focusComposer(true), 60);
+      if (closed) later(() => focusComposer(!arrivalOwed), 60);
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    // The closing menu hands focus back to its trigger, which can land after the observer's tick: an arrival still owed takes it back.
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (arrivalOwed && target instanceof HTMLElement && target.matches("button[aria-haspopup]")) later(() => focusComposer(false), 30);
+    };
+    document.addEventListener("focusin", onFocusIn);
     return () => {
       observer.disconnect();
+      document.removeEventListener("focusin", onFocusIn);
       timers.forEach((id) => window.clearTimeout(id));
     };
   }, [fine, entryKey, rootRef]);

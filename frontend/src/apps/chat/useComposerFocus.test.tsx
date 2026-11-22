@@ -71,6 +71,26 @@ describe("CHAT-FOCUS-01 composer focus", () => {
 });
 
 describe("CHAT-FOCUS-02 new chat from a menu", () => {
+  test("an arrival wins focus from the menu's trigger button when the menu closes after the retries", async () => {
+    const view = renderWithQueryClient(<Harness />);
+    await waitFor(() => expect(document.activeElement).toBe(composer(view.container)));
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    document.body.appendChild(menu);
+    await act(async () => {
+      setKey("project-new-chat");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      menu.remove();
+      trigger.setAttribute("aria-haspopup", "menu");
+      trigger.focus();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(document.activeElement).toBe(composer(view.container));
+    trigger.remove();
+  });
+
   test("a thread switch focuses the composer even when focus was left on a non-field container after a menu closed", async () => {
     const view = renderWithQueryClient(<Harness />);
     await waitFor(() => expect(document.activeElement).toBe(composer(view.container)));
