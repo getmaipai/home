@@ -18,7 +18,7 @@ import { codeApi, type CodeTier } from "./codeApi";
 import { stopWords, activityOf, elapsedWords, isBusy, repoLine, stageOf, stateWord, tierWord } from "./codeTranscript";
 import { CODE_SESSIONS_KEY, CODE_TIERS_KEY, tierOptions } from "./NewSession";
 import { ChangesTab, FilesTab, PlanTab, TerminalTab } from "./SessionTabs";
-import { Stack, codeDensity } from "./layout";
+import { Stack } from "./layout";
 import { CodeThread } from "./CodeThread";
 
 const TerminalIcon = getIcon("terminal");
@@ -95,7 +95,7 @@ export function SessionView({ id }: { id: string }) {
   const subtitle = repoLine(session.repo);
 
   return (
-    <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1" style={codeDensity(phone)}>
+    <Stack row gap="none" data-slot="code-session" className="min-h-0 min-w-0 flex-1">
       <Stack gap="none" className="min-h-0 min-w-0 flex-1">
         <ChatHeader name={session.title} media={<TerminalIcon aria-hidden className="size-6" />} {...(phone ? { onMenu: () => navigate("/apps/code") } : {})}
           actions={<>

@@ -1,7 +1,7 @@
 // CODE-COMPOSER: the session's transcript and composer are the kit's shared Thread (the one chat, Create and projects mount), on an external-store runtime fed by
 // the hub's transcript. The kit draws the composer, the + files menu, drag and drop, attachment chips and the Quality chip (the level control); this file only
 // passes data and fills the kit's own slots: ComposerQueue (held request cards, the waiting line, failures), ComposerNotice (the status line), ComposerExtraEnd
-// (permission mode and the context ring) and ToolFallback (commands, file changes, approvals). Nothing is wrapped or restyled.
+// (the context ring) and ToolFallback (commands, file changes, approvals). Nothing is wrapped or restyled.
 import { i18n } from "@lingui/core";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { AssistantRuntimeProvider, ComposerPrimitive, unstable_defaultDirectiveFormatter, useExternalStoreRuntime, type AppendMessage, type AttachmentAdapter, type ThreadMessageLike, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -17,6 +17,7 @@ import type { ComposerModeData, ComposerQualityData } from "@maipai/ui/src/eleme
 import { getIcon } from "@maipai/ui/src/icons";
 import { codeApi, type CodeContext, type CodeMessage, type CodeSession, type CodeTier, type TreeEntry } from "./codeApi";
 import { approvalWords, outputLines, stopWords, tierWord } from "./codeTranscript";
+import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { ContextRing } from "./ContextRing";
 
 const ShieldIcon = getIcon("shield-check");
@@ -105,7 +106,8 @@ const Queue = () => {
 const Notice = () => { const s = useState_(); return <span data-slot="code-status">{s.statusLine}</span>; };
 const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex shrink-0 items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
-const THREAD_COMPONENTS = { ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerFooterEnd: ExtraEnd, composerDensity: "compact" as const, emptyLayout: "top" as const, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
+// The density is Chat's, read from its one definition (THREAD_SLOTS), so a change there moves both. The mode and level controls stay inside the pill, as in Chat.
+const THREAD_COMPONENTS = { composerDensity: THREAD_SLOTS.composerDensity, ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerExtraEnd: ExtraEnd, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 
 export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tree }: {
   state: CodeThreadState; messages: readonly CodeMessage[]; tiers: readonly CodeTier[]; onTier: (tier: CodeTier) => void;
@@ -143,7 +145,7 @@ export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tre
   return <AssistantRuntimeProvider runtime={runtime}>
     <StateContext.Provider value={state}>
       <ComposerPrimitive.Unstable_TriggerPopoverRoot>
-        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: session.mode, placement: "footer" as const, onModeChange: (id) => state.onMode(id as CodeSession["mode"]), quality } }} />
+        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: session.mode, onModeChange: (id) => state.onMode(id as CodeSession["mode"]), quality } }} />
         {mentions.length > 0 ? <ComposerMentions items={mentions} formatter={unstable_defaultDirectiveFormatter} /> : null}
       </ComposerPrimitive.Unstable_TriggerPopoverRoot>
     </StateContext.Provider>

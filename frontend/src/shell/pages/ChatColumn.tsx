@@ -10,6 +10,7 @@ import { readRailCollapsePreference, writeRailCollapsePreference } from "@/shell
 // ChatGPT-shaped. One hide/show control and quiet 36px rows.
 
 export const CHAT_COLUMN_ID = "chat-rail";
+const CHAT_COLUMN_SLOT = "chat-rail";
 /** Below this width the column starts hidden (a default, never a lock). */
 export const CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH = 1024;
 
@@ -51,8 +52,8 @@ export function searchableThreadsFor(state: ChatThreadListState, temporary: bool
 }
 
 /** The desktop column's open or hidden state, remembered per browser, and
- * the phone sheet's open state. */
-export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
+ * the phone sheet's open state. Chat and Code share it (CODE-UI-01): `railSlot` is the data-slot of the column the hook moves focus in. */
+export function useChatColumn({ isDesktop, railSlot = CHAT_COLUMN_SLOT }: { isDesktop: boolean; railSlot?: string }) {
   const [collapsed, setCollapsed] = useState(() => {
     const stored = readRailCollapsePreference();
     if (stored !== null) return stored;
@@ -88,7 +89,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
   const control = useMemo<ChatColumnControl>(() => ({
     toggle: () => {
       if (isDesktop) {
-        focusShowAfterHide.current = !collapsedRef.current && Boolean(document.querySelector('[data-slot="chat-rail"]')?.contains(document.activeElement));
+        focusShowAfterHide.current = !collapsedRef.current && Boolean(document.querySelector(`[data-slot="${railSlot}"]`)?.contains(document.activeElement));
         setCollapsedPreference(!collapsedRef.current);
       } else setSheetOpen(true);
     },
@@ -96,7 +97,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
       if (isDesktop) setCollapsedPreference(false);
       else setSheetOpen(true);
     },
-  }), [isDesktop, setCollapsedPreference]);
+  }), [isDesktop, railSlot, setCollapsedPreference]);
 
   return {
     collapsed,

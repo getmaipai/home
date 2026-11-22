@@ -23,8 +23,11 @@ only what changes. [code-session-tiers-2026-11-21.md](code-session-tiers-2026-11
 The layout is still Claude Code on the web (rule S2: its layout, not its styling). What changes is which shipped parts draw it.
 
 - **Where it lives.** The catalog package `code`, page index at `/apps/code`, with a rail entry "Code" beside Chat. No hand-written route.
-- **Sessions list.** The package's declared sidebar, drawn by `SectionSidebar`: New session at the top, then sessions newest first with
-  state, repository and `+N -M`. On a phone it moves into the shell drawer like every other column.
+- **Sessions list.** Drawn by `SectionSidebar` with Chat's props (search, hide and show, Cmd/Ctrl+B, the same remembered choice through
+  `useChatColumn`): New session at the top, then sessions newest first with state, repository and `+N -M`. On a phone it moves into the
+  shell drawer like every other column. Exception (CODE-UI-04, 2026-11-22): the package does not declare `contributes.sidebar`, because a
+  declared sidebar is static schema and these rows are live (a polled hub query with state dots), exactly as Chat's rows are fed by the
+  thread runtime and not by a manifest. `CodePage.tsx` draws it with the shared column; a test fails if Code draws its own column config.
 - **Session view.** The transcript is the assistant-ui thread with the shipped tool cards, as designed. The header is the kit
   `chat-header` with the title, `repo @ branch`, the mode chip, the tier control (`tier-segment`) and the context meter.
 - **Changes, Files, Terminal, Plan** are tabs of the standard right pane, after the companion, which stays its first tab (S2). It opens when the person clicks a file, a diff card or a

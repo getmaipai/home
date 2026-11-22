@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { Roster } from "@/lib/api";
+import { readFileSync } from "node:fs";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { CodePage, sessionIdOf } from "./CodePage";
 
 const realFetch = globalThis.fetch;
@@ -108,14 +110,13 @@ describe("the Code app page", () => {
     expect(document.querySelector('[data-slot="composer-input"], textarea.aui-composer-input')).toBeTruthy();
   });
 
-  test("the composer is the kit's compact density (one slim row with Add, the field and Send; the mode and level sit in the footer below), not the large unified panel", async () => {
+  test("the composer is Chat's: the same density, with the mode and level inside the pill, not a footer row", async () => {
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
     const shell = document.querySelector('[data-slot="aui_composer-shell"]')!;
-    expect(shell.getAttribute("data-density")).toBe("compact");
-    expect(shell.hasAttribute("data-unified")).toBe(false);
-    expect(shell.querySelector('[data-slot="composer-quality"]')).toBeNull();
-    expect(document.querySelector('[data-slot="aui_composer-footer"] [data-slot="composer-quality"]')).toBeTruthy();
+    expect(shell.getAttribute("data-density")).toBe(THREAD_SLOTS.composerDensity);
+    expect(document.querySelector('[data-slot="aui_composer-footer"]')).toBeNull();
+    await waitFor(() => expect(shell.querySelector('[data-slot="composer-quality"]')).toBeTruthy());
   });
   test("adding a file goes through the composer's attachment adapter to the session's upload route", async () => {
     open("/apps/code/csess-abc123");
@@ -128,5 +129,25 @@ describe("the Code app page", () => {
     expect(input).toBeTruthy();
     fireEvent.change(input, { target: { files: [new File(["hello"], "notes.md", { type: "text/markdown" })] } });
     await waitFor(() => expect(calls).toContain("POST /api/code/sessions/csess-abc123/upload"));
+  });
+
+  // CODE-UI-01: Code and Chat share one composer, one density and one history column, so they cannot drift.
+  test("Code sets no density of its own and draws no composer or column config of its own", () => {
+    const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+    const code = ["./CodePage.tsx", "./SessionView.tsx", "./CodeThread.tsx", "./layout.tsx", "./NewSession.tsx"].map(read).join("\n");
+    expect(code).not.toMatch(/codeDensity|composerDensity:\s*"|emptyLayout|placement:\s*"footer"|--font-size-body|--spacing/);
+    const list = read("./SessionList.tsx");
+    expect(list).toContain("useChatColumn");
+    expect(list).toContain("chatColumnShortcutLabel");
+    expect(list).toMatch(/search=\{/);
+    expect(read("./CodePage.tsx")).toContain("useChatColumn");
+    expect(read("./CodePage.tsx")).toContain("registerSidebarToggleShortcut");
+  });
+  test("the sessions column has search and a hide control with the Chat shortcut", async () => {
+    open("/apps/code");
+    await within(document.body).findByText("Fix the thermostat");
+    expect(document.querySelector('[data-slot="section-sidebar-search"]')).toBeTruthy();
+    expect(document.querySelector('[data-slot="section-sidebar-toggle"]')?.getAttribute("aria-keyshortcuts")).toBe("Meta+B Control+B");
+    expect(document.querySelector('[data-slot="code-rail"]')).toBeTruthy();
   });
 });
