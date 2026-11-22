@@ -11,6 +11,7 @@ import { getStackClient } from "@/lib/stackEngine";
 import type { PersonRow } from "@/types";
 import { audienceBand } from "@/lib/audience";
 import { sqlite } from "@/db";
+import { sandboxGatewayUrl } from "@/lib/codingGatewayAddress";
 
 export type GateRefusal = { status: 403 | 429 | 503; message: string; code: string; retryAfter?: number };
 
@@ -40,6 +41,19 @@ function publicHost(): string | null {
   try { return new URL(configured).host.toLowerCase(); } catch { return null; }
 }
 
+/** A sandbox reaches the gateway over plain http on the host-only sandbox network: the peer is in the gateway address's /24 and the request is for that address.
+ * Nothing outside that one network (a LAN device, a tailnet peer) gets this exception, and the proxy and public-host checks above still apply. */
+export function fromSandboxNetwork(peer: string, hostHeader: string | undefined): boolean {
+  const gateway = sandboxGatewayHost();
+  const asked = hostHeader?.replace(/:\d+$/, "");
+  if (!gateway || asked !== gateway) return false;
+  const a = peer.replace(/^::ffff:/i, "").split("."); const b = gateway.split(".");
+  return a.length === 4 && b.length === 4 && a.slice(0, 3).join(".") === b.slice(0, 3).join(".");
+}
+function sandboxGatewayHost(): string | null {
+  try { return new URL(sandboxGatewayUrl()).hostname; } catch { return null; }
+}
+
 /** The transport rules, evaluated before the key is even read. The peer address is the socket's own: a forwarded-for header is never believed here. */
 export function transportRefusal(c: Context): GateRefusal | null {
   const proxied = PROXY_HEADERS.some(name => c.req.header(name) !== undefined);
@@ -56,7 +70,7 @@ export function transportRefusal(c: Context): GateRefusal | null {
   if (loopback && proxyTrusted()) {
     return { status: 403, code: "behind_proxy", message: "Coding is not available through the proxy on this computer. Connect to the home address directly from your own device." };
   }
-  if (new URL(c.req.url).protocol !== "https:" && !loopback) {
+  if (new URL(c.req.url).protocol !== "https:" && !loopback && !fromSandboxNetwork(origin.address, host)) {
     return { status: 403, code: "https_only", message: "Coding needs a secure address. Use the https address from Settings, Coding, not http." };
   }
   // The tailnet ranges come first: an IPv6 tailnet address (fd7a:115c:a1e0::/48) also looks like a private household range.

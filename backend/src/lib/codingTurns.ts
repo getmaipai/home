@@ -182,10 +182,11 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
     }
     log("turn_done", turn, `in=${result.usage?.input_tokens ?? 0} out=${result.usage?.output_tokens ?? 0}`);
     settle(turn, "done");
-  } catch {
+  } catch (e) {
     // Reason code only: the error text can hold a path or a repository name (rule 6a).
+const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown }).name ?? "error").replace(/[^A-Za-z0-9_]/g, "").slice(0, 40) || "error";
     updateSession(turn.sessionId, { state: turn.abort.signal.aborted ? "idle" : "failed", lastActivityAt: new Date().toISOString() });
-    if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error" }] }); }
+    if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn, `reason=${why}`); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error" }] }); }
     settle(turn, turn.abort.signal.aborted ? "cancelled" : "failed");
   } finally { if (timer) clearTimeout(timer); }
   if (turn.state === "done") advanceQueue(turn.sessionId, turn.personId); else clearQueue(turn.sessionId);

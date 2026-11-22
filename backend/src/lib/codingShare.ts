@@ -21,8 +21,11 @@ export function setSecretScanner(next: SecretScanner | null): void { scanner = n
 const activeScanner = (): SecretScanner => scanner ?? createGitleaksScanner();
 
 /** The hub-side workspace of a session (design 3.4): the only folder the agent sees. */
-let workspaceRoot: string = path.join(dataDir, "coding");
-export function __setWorkspaceRootForTests(root: string | null): void { workspaceRoot = root ?? path.join(dataDir, "coding"); }
+/** The folder Code workspaces live in. The Stack only mounts a workspace inside ITS coding folder (STACK_CODING_ROOT, default <stack data>/coding), so a Home whose
+ * data folder is elsewhere sets MAIPAI_CODING_ROOT to that same folder; the default stays <data>/coding. */
+const defaultWorkspaceRoot = (): string => process.env.MAIPAI_CODING_ROOT?.trim() || path.join(dataDir, "coding");
+let workspaceRoot: string = defaultWorkspaceRoot();
+export function __setWorkspaceRootForTests(root: string | null): void { workspaceRoot = root ?? defaultWorkspaceRoot(); }
 export const codingWorkspace = (personId: string, sessionId: string): string => path.join(workspaceRoot, personId, sessionId, "work");
 
 let remoteForTests: { url: string } | null = null;

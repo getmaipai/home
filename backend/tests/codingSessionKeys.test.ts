@@ -115,7 +115,7 @@ describe("the key's life with the session", () => {
     const k2 = createSessionKey(a, s.id, 3_600_000); await deleteCodingSession(a, s.id); expect(outcome(k2).ok).toBe(false);
   });
   test("the sandbox address is the sandbox network's gateway host on Home's port, with two overrides", () => {
-    expect(sandboxGatewayUrl({ MAIPAI_PORT: "3000" } as never)).toMatch(/^http:\/\/192\.168\.64\.1:\d+\/code\/v1$/);
+    expect(sandboxGatewayUrl({ MAIPAI_PORT: "3000" } as never)).toMatch(/^http:\/\/192\.168\.128\.1:\d+\/code\/v1$/);
     expect(sandboxGatewayUrl({ MAIPAI_SANDBOX_GATEWAY_HOST: "192.0.2.9" } as never)).toMatch(/^http:\/\/192\.0\.2\.9:\d+\/code\/v1$/);
     expect(sandboxGatewayUrl({ MAIPAI_SANDBOX_GATEWAY_URL: "http://192.0.2.5:9/code/v1/" } as never)).toBe("http://192.0.2.5:9/code/v1");
   });
