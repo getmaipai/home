@@ -16199,6 +16199,11 @@ msgid "setting.talent.life.enabled.does_teen"
 msgstr "Made-up characters can grow over time."
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:67
+msgid "main"
+msgstr "main"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:22
 #: src/shell/pages/status/StatusComponents.tsx:69
 #: src/shell/pages/StatusPage.tsx:62
@@ -20366,6 +20371,11 @@ msgstr "Overview"
 #: src/apps/settings/SafetyChangesSection.tsx:63
 msgid "Owner"
 msgstr "Owner"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:66
+msgid "owner/name"
+msgstr "owner/name"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/LayersBody.tsx:39

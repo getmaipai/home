@@ -63,8 +63,8 @@ export function NewSession() {
         <Select aria-label={i18n._({ id: "Repository", message: "Repository" })} value={connectionId} onValueChange={setConnectionId} options={["none", ...active.map((c) => c.id)]}
           getLabel={(id) => { const c = active.find((x) => x.id === id); return c ? `${c.kind === "github" ? "GitHub" : "Gitea"}: ${c.account}` : i18n._({ id: "No repository", message: "No repository" }); }} />
         {chosen ? <Stack row className="flex-wrap">
-          <Input value={fullName} onChange={(event) => setFullName(event.target.value)} aria-label={i18n._({ id: "Repository name, for example owner/name", message: "Repository name, for example owner/name" })} placeholder="owner/name" aria-invalid={fullName !== "" && !repoOk} />
-          <Input value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} aria-label={i18n._({ id: "Starting branch", message: "Starting branch" })} placeholder="main" />
+          <Input value={fullName} onChange={(event) => setFullName(event.target.value)} aria-label={i18n._({ id: "Repository name, for example owner/name", message: "Repository name, for example owner/name" })} placeholder={i18n._({ id: "owner/name", message: "owner/name" })} aria-invalid={fullName !== "" && !repoOk} />
+          <Input value={baseBranch} onChange={(event) => setBaseBranch(event.target.value)} aria-label={i18n._({ id: "Starting branch", message: "Starting branch" })} placeholder={i18n._({ id: "main", message: "main" })} />
         </Stack> : null}
       </Stack> : null}
       <Stack row className="flex-wrap items-center justify-between">

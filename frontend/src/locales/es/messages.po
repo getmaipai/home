@@ -18417,6 +18417,11 @@ msgid "setting.talent.life.enabled.does_teen"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:67
+msgid "main"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:22
 #: src/shell/pages/status/StatusComponents.tsx:69
 #: src/shell/pages/StatusPage.tsx:62
@@ -23128,6 +23133,11 @@ msgstr "Resumen"
 #, needs-review
 msgid "Owner"
 msgstr "Propietario"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:66
+msgid "owner/name"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/LayersBody.tsx:39
