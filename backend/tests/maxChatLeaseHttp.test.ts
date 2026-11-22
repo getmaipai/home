@@ -116,24 +116,21 @@ describe("Max chat lease over HTTP (TIER-HOME-05)", () => {
     expect(await (await client.get("/api/ai/chat-lease")).json()).toMatchObject({ estimates: { max_load_s: 60, self_test_s: 35 } });
   });
 
-  test("a stale self-test answers not_ready and says the self-test is the missing step", async () => {
+  test("a stale self-test is run by Home itself and Max then starts, with no extra tap", async () => {
     const { client } = await owner();
     stale = true;
     const res = await client.post("/api/ai/chat-lease", {});
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "not_ready", first_unmet: "self_test", error: "Max needs a quick test first." });
-    expect(mode).toBe("normal");
+    expect(res.status).toBe(200);
+    expect(requests).toContain("POST /stack/v1/coding/mode/self-test");
+    expect(mode).toBe("coding");
   });
 
-  test("the self-test route (owner and admin) refreshes the record, and the next request gets the lease", async () => {
+  test("the admin self-test route still refreshes the record", async () => {
     const { client } = await owner();
     stale = true;
-    expect((await client.post("/api/ai/chat-lease", {})).status).toBe(409);
     expect((await client.post("/api/coding/mode/self-test", {})).status).toBe(202);
     const mine = await (await client.get("/api/coding/mode")).json() as { readiness: { ready: boolean } };
     expect(mine.readiness.ready).toBe(true);
-    expect((await client.post("/api/ai/chat-lease", {})).status).toBe(200);
-    expect(mode).toBe("coding");
   });
 
   test("a failed swap leaves chat as it was and says so", async () => {

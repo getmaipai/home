@@ -37,6 +37,7 @@ import { dropVideoStatusCache } from "@/lib/videos/ready";
 import { dropMusicStatusCache } from "@/lib/music/ready";
 import { codingModeReadiness } from "@/lib/codingMode";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { ensureSelfTest } from "@/lib/maxAutoSelfTest";
 import { readSlot } from "@/lib/tiers";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { roleHealth } from "@/lib/roleHealth";
@@ -443,7 +444,9 @@ const LEASE_REFUSAL: Record<string, { status: 403 | 409 | 503; line: string }> =
 aiChoicesRoutes.openapi(leaseTakeRoute, async (c) => {
   const person = c.get("person");
   const body = await c.req.json().catch(() => ({})) as { pinned?: boolean };
-  const result = await getChatLease().acquire(person, { pinned: body.pinned === true });
+  let result = await getChatLease().acquire(person, { pinned: body.pinned === true });
+  // A stale self-test is the one step Home can do for the person: run it now, then try once more.
+  if (!result.ok && result.refusal === "not_ready" && (await ensureSelfTest())) result = await getChatLease().acquire(person, { pinned: body.pinned === true });
   if (!result.ok) {
     const refusal = LEASE_REFUSAL[result.refusal]!;
     // not_ready names the step that is missing so the composer can offer it (a stale self-test is the common one, and an admin can run it).
