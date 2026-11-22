@@ -78,6 +78,13 @@ export function denyPendingFor(sessionId: string): number {
   return mine.length;
 }
 
+/** The kill switch: every held request of every session is denied. */
+export function denyAllPending(): number {
+  const all = [...pending.values()];
+  for (const p of all) settleRequest(p, "deny");
+  return all.length;
+}
+
 /** The host object for one turn. `signal` ends any wait: an aborted turn denies what it was waiting for. */
 export function createTurnHost(input: { sessionId: string; personId: string; signal: AbortSignal }): CodingHost {
   const { sessionId, personId, signal } = input;

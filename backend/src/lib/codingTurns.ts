@@ -5,20 +5,20 @@
 // The agent and the sandbox are interfaces: the real OpenCode bridge and the Stack's /stack/v1/sandboxes come later and plug in through
 // `setCodingRuntime`. Rule 6a: a queue job and every log line here carry ids, counts and reason codes only. The message text stays in this
 // process for the agent and is never put in a job, a log or an error.
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { codingSessions, people } from "@/db/schema";
 import { randomSuffix } from "@/lib/id";
-import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getPersonSettingValue, onHouseholdSettingWrite } from "@/lib/settings";
 import { appendLogLine } from "@/lib/log";
 import { audienceBand } from "@/lib/audience";
 import { jobQueueCopy, type JobQueueReason } from "@/lib/jobQueueCopy";
 import { chatLeaseHeldBy, type ChatLease, type LeaseRefusal } from "@/lib/chatLease";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import type { Tier } from "@/lib/tiers";
-import { revokeSessionKeys } from "@/lib/apiKeys";
+import { revokeAllSessionKeys, revokeSessionKeys } from "@/lib/apiKeys";
 import { addCheckpoint, CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, requireCodingAccess, updateSession } from "@/lib/codingSessions";
-import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
+import { createTurnHost, denyAllPending, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
 import { readChangeCounts } from "@/lib/codingChanges";
 import { appendCodingMessage } from "@/lib/codingTranscript";
 import { recordCodingEvent } from "@/lib/codingEvents";
@@ -57,7 +57,7 @@ interface Turn {
   tier: Tier; state: TurnState; createdAt: number;
   capReason: WaitReason | null; leaseReason: WaitReason | null; leaseRefusal: LeaseRefusal | null;
   queueReason: QueueJob["riseReason"]; position: number | null;
-  standardOnce: boolean; leaseHeld: boolean; stopReason: "user" | "wall_clock" | null; abort: AbortController; done: Promise<void>; finish: () => void;
+  standardOnce: boolean; leaseHeld: boolean; stopReason: "user" | "wall_clock" | "denied" | null; abort: AbortController; done: Promise<void>; finish: () => void;
 }
 const turns = new Map<string, Turn>();
 const newTurnId = () => `ctrn-${randomSuffix(10)}`;
@@ -135,6 +135,16 @@ async function startTurn(turn: Turn): Promise<void> {
   const person = ownerOf(turn.personId);
   const session = getSessionRow(turn.personId, turn.sessionId);
   if (!person || !session) { settle(turn, "cancelled"); return; }
+  // A turn that waited (for a slot, the lease) is admitted again now: Coding off or paused, a removed grant, a guest or a changed role stop it before anything starts.
+  if (codingSessionRefusal(person)) {
+    turn.stopReason ??= "denied";
+    updateSession(session.id, { state: "idle" });
+    appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "denied" }] });
+    recordCodingEvent({ sessionId: turn.sessionId, personId: turn.personId, kind: "stopped", detail: { reason: "denied" } });
+    log("turn_refused_at_start", turn);
+    settle(turn, "cancelled"); clearQueue(turn.sessionId); refreshHouseholdQueue();
+    return;
+  }
   // Every turn clamps again: the stored tier is a wish and the turn's tier is the truth (design 3.2). A "Use Standard for this message" pick stands for this turn only.
   const choice = correctStoredTier(session);
   turn.tier = turn.standardOnce ? "standard" : choice.tier;
@@ -312,6 +322,43 @@ export function stopCodingSession(person: Pick<PersonRow, "id">, sessionId: stri
   updateSession(sessionId, { state: "idle" });
   refreshHouseholdQueue();
   return true;
+}
+
+/** CODE-SAFE-01: the kill switch (Coding turned off, or paused). True while no Code session may run. */
+export const codingKilled = (): boolean => getHouseholdSettingValue("coding.enabled") !== true || getHouseholdSettingValue("coding.paused") === true;
+
+/**
+ * CODE-SAFE-01: when Coding is off or paused, everything that is running ends now, not at the next message: every queued and running turn is aborted (a stopped-run card
+ * says "denied"), the message queues are cleared, held requests are denied, every per-session key is revoked, and every session's sandbox is stopped (a stop that fails
+ * is retried by nothing: the machine has no key and no gateway, and the next start rebuilds it). The synchronous part has run when the call returns its promise; the promise
+ * ends when the sandbox stops have been answered. Returns how many sandboxes were asked to stop. A no-op while Coding is on and not paused.
+ */
+export async function enforceCodingKillSwitch(): Promise<number> {
+  if (!codingKilled()) return 0;
+  for (const turn of [...turns.values()]) {
+    if (turn.state !== "queued" && turn.state !== "running") continue;
+    turn.stopReason ??= "denied"; turn.abort.abort();
+    if (turn.state === "queued") settle(turn, "cancelled");
+    log("turn_killed", turn);
+  }
+  messageQueues.clear();
+  denyAllPending();
+  revokeAllSessionKeys();
+  const rows = db.select({ id: codingSessions.id, state: codingSessions.state }).from(codingSessions).where(isNull(codingSessions.deletedAt)).all();
+  for (const row of rows) if (row.state === "queued" || row.state === "starting" || row.state === "working" || row.state === "needs_you") updateSession(row.id, { state: "idle" });
+  appendLogLine(`coding kill_switch sessions=${rows.length}`);
+  refreshHouseholdQueue();
+  const sandbox = runtime?.sandbox;
+  if (!sandbox) return 0;
+  await Promise.allSettled(rows.map((row) => sandbox.stop(row.id)));
+  return rows.length;
+}
+let watching = false;
+/** Wires the kill switch to the settings: any write of `coding.enabled` or `coding.paused` enforces it. Safe to call twice. */
+export function watchCodingKillSwitch(): void {
+  if (watching) return;
+  watching = true;
+  onHouseholdSettingWrite((key) => { if (key === "coding.enabled" || key === "coding.paused") void enforceCodingKillSwitch().catch(() => undefined); });
 }
 
 /** Undo on a receipt: restores the checkpoint through the sandbox and records it in the person's trail. The person's own click; the brake lets undo through always. */
