@@ -7,7 +7,7 @@ import { requireAuth } from "@/middleware/auth";
 import { CodingSession } from "@maipai/spec/gen/ts/coding-session.js";
 import { CodingEvent } from "@maipai/spec/gen/ts/coding-event.js";
 import {
-  CodingSessionError, createCodingSession, offeredCodingTiers, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionTier, codingSessionRefusal,
+  CodingSessionError, createCodingSession, offeredCodingTiers, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionMode, setSessionTier, codingSessionRefusal,
 } from "@/lib/codingSessions";
 import { warmCodingSession, cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
@@ -85,6 +85,15 @@ codingSessionsRoutes.openapi(getR, async (c) => {
   const refusal = codingSessionRefusal(c.get("person")); if (refusal) return c.json({ error: refusal }, 403);
   const v = await view(c.get("person"), c.req.valid("param").id);
   return v ? c.json(v, 200) : c.json({ error: "That session was not found. It may have been deleted." }, 404);
+});
+
+const modeR = createRoute({
+  method: "put", path: "/{id}/mode", tags: ["Code"], summary: "Switch the session's permission mode; it applies at the next message", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam, body: { content: { "application/json": { schema: z.object({ mode: z.enum(["plan", "ask", "auto_edit"]) }).strict() } } } },
+  responses: { 200: { content: { "application/json": { schema: CodingSession } }, description: "The session with its new mode." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(modeR, (c) => {
+  try { return c.json(setSessionMode(c.get("person"), c.req.valid("param").id, c.req.valid("json").mode), 200); } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
 const tierR = createRoute({

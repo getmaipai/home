@@ -103,7 +103,7 @@ describe("the Code app page", () => {
     await waitFor(() => expect(document.querySelector('[data-slot="aui_composer-shell"]')).toBeTruthy());
     await waitFor(() => expect(document.querySelector('button[aria-label^="Level"]')).toBeTruthy());
     await waitFor(() => expect(document.querySelector('[data-slot="code-context"]')?.getAttribute("title")).toBe("52K of 64K tokens used"));
-    expect(document.querySelector('[data-slot="code-statusbar"]')!.textContent).toContain("Asks before changes");
+    expect(document.querySelector('[data-slot="composer-mode-pill"]')!.textContent).toContain("Ask before changes");
     expect(document.querySelector('[data-slot="composer-input"], textarea.aui-composer-input')).toBeTruthy();
   });
 

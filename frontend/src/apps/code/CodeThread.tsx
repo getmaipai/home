@@ -21,8 +21,6 @@ import { ContextRing } from "./ContextRing";
 
 const ShieldIcon = getIcon("shield-check");
 
-const modeWords = (mode: CodeSession["mode"]): string => mode === "plan" ? i18n._({ id: "Plan first", message: "Plan first" }) : mode === "auto_edit" ? i18n._({ id: "Edits without asking", message: "Edits without asking" }) : i18n._({ id: "Asks before changes", message: "Asks before changes" });
-
 /** What the Thread's slots read: the session's live bits the host owns. */
 export interface CodeThreadState {
   session: CodeSession;
@@ -37,6 +35,7 @@ export interface CodeThreadState {
   notices: readonly string[];
   onAnswer: (requestId: string, answer: "allow" | "deny") => void;
   onCancelQueued: (id: string) => void;
+  onMode: (mode: CodeSession["mode"]) => void;
 }
 const StateContext = createContext<CodeThreadState | null>(null);
 const useState_ = (): CodeThreadState => { const s = useContext(StateContext); if (!s) throw new Error("CodeThread slots render inside CodeThread"); return s; };
@@ -104,7 +103,7 @@ const Queue = () => {
   </>;
 };
 const Notice = () => { const s = useState_(); return <span data-slot="code-status">{s.statusLine}</span>; };
-const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex items-center gap-2 text-body text-muted-foreground"><span className="max-sm:sr-only">{modeWords(s.session.mode)}</span><ContextRing context={s.context} /></span>; };
+const ExtraEnd = () => { const s = useState_(); return <span data-slot="code-statusbar" className="flex items-center gap-2 text-body text-muted-foreground"><ContextRing context={s.context} /></span>; };
 
 const THREAD_COMPONENTS = { ToolFallback: CodeToolFallback, ToolGroup: Plain, ReasoningGroup: Plain, Welcome, ComposerQueue: Queue, ComposerNotice: Notice, composerNoticeReserve: true, ComposerExtraEnd: ExtraEnd, composerDensity: "compact" as const, emptyLayout: "top" as const, viewport: { turnAnchor: "bottom" as const, autoScroll: true, scrollToBottomOnRunStart: true, scrollToBottomOnInitialize: true } };
 
@@ -134,12 +133,17 @@ export function CodeThread({ state, messages, tiers, onTier, onSend, onStop, tre
     adapters: { attachments },
   });
   const quality: ComposerQualityData = { value: session.tier ?? "standard", onValueChange: (v) => onTier(v as CodeTier), options: tiers.map((t) => ({ value: t, label: tierWord(t) })), band: "adult", label: i18n._({ id: "Level", message: "Level" }) };
-  const modes: ComposerModeData[] = [{ id: "code", label: i18n._({ id: "Code", message: "Code" }), icon: "terminal", placeholder: i18n._({ id: "Message the agent. Type @ to point at a file.", message: "Message the agent. Type @ to point at a file." }) }];
+  const placeholder = i18n._({ id: "Message the agent. Type @ to point at a file.", message: "Message the agent. Type @ to point at a file." });
+  const modes: ComposerModeData[] = [
+    { id: "ask", label: i18n._({ id: "Ask before changes", message: "Ask before changes" }), icon: "shield-check", placeholder },
+    { id: "auto_edit", label: i18n._({ id: "Auto edit", message: "Auto edit" }), icon: "pencil", placeholder },
+    { id: "plan", label: i18n._({ id: "Plan", message: "Plan" }), icon: "square-pen", placeholder },
+  ];
   const mentions = tree.filter((e) => e.kind === "file").slice(0, 400).map((e) => ({ id: e.path, type: "file", label: e.path }));
   return <AssistantRuntimeProvider runtime={runtime}>
     <StateContext.Provider value={state}>
       <ComposerPrimitive.Unstable_TriggerPopoverRoot>
-        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: "code", onModeChange: () => undefined, quality } }} />
+        <Thread tourId="code.thread" composerTourId="code.composer" components={{ ...THREAD_COMPONENTS, composerModes: { modes, mode: session.mode, onModeChange: (id) => state.onMode(id as CodeSession["mode"]), quality } }} />
         {mentions.length > 0 ? <ComposerMentions items={mentions} formatter={unstable_defaultDirectiveFormatter} /> : null}
       </ComposerPrimitive.Unstable_TriggerPopoverRoot>
     </StateContext.Provider>

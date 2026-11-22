@@ -125,7 +125,7 @@ export function getCodingSession(person: Pick<PersonRow, "id">, id: string): Cod
 }
 
 /** The one writer of a session's state and counters; every change stamps the clock. */
-export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "modelId" | "usage" | "lastActivityAt" | "changes">>): void {
+export function updateSession(id: string, patch: Partial<Pick<Row, "state" | "tier" | "mode" | "modelId" | "usage" | "lastActivityAt" | "changes">>): void {
   const at = new Date().toISOString();
   db.update(codingSessions).set({ ...patch, updatedAt: at, hlc: nextHlc() }).where(eq(codingSessions.id, id)).run();
 }
@@ -149,6 +149,15 @@ export function setSessionTier(person: PersonRow, id: string, requested: Tier): 
   const choice = authorizeTier({ person, category: "coding", requested });
   if (choice.tier !== requested) throw new CodingSessionError("not_allowed", "You cannot use that level for coding. Pick another level.");
   updateSession(id, { tier: requested });
+  return wire(getSessionRow(person.id, id)!);
+}
+
+/** The person switches the permission mode now; it applies at the next turn (the engine config is built per turn). */
+export function setSessionMode(person: PersonRow, id: string, mode: "plan" | "ask" | "auto_edit"): CodingSessionWire {
+  requireCodingAccess(person);
+  const row = getSessionRow(person.id, id);
+  if (!row) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  updateSession(id, { mode });
   return wire(getSessionRow(person.id, id)!);
 }
 
