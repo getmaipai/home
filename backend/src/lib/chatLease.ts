@@ -60,6 +60,8 @@ export function createChatLease(deps: LeaseDeps) {
   let state: LeaseState = "off";
   let holderId: string | null = null;
   let pinned = false;
+  /** TIER-LEASE-03: the holder asked to hand the lease over at the next boundary (no request in flight); `tick` honours it before the grace. */
+  let yielding = false;
   let inFlight = 0;
   let lastActivityAt: number | null = null;
   let transition: Promise<unknown> | null = null;
@@ -136,8 +138,22 @@ export function createChatLease(deps: LeaseDeps) {
     return true;
   }
 
+  /** TIER-LEASE-03: Yield. Holder only. Released at once when nothing is in flight, else at the next boundary (the running request is never cut off). */
+  async function yieldLease(personId: string): Promise<"released" | "yielding" | false> {
+    if (state !== "held" || holderId !== personId) return false;
+    if (inFlight > 0) { yielding = true; return "yielding"; }
+    await release();
+    return "released";
+  }
+  /** TIER-LEASE-03: only an owner or admin sets or clears a pin, and only on a lease that is held. */
+  function setPin(by: Holder, value: boolean): boolean {
+    if (!isOwnerOrAdmin(by) || state !== "held") return false;
+    pinned = value; return true;
+  }
+
   async function release(): Promise<void> {
     if (state !== "held" || inFlight > 0) return;
+    yielding = false;
     state = "releasing";
     const run = deps.swapToStandard();
     transition = run;
@@ -159,6 +175,7 @@ export function createChatLease(deps: LeaseDeps) {
       return false;
     }
     if (state !== "held" || inFlight > 0 || lastActivityAt === null) return false;
+    if (yielding) { await release(); return true; }
     if (decision().action !== "release") return false;
     await release();
     return true;
@@ -170,11 +187,12 @@ export function createChatLease(deps: LeaseDeps) {
     state = "off";
     holderId = null;
     pinned = false;
+    yielding = false;
     inFlight = 0;
     lastActivityAt = null;
   }
 
-  return { acquire, release, tick, touch, decision, evicted, requestStarted, noteToken, requestEnded, snapshot, holdsGenerators };
+  return { acquire, release, yieldLease, setPin, tick, touch, decision, evicted, requestStarted, noteToken, requestEnded, snapshot, holdsGenerators };
 }
 
 export type ChatLease = ReturnType<typeof createChatLease>;
