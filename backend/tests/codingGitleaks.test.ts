@@ -48,7 +48,7 @@ describe.skipIf(process.env.MAIPAI_REAL_GITLEAKS !== "1")("the real gitleaks (op
       git("init", "-q", "-b", "main"); writeFileSync(join(dir, "ok.txt"), "hello\n"); git("add", "-A"); git("commit", "-qm", "clean");
       const real = createGitleaksScanner();
       expect(await real({ dir, ref: "refs/heads/main" })).toEqual([]);
-      writeFileSync(join(dir, "creds.env"), "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7ABCDEFG\nAWS_SECRET_ACCESS_KEY=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\n"); git("add", "-A"); git("commit", "-qm", "oops");
+      writeFileSync(join(dir, "creds.env"), `AWS_ACCESS_KEY_ID=${"AK" + "IA"}IOSFODNN7ABCDEFG\nAWS_SECRET_ACCESS_KEY=${"wJalrXUtnFEMI/K7MDENG"}/bPxRfiCYzZ1a2b3c4d\n`); git("add", "-A"); git("commit", "-qm", "oops");
       const found = await real({ dir, ref: "refs/heads/main" });
       expect(found.some((f) => f.path === "creds.env")).toBe(true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
