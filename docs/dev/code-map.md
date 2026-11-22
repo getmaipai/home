@@ -678,6 +678,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/gazetteer.ts` | searchLocalPlaces, nearestLocalPlace |
 | `backend/src/lib/genLive.ts` | getLive, clearLive, previewVersionOf, updateLive, liveCardFields |
 | `backend/src/lib/generationFailure.ts` | classifyGenerationFailure, RETRY_BACKOFF_MS |
+| `backend/src/lib/gitConnections.ts` | GITHUB_HOST, CreateGitConnectionInput, GitConnectionError, gitConnectionRefusal, verifyGitToken, createGitConnection |
+| `backend/src/lib/gitHost.ts` | GitHostError, __allowFileRemotesForTests, __observeGitForTests, CREDENTIAL_HELPER, gitChildConfig, gitChildEnv |
 | `backend/src/lib/grants.ts` | grantActionClassificationIsComplete, createGrant, listGrants, revokeGrant, isGrantActive, personIsGranted |
 | `backend/src/lib/guards.ts` | EMPTIED_LINES, MALFORMED, CLOSER_RE, isCloserSentence, trimClosers, OBJECTION_RE |
 | `backend/src/lib/guestControlsNotice.ts` | noticeGuestsWithoutControls |
@@ -715,7 +717,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/hubShutdown.ts` | SHUTDOWN_DEADLINE_MS, shutdownEngines, __resetHubShutdownForTests |
 | `backend/src/lib/i18nServer.ts` | notificationLanguage, renderNotification, renderNotificationFor, spokenNotificationLine |
 | `backend/src/lib/icuPlaceholders.ts` | placeholderOccurrences, placeholdersOf, requiredPlaceholdersOf |
-| `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newBiometricPrintId, newJobId, newConversationTurnId, newToolUndoId |
+| `backend/src/lib/id.ts` | newPersonId, newApiKeyId, newGitConnectionId, newBiometricPrintId, newJobId, newConversationTurnId |
 | `backend/src/lib/imageApp.ts` | imageAppData |
 | `backend/src/lib/imageEdit.ts` | ImageEditError, EDIT_OPERATIONS, EDIT_WAIT_MS, PICTURES_OFF_REASON, COMMENT_NOT_SET_UP, BEST_NEEDS_DOWNLOAD |
 | `backend/src/lib/imageSimilarity/cluster.ts` | SAME_PIXELS_BITS, VERIFY_RADIUS_BITS, MAX_VERIFIED_PAIRS, VERIFY_TIME_BUDGET_MS, cluster |
@@ -1490,6 +1492,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/whisperTurns.ts` | markWhisperTurn, isWhisperTurn, __resetWhisperTurnsForTests, setWhisperMode, isWhisperMode, noteWhisperTag |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, widgetKey, orderHomeCards, arrangeHomeCards, arrangeHomeSections |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
+| `backend/src/lib/workspaceFs.ts` | WorkspacePathError, resolveInsideWorkspace, __setWorkspaceReadHooksForTests, readWorkspaceFile, listWorkspaceDir |
 | `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
 | `backend/src/lib/writingFormats.ts` | WRITING_FORMAT_TOOL_ID, __setWritingFormatsForTests, installedWritingFormats, writingFormatsFor, writingFormatToolSpec, writingFormatForArgs |
 | `backend/src/lib/wyoming.ts` | encodeWyomingMessage, WyomingFramer, readWavPcm |
