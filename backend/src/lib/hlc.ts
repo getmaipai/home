@@ -32,6 +32,8 @@ export const HLC_BEARING_TABLES = [
   "api_keys",
   "git_connections",
   "coding_sessions",
+  "coding_messages",
+  "coding_events",
   "memory_records",
   "memory_embeddings",
   "episodes",

@@ -17,19 +17,25 @@ import { chatLeaseHeldBy, type ChatLease, type LeaseRefusal } from "@/lib/chatLe
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import type { Tier } from "@/lib/tiers";
 import { CodingSessionError, codingSessionRefusal, correctStoredTier, getSessionRow, markSessionDeleted, updateSession } from "@/lib/codingSessions";
+import { createTurnHost, denyPendingFor, startTaint, type CodingHost } from "@/lib/codingBridge";
+import { appendCodingMessage } from "@/lib/codingTranscript";
+import { recordCodingEvent } from "@/lib/codingEvents";
 import type { PersonRow } from "@/types";
 
 /** What the agent bridge returns for a finished turn. `modelId` is provenance from the Stack's reply (never chosen or branched on). */
 export interface CodingTurnResult { modelId?: string; usage?: { input_tokens: number; output_tokens: number } }
 /** The agent bridge (CODE-AGENT-01, later: OpenCode events to message parts). It runs at the tier it is given; Home maps no tier to a model. */
 export interface CodingAgent {
-  runTurn(input: { sessionId: string; turnId: string; tier: Tier; message: string; signal: AbortSignal }): Promise<CodingTurnResult>;
+  /** `host` is how the agent reports events and asks to act (lib/codingBridge.ts); an agent that needs nothing from it may ignore it. */
+  runTurn(input: { sessionId: string; turnId: string; tier: Tier; message: string; signal: AbortSignal; host: CodingHost }): Promise<CodingTurnResult>;
 }
 /** The sandbox the agent works in (CODE-SANDBOX-01: the Stack's /stack/v1/sandboxes, pinned). Only the seam exists now. */
 export interface CodingSandbox {
   start(input: { sessionId: string; environmentId: string }): Promise<void>;
   stop(sessionId: string): Promise<void>;
   destroy(sessionId: string): Promise<void>;
+  /** CODE-BRAKE-01: Undo on a receipt restores the checkpoint the action started from (the checkpoint store is a later slice). */
+  restoreCheckpoint?(input: { sessionId: string; checkpointId: string }): Promise<void>;
 }
 export interface CodingRuntime { agent: CodingAgent; sandbox: CodingSandbox; lease: () => ChatLease }
 
@@ -45,10 +51,16 @@ interface Turn {
   tier: Tier; state: TurnState; createdAt: number;
   capReason: WaitReason | null; leaseReason: WaitReason | null; leaseRefusal: LeaseRefusal | null;
   queueReason: QueueJob["riseReason"]; position: number | null;
-  standardOnce: boolean; leaseHeld: boolean; abort: AbortController; done: Promise<void>; finish: () => void;
+  standardOnce: boolean; leaseHeld: boolean; stopReason: "user" | "wall_clock" | null; abort: AbortController; done: Promise<void>; finish: () => void;
 }
 const turns = new Map<string, Turn>();
 const newTurnId = () => `ctrn-${randomSuffix(10)}`;
+
+/** The wall-clock budget for one message (design 3.4): 30 minutes unless the person's own `coding.person.message_minutes` is lower or set; then the agent stops with a stopped-run. */
+export const DEFAULT_MESSAGE_MINUTES = 30;
+let budgetOverrideMs: number | null = null;
+export function __setBudgetMsForTests(ms: number | null): void { budgetOverrideMs = ms; }
+function budgetMs(person: PersonRow): number { return budgetOverrideMs ?? (positive(getPersonSettingValue(person, "coding.person.message_minutes")) ?? DEFAULT_MESSAGE_MINUTES) * 60_000; }
 
 const log = (event: string, turn: Pick<Turn, "id" | "sessionId" | "personId">, extra = "") => appendLogLine(`coding ${event} turn=${turn.id} session=${turn.sessionId} person=${turn.personId}${extra ? ` ${extra}` : ""}`);
 const ownerOf = (personId: string): PersonRow | undefined => db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
@@ -133,12 +145,22 @@ async function startTurn(turn: Turn): Promise<void> {
 async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   const rt = runtime!;
   log("turn_started", turn, `tier=${turn.tier}`);
+  const owner = ownerOf(turn.personId);
+  const timer = owner ? setTimeout(() => { turn.stopReason ??= "wall_clock"; turn.abort.abort(); }, budgetMs(owner)) : null;
+  timer?.unref?.();
+  const stopped = (): void => {
+    const reason = turn.stopReason ?? "user";
+    appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason }] });
+    recordCodingEvent({ sessionId: turn.sessionId, personId: turn.personId, kind: "stopped", detail: { reason } });
+    log("turn_stopped", turn, `reason=${reason}`);
+  };
   try {
     await rt.sandbox.start({ sessionId: turn.sessionId, environmentId });
-    if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle" }); settle(turn, "cancelled"); refreshHouseholdQueue(); return; }
+    if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle" }); stopped(); settle(turn, "cancelled"); clearQueue(turn.sessionId); refreshHouseholdQueue(); return; }
     updateSession(turn.sessionId, { state: "working" });
-    const result = await rt.agent.runTurn({ sessionId: turn.sessionId, turnId: turn.id, tier: turn.tier, message: turn.message, signal: turn.abort.signal });
-    if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle", lastActivityAt: new Date().toISOString() }); settle(turn, "cancelled"); return; }
+    const host = createTurnHost({ sessionId: turn.sessionId, personId: turn.personId, signal: turn.abort.signal });
+    const result = await rt.agent.runTurn({ sessionId: turn.sessionId, turnId: turn.id, tier: turn.tier, message: turn.message, signal: turn.abort.signal, host });
+    if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle", lastActivityAt: new Date().toISOString() }); stopped(); settle(turn, "cancelled"); return; }
     const row = getSessionRow(turn.personId, turn.sessionId);
     if (row) {
       const modelId = result.modelId && /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(result.modelId) ? result.modelId : null;
@@ -150,9 +172,10 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   } catch {
     // Reason code only: the error text can hold a path or a repository name (rule 6a).
     updateSession(turn.sessionId, { state: turn.abort.signal.aborted ? "idle" : "failed", lastActivityAt: new Date().toISOString() });
-    log(turn.abort.signal.aborted ? "turn_stopped" : "turn_failed", turn);
+    if (turn.abort.signal.aborted) stopped(); else { log("turn_failed", turn); appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "agent", parts: [{ type: "stopped", reason: "error" }] }); }
     settle(turn, turn.abort.signal.aborted ? "cancelled" : "failed");
-  }
+  } finally { if (timer) clearTimeout(timer); }
+  if (turn.state === "done") advanceQueue(turn.sessionId, turn.personId); else clearQueue(turn.sessionId);
   refreshHouseholdQueue();
 }
 
@@ -171,8 +194,10 @@ export function submitTurn(person: PersonRow, sessionId: string, message: string
   let finish = () => undefined as void;
   const done = new Promise<void>((resolve) => { finish = resolve; });
   const turn: Turn = { id: newTurnId(), sessionId, personId: person.id, message, tier: choice.tier, state: "queued", createdAt: Date.now(), capReason: null, leaseReason: null, leaseRefusal: null,
-    queueReason: null, position: null, standardOnce: false, leaseHeld: false, abort: new AbortController(), done, finish };
+    queueReason: null, position: null, standardOnce: false, leaseHeld: false, stopReason: null, abort: new AbortController(), done, finish };
   turns.set(turn.id, turn);
+  startTaint(sessionId, (session.repo as { kind?: string }).kind ?? "none");
+  appendCodingMessage({ sessionId, personId: person.id, role: "user", parts: [{ type: "text", text: message }] });
   updateSession(sessionId, { state: "queued", lastActivityAt: new Date().toISOString() });
   log("turn_queued", turn, `tier=${turn.tier}`);
   refreshHouseholdQueue();
@@ -203,6 +228,46 @@ export function offersUseStandard(turnId: string): boolean {
   return !!turn && turn.state === "queued" && turn.tier === "max" && !!turn.leaseReason;
 }
 
+// The message queue (design 3.3, the kit's `message-queue`): a message typed while the agent works waits here, in order, and a person can take one back.
+// It is per session, in memory, at most MAX_QUEUED long. The next one becomes a turn when the current turn finishes well; Stop or a failure clears the rest.
+export const MAX_QUEUED_MESSAGES = 10;
+interface QueuedMessage { id: string; text: string }
+const messageQueues = new Map<string, QueuedMessage[]>();
+function clearQueue(sessionId: string): void { messageQueues.delete(sessionId); }
+function advanceQueue(sessionId: string, personId: string): void {
+  const next = messageQueues.get(sessionId)?.shift();
+  const person = ownerOf(personId);
+  if (!next || !person) return;
+  try { submitTurn(person, sessionId, next.text); } catch { clearQueue(sessionId); log("queue_dropped", { id: "none", sessionId, personId }); }
+}
+/** The person's message: it starts a turn now, or joins the session's message queue when the agent is still working. */
+export function sendMessage(person: PersonRow, sessionId: string, message: string): { turn_id: string; tier: Tier } | { queued_message_id: string; position: number } {
+  const busy = [...turns.values()].some((turn) => turn.sessionId === sessionId && (turn.state === "queued" || turn.state === "running"));
+  if (!busy) return submitTurn(person, sessionId, message);
+  const refusal = codingSessionRefusal(person);
+  if (refusal) throw new CodingSessionError("not_allowed", refusal);
+  if (!getSessionRow(person.id, sessionId)) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  if (!message.trim() || message.length > 200_000) throw new CodingSessionError("bad_input", "Write a message first, and keep it under 200,000 characters.");
+  const queue = messageQueues.get(sessionId) ?? [];
+  if (queue.length >= MAX_QUEUED_MESSAGES) throw new CodingSessionError("busy", "Too many messages are waiting in this session. Wait for the agent to catch up, or take one back.");
+  const id = `cqm-${randomSuffix(8)}`;
+  queue.push({ id, text: message }); messageQueues.set(sessionId, queue);
+  appendLogLine(`coding message_queued session=${sessionId} person=${person.id} waiting=${queue.length}`);
+  return { queued_message_id: id, position: queue.length };
+}
+/** The ✕ on a queued message. */
+export function cancelQueuedMessage(person: Pick<PersonRow, "id">, sessionId: string, messageId: string): boolean {
+  if (!getSessionRow(person.id, sessionId)) return false;
+  const queue = messageQueues.get(sessionId); const at = queue?.findIndex((m) => m.id === messageId) ?? -1;
+  if (!queue || at < 0) return false;
+  queue.splice(at, 1); return true;
+}
+/** Messages waiting in a session, as ids and a count (the text is the person's; the page already holds it). */
+export function queuedMessageIds(person: Pick<PersonRow, "id">, sessionId: string): string[] { return getSessionRow(person.id, sessionId) ? (messageQueues.get(sessionId) ?? []).map((m) => m.id) : []; }
+
+/** The id of the session's queued or running turn, if any. */
+export function activeTurnOf(sessionId: string): string | null { return [...turns.values()].find((t) => t.sessionId === sessionId && (t.state === "queued" || t.state === "running"))?.id ?? null; }
+
 /** Resolves when the turn has finished, failed or been cancelled. */
 export function turnFinished(turnId: string): Promise<void> { return turns.get(turnId)?.done ?? Promise.resolve(); }
 export function turnState(turnId: string): TurnState | null { return turns.get(turnId)?.state ?? null; }
@@ -212,12 +277,24 @@ export function stopCodingSession(person: Pick<PersonRow, "id">, sessionId: stri
   if (!getSessionRow(person.id, sessionId)) return false;
   for (const turn of turns.values()) {
     if (turn.sessionId !== sessionId) continue;
-    if (turn.state === "queued") { turn.abort.abort(); settle(turn, "cancelled"); log("turn_cancelled", turn); }
-    else if (turn.state === "running") turn.abort.abort();
+    if (turn.state === "queued") { turn.stopReason ??= "user"; turn.abort.abort(); settle(turn, "cancelled"); log("turn_cancelled", turn); }
+    else if (turn.state === "running") { turn.stopReason ??= "user"; turn.abort.abort(); }
   }
+  clearQueue(sessionId);
+  denyPendingFor(sessionId);
   updateSession(sessionId, { state: "idle" });
   refreshHouseholdQueue();
   return true;
+}
+
+/** Undo on a receipt: restores the checkpoint through the sandbox and records it in the person's trail. The person's own click; the brake lets undo through always. */
+export async function undoToCheckpoint(person: Pick<PersonRow, "id">, sessionId: string, checkpointId: string): Promise<void> {
+  if (!getSessionRow(person.id, sessionId)) throw new CodingSessionError("not_found", "That session was not found. It may have been deleted.");
+  if (!runtime?.sandbox.restoreCheckpoint) throw new CodingSessionError("not_allowed", "Undo is not available for this session yet.");
+  if (!/^[A-Za-z0-9_.-]{1,80}$/.test(checkpointId)) throw new CodingSessionError("bad_input", "That checkpoint is not valid. Pick one from the session's history.");
+  await runtime.sandbox.restoreCheckpoint({ sessionId, checkpointId });
+  recordCodingEvent({ sessionId, personId: person.id, kind: "checkpoint_restored", detail: { checkpoint_id: checkpointId } });
+  appendLogLine(`coding checkpoint_restored session=${sessionId} person=${person.id}`);
 }
 
 /** Delete stops anything running, destroys the sandbox and moves the record to the trash. */
@@ -229,4 +306,4 @@ export async function deleteCodingSession(person: Pick<PersonRow, "id">, session
 }
 
 /** Tests only: forget every turn and the retry timer. */
-export function __resetCodingTurnsForTests(): void { turns.clear(); runtime = null; capOverride = null; if (retryTimer) clearTimeout(retryTimer); retryTimer = null; }
+export function __resetCodingTurnsForTests(): void { turns.clear(); messageQueues.clear(); budgetOverrideMs = null; runtime = null; capOverride = null; if (retryTimer) clearTimeout(retryTimer); retryTimer = null; }

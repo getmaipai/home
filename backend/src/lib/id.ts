@@ -26,6 +26,15 @@ export function newCodingSessionId(): string {
   return `csess-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/coding-event.schema.json's `^cevt-[a-z0-9]{6,}$`. */
+export function newCodingEventId(): string {
+  return `cevt-${randomSuffix(10)}`;
+}
+
+/** Hub-internal ids for a Code session's messages and held host requests (not spec records). */
+export const newCodingMessageId = (): string => `cmsg-${randomSuffix(10)}`;
+export const newCodingRequestId = (): string => `creq-${randomSuffix(10)}`;
+
 /** Matches spec/schemas/biometric-print.schema.json's `^print-[a-z0-9]{6,}$`. */
 export function newBiometricPrintId(): string {
   return `print-${randomSuffix(10)}`;

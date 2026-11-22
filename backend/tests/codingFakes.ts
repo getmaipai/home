@@ -1,16 +1,18 @@
 // CODE-AGENT-01 fakes: an agent and a sandbox that record what they were asked and finish when the test says so. The real ones are the OpenCode
 // bridge and the Stack's /stack/v1/sandboxes (later slices).
 import type { CodingAgent, CodingSandbox, CodingTurnResult } from "../src/lib/codingTurns";
+import type { CodingHost } from "../src/lib/codingBridge";
 import type { Tier } from "../src/lib/tiers";
 
 export interface AgentCall { sessionId: string; turnId: string; tier: Tier; message: string }
-export function fakeAgent(over: { result?: CodingTurnResult; fail?: boolean } = {}) {
+export function fakeAgent(over: { result?: CodingTurnResult; fail?: boolean; script?: (host: CodingHost) => Promise<void> } = {}) {
   const calls: AgentCall[] = [];
   const waiting: Array<() => void> = [];
   let hold = true;
   const agent: CodingAgent = {
     runTurn: async (input) => {
       calls.push({ sessionId: input.sessionId, turnId: input.turnId, tier: input.tier, message: input.message });
+      await over.script?.(input.host);
       if (hold && !input.signal.aborted) await new Promise<void>((resolve) => { waiting.push(resolve); input.signal.addEventListener("abort", () => resolve()); });
       if (over.fail) throw new Error("/home/willow/secret-repo: agent crashed");
       return over.result ?? { modelId: "coding-model-1", usage: { input_tokens: 10, output_tokens: 5 } };
@@ -25,6 +27,7 @@ export function fakeSandbox() {
     start: async ({ sessionId }) => { events.push(`start:${sessionId}`); },
     stop: async (id) => { events.push(`stop:${id}`); },
     destroy: async (id) => { events.push(`destroy:${id}`); },
+    restoreCheckpoint: async ({ sessionId, checkpointId }) => { events.push(`restore:${sessionId}:${checkpointId}`); },
   };
   return { sandbox, events };
 }

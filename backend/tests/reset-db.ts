@@ -33,6 +33,8 @@ import {
   apiKeys,
   gitConnections,
   codingSessions,
+  codingMessages,
+  codingEvents,
   codingTokenUsage,
   memoryRecords,
   memoryEmbeddings,
@@ -343,6 +345,8 @@ export function resetDb(): void {
   db.delete(worldPlaces).run();
   db.delete(quickTimers).run();
   db.delete(gitConnections).run();
+  db.delete(codingMessages).run();
+  db.delete(codingEvents).run();
   db.delete(codingSessions).run();
   db.delete(apiKeys).run();
   db.delete(personApiTokens).run();

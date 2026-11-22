@@ -190,6 +190,30 @@ export const codingSessions = sqliteTable("coding_sessions", {
   updatedAt: text("updated_at").notNull(),
 }, (t) => [index("coding_sessions_person_idx").on(t.personId)]);
 
+// CODE-AGENT-01: a Code session's transcript. Parts are stored already credential-redacted (lib/codingRedact.ts); a message never reaches a job or a household log.
+export const codingMessages = sqliteTable("coding_messages", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id").notNull().references(() => codingSessions.id),
+  personId: text("person_id").notNull().references(() => people.id),
+  seq: integer("seq").notNull(),
+  role: text("role", { enum: ["user", "agent", "system"] }).notNull(),
+  parts: text("parts", { mode: "json" }).$type<Record<string, unknown>[]>().notNull(),
+  createdAt: text("created_at").notNull(),
+  hlc: text("hlc").notNull(),
+}, (t) => [index("coding_messages_session_idx").on(t.sessionId, t.seq)]);
+
+// CODE-AGENT-01: the person's audit trail (spec coding-event). Person scope, owner only; household logs never read it.
+export const codingEvents = sqliteTable("coding_events", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id").notNull().references(() => codingSessions.id),
+  personId: text("person_id").notNull().references(() => people.id),
+  at: text("at").notNull(),
+  kind: text("kind").notNull(),
+  detail: text("detail", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  provenance: text("provenance").notNull(),
+  hlc: text("hlc").notNull(),
+}, (t) => [index("coding_events_session_idx").on(t.sessionId, t.at)]);
+
 // Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for
 // memory/entity/episode records: one monotonic counter per record_kind.
 // See lib/id.ts.

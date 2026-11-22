@@ -201,7 +201,9 @@ async function dirBytes(dir: string): Promise<number> {
   return total;
 }
 
-export interface PushInput { personId: string; credential: GitCredential; owner: string; repo: string; workspace: string; branch: string; baseBranch: string; remote?: { url: string } }
+export interface PushInput { personId: string; credential: GitCredential; owner: string; repo: string; workspace: string; branch: string; baseBranch: string; remote?: { url: string };
+  /** CODE-AGENT-01: the secret check's hook point. Runs on the hub's clean copy of the branch after the tree scan and before the network push; it throws to stop the push. */
+  beforePush?: (copyDir: string, branch: string) => Promise<void> }
 
 /** Pushes the session's own `maipai/...` branch, from a clean copy the hub makes of the committed branch. No force, no delete, no tag, never the base branch. */
 export async function pushSessionBranch(input: PushInput): Promise<void> {
@@ -225,6 +227,7 @@ export async function pushSessionBranch(input: PushInput): Promise<void> {
     if (fetched.code !== 0) throw new GitHostError("The session's branch has no commits to push. Commit your changes on the session's branch and try again.");
     if (await dirBytes(copy) > maxRepoBytes) throw new GitHostError("The branch is larger than Home will push. Remove large files from the branch and try again.");
     await scanTree(copy, `refs/heads/${branch}`);
+    await input.beforePush?.(copy, branch);
     const pushed = await runGit(["push", "--porcelain", "--no-verify", url, `refs/heads/${branch}:refs/heads/${branch}`],
       { cwd: copy, token: input.credential.token, credentialUser: userFor(input.credential), credentialHost: input.credential.host, allowFile: file, timeoutMs: NETWORK_MS });
     if (pushed.code !== 0) throw failure(input.personId, input.credential, `${pushed.stderr}\n${pushed.stdout}`, "push");
