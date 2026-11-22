@@ -1,0 +1,60 @@
+{
+  "id": "code",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "Utilities",
+  "display": "Code",
+  "description": "Work with a coding agent on your own computer: start a session, watch it work, approve what it asks, and keep the changes.",
+  "routing": {
+    "examples": [
+      "open code",
+      "start a coding session",
+      "open my coding sessions",
+      "let me code something",
+      "open the code app"
+    ],
+    "patterns": []
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected",
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "contributes": {
+    "pages": [
+      {
+        "id": "index",
+        "label": "Code",
+        "icon": "terminal",
+        "nav": true,
+        "kind": "schema",
+        "module": "index",
+        "keywords": [
+          "code",
+          "coding",
+          "programming",
+          "session"
+        ]
+      }
+    ]
+  }
+}

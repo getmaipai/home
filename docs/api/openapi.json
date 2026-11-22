@@ -57392,6 +57392,71 @@
         }
       }
     },
+    "/api/code/sessions/tiers": {
+      "get": {
+        "tags": [
+          "Code"
+        ],
+        "summary": "The tiers this person may run for coding, and the one a new session starts on",
+        "responses": {
+          "200": {
+            "description": "Only tiers the person may run now (a tier they cannot use is absent).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "standard",
+                          "boost",
+                          "max"
+                        ]
+                      }
+                    },
+                    "last": {
+                      "type": "string",
+                      "enum": [
+                        "standard",
+                        "boost",
+                        "max"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "tiers",
+                    "last"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Coding is not available to this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/code/sessions/{id}": {
       "get": {
         "tags": [

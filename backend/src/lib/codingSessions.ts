@@ -77,6 +77,13 @@ function lastTierOf(personId: string): Tier {
   return last && isTier(last.tier) ? last.tier : "standard";
 }
 
+/** CODE-TIER-04: the tiers this person may run for coding right now (a tier they may not use is absent, never shown locked) and the one a new session starts on. */
+export function offeredCodingTiers(person: PersonRow): { tiers: Tier[]; last: Tier } {
+  const tiers = (["standard", "boost", "max"] as const).filter((t) => authorizeTier({ person, category: "coding", requested: t }).tier === t);
+  const last = authorizeTier({ person, category: "coding", requested: lastTierOf(person.id) }).tier;
+  return { tiers: tiers.length ? [...tiers] : ["standard"], last };
+}
+
 export function createCodingSession(person: PersonRow, input: z.input<typeof CreateCodingSessionInput>): CodingSessionWire {
   const refusal = codingSessionRefusal(person);
   if (refusal) throw new CodingSessionError("not_allowed", refusal);

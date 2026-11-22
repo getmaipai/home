@@ -27,13 +27,13 @@ export const RAIL_GROUPS: ReadonlyArray<{ id: string; label?: string }> = [
 // without a second copy of their catalog entries.
 export function railGroupForApp(to: string): string {
   if (RAIL_GROUP_BY_APP_ID[to]) return RAIL_GROUP_BY_APP_ID[to]!;
-  if (["/", "/chat", "/media", "/files", "/people"].includes(to)) return "main";
+  if (["/", "/chat", "/media", "/files", "/people", "/apps/code"].includes(to)) return "main";
   if (/^\/apps\/(audio|video|image|elements|pictures|voice|songs)(\/|$)/.test(to)) return "create";
   return "tools";
 }
 
 /** Audio, Video, Image and Elements (the app, not a kit part) are always in the menu: nobody has to pin them, and unpinning them changes nothing. */
-export const ALWAYS_IN_RAIL: ReadonlySet<string> = new Set(["/apps/audio", "/apps/video", "/apps/image", "/apps/elements"]);
+export const ALWAYS_IN_RAIL: ReadonlySet<string> = new Set(["/apps/audio", "/apps/video", "/apps/image", "/apps/elements", "/apps/code"]);
 
 export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly string[] = []) {
   const core = [
@@ -51,7 +51,7 @@ export function railItemsForCatalog(apps: readonly AppEntry[], pinned: readonly 
   return [...core, ...apps.filter((app) => !coreRoutes.has(app.to) && (ALWAYS_IN_RAIL.has(app.to) || pinnedSet.has(app.to))).map((app) => ({ id: app.to, label: app.label, icon: app.icon, href: app.to, group: railGroupForApp(app.to) }))];
 }
 
-export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/video", "/apps/podcasts", "/apps/image", "/apps/elements"] as const;
+export const AUTO_COLLAPSE_PREFIXES = ["/chat", "/settings", "/files", "/apps/audio", "/apps/video", "/apps/podcasts", "/apps/image", "/apps/elements", "/apps/code"] as const;
 
 export function routeAutoCollapses(pathname: string): boolean {
   return AUTO_COLLAPSE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

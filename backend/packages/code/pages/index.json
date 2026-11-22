@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "code-index",
+  "title": "Code",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "terminal",
+      "text": "Your coding sessions open here."
+    }
+  ]
+}

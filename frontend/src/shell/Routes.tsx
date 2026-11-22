@@ -117,6 +117,7 @@ const WikipediaPage = lazyNamed(() => import("@/shell/pages/WikipediaPage"), "Wi
 const MusicLikeThisPage = lazyNamed(() => import("@/shell/pages/MusicLikeThisPage"), "MusicLikeThisPage");
 const NewsDiscussPage = lazyNamed(() => import("@/shell/pages/NewsDiscussPage"), "NewsDiscussPage");
 const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
+const CodePage = lazyNamed(() => import("@/apps/code/CodePage"), "CodePage");
 const MediaHomePage = lazyNamed(() => import("@/shell/pages/MediaHomePage"), "MediaHomePage");
 const MediaSearchPage = lazyNamed(() => import("@/shell/pages/MediaSearchPage"), "MediaSearchPage");
 const AllAppsPage = lazyNamed(() => import("@/shell/pages/AllAppsPage"), "AllAppsPage");
@@ -577,6 +578,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           <Route path="apps/image/character-sheet" element={<LegacyImageCastRedirect page="character-sheet" />} />
           <Route path="apps/audio/like-this" element={<Suspense fallback={null}><MusicLikeThisPage person={person} /></Suspense>} />
           <Route path="apps/news/discuss" element={<Suspense fallback={null}><NewsDiscussPage person={person} /></Suspense>} />
+          <Route path="apps/code/*" element={<Suspense fallback={null}><CodePage person={person} /></Suspense>} />
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />

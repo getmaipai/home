@@ -27,6 +27,7 @@ import { parseCurrentLocation, resolveWeatherPlace } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getPackageStatus, allPackageStatuses } from "@/lib/smoke";
+import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import type { PersonRow } from "@/types";
 
@@ -301,6 +302,13 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
   return problems;
 }
 
+/** The bundled Code app's package id (CODE-APP-01). */
+export const CODE_APP_ID = "code";
+/** Whether this household offers Code at all: Coding on, not paused, no piece missing. A person's own `use:code` is checked by the pass. */
+export function codeAppOffered(): boolean {
+  return getHouseholdSettingValue("coding.enabled") === true && getHouseholdSettingValue("coding.paused") !== true && !missingCodingPiece();
+}
+
 // ---- Who may see an app --------------------------------------------------------------------
 
 /** The one gate for the app list, a page and a data call: the person may use the package (`mayUse`: its `min_role`, their grants),
@@ -318,6 +326,8 @@ export function appVisibleTo(
   if (status.status !== "enabled") return false;
   if (missingRequired(manifest, unavailable).length > 0) return false;
   if (!manifest.platforms.includes("home")) return false;
+  // CODE-APP-01 (C10): the Code app is absent, not locked, while Coding is off, paused or missing a piece. Who may use it is the pass's `use:code` above.
+  if (manifest.id === CODE_APP_ID && !codeAppOffered()) return false;
   return true;
 }
 

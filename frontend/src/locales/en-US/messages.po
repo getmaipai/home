@@ -29,12 +29,12 @@ msgid " · Household voice"
 msgstr " · Household voice"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:90
+#: ../backend/src/routes/settings.ts:91
 msgid "settings.attention.backups.key_missing"
 msgstr " · key not saved"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:89
+#: ../backend/src/routes/settings.ts:90
 msgid "settings.attention.backups.key_saved"
 msgstr " · key saved"
 
@@ -59,7 +59,7 @@ msgid " A reply being written right now will be cut off."
 msgstr " A reply being written right now will be cut off."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:98
+#: ../backend/src/routes/settings.ts:99
 msgid "settings.attention.robots.connected"
 msgstr " connected"
 
@@ -74,7 +74,7 @@ msgid " Plan for about {needGb} GB free there."
 msgstr " Plan for about {needGb} GB free there."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:99
+#: ../backend/src/routes/settings.ts:100
 msgid "settings.attention.robots.waiting"
 msgstr " waiting"
 
@@ -404,7 +404,7 @@ msgid "{count} alarms"
 msgstr "{count} alarms"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:88
+#: ../backend/src/routes/settings.ts:89
 msgid "settings.attention.backups.many"
 msgstr "{count} backups"
 
@@ -445,7 +445,7 @@ msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr "{count} of {total} could not be forgotten: {reason}"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:67
+#: ../backend/src/routes/settings.ts:68
 msgid "settings.attention.repairs.many"
 msgstr "{count} repairs need attention"
 
@@ -455,7 +455,7 @@ msgid "{count} restored"
 msgstr "{count} restored"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:97
+#: ../backend/src/routes/settings.ts:98
 msgid "settings.attention.robots.many"
 msgstr "{count} robots"
 
@@ -539,6 +539,11 @@ msgstr "{feature} {level} on or off"
 #: src/apps/settings/FeatureAccess.tsx:95
 msgid "{feature} for {name}"
 msgstr "{feature} for {name}"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:24
+msgid "{files} files changed, +{additions} -{deletions}"
+msgstr "{files} files changed, +{additions} -{deletions}"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:38
@@ -735,6 +740,11 @@ msgstr "{label} still"
 #: src/apps/settings/ReferenceLibrarySettings.tsx:284
 msgid "{label} version"
 msgstr "{label} version"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:30
+msgid "{label}: {files} files saved"
+msgstr "{label}: {files} files saved"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:65
@@ -1542,7 +1552,7 @@ msgid "0.1 to 2. Higher is livelier and also raises the pitch."
 msgstr "0.1 to 2. Higher is livelier and also raises the pitch."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:87
+#: ../backend/src/routes/settings.ts:88
 msgid "settings.attention.backups.one"
 msgstr "1 backup"
 
@@ -1564,12 +1574,12 @@ msgid "1 hour"
 msgstr "1 hour"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:66
+#: ../backend/src/routes/settings.ts:67
 msgid "settings.attention.repairs.one"
 msgstr "1 repair needs attention"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:96
+#: ../backend/src/routes/settings.ts:97
 msgid "settings.attention.robots.one"
 msgstr "1 robot"
 
@@ -2815,17 +2825,17 @@ msgid "area.AI settings"
 msgstr "AI settings"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:80
+#: ../backend/src/routes/settings.ts:81
 msgid "settings.attention.ai.setup"
 msgstr "AI setup"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:75
+#: ../backend/src/routes/settings.ts:76
 msgid "settings.attention.install.running.title"
 msgstr "AI setup is still running."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:73
+#: ../backend/src/routes/settings.ts:74
 msgid "settings.attention.install.title"
 msgstr "AI setup needs attention."
 
@@ -3554,6 +3564,11 @@ msgid "Archive \"{text}\""
 msgstr "Archive \"{text}\""
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:55
+msgid "Archived"
+msgstr "Archived"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 #: src/shell/pages/performance/DiskHardwareBody.tsx:28
 msgid "Area"
@@ -3930,6 +3945,11 @@ msgid "Back to robots"
 msgstr "Back to robots"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:60
+msgid "Back to sessions"
+msgstr "Back to sessions"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/AdminGatedContent.tsx:37
 msgid "Back to Settings"
 msgstr "Back to Settings"
@@ -3993,7 +4013,7 @@ msgstr "Backup storage limit (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:173
+#: src/shell/Routes.tsx:174
 msgid "Backups"
 msgstr "Backups"
 
@@ -4431,6 +4451,7 @@ msgid "Books that live on this Home, like Wikipedia and health information. Each
 msgstr "Books that live on this Home, like Wikipedia and health information. Each one downloads once, then works with no internet. Children and teens only see the books made for them."
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:74
 #: src/apps/settings/AiGlance.tsx:37
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
@@ -4688,6 +4709,7 @@ msgstr "Can use it now"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:278
+#: src/apps/code/SessionTabs.tsx:21
 #: src/apps/people/ProfileForm.tsx:195
 #: src/apps/people/ProfileForm.tsx:200
 #: src/apps/reminders/RemindersPage.tsx:188
@@ -4919,6 +4941,11 @@ msgid "Change a few settings"
 msgstr "Change a few settings"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:69
+msgid "Change a file?"
+msgstr "Change a file?"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/musicComposerMode.ts:141
 msgid "Change a voice"
 msgstr "Change a voice"
@@ -4985,6 +5012,11 @@ msgid "Changed"
 msgstr "Changed"
 
 #. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:26
+msgid "Changed {path}"
+msgstr "Changed {path}"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicVoiceCreate.tsx:101
 msgid "Changed voice"
 msgstr "Changed voice"
@@ -4993,6 +5025,12 @@ msgstr "Changed voice"
 #: src/apps/setup/HostTuneStep.tsx:124
 msgid "Changed. Now: {proposed}."
 msgstr "Changed. Now: {proposed}."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:89
+#: src/apps/code/SessionView.tsx:104
+msgid "Changes"
+msgstr "Changes"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1815
@@ -5174,7 +5212,7 @@ msgid "Chat is down"
 msgstr "Chat is down"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:81
+#: ../backend/src/routes/settings.ts:82
 msgid "settings.attention.health.title"
 msgstr "Chat is not ready."
 
@@ -5273,7 +5311,7 @@ msgstr "Chat settings"
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:176
+#: src/shell/Routes.tsx:177
 msgid "Chat showcase"
 msgstr "Chat showcase"
 
@@ -6323,6 +6361,7 @@ msgid "Clone settings"
 msgstr "Clone settings"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:95
 #: src/apps/settings/EngineLinkCredentialSection.tsx:288
 #: src/apps/settings/FreeUpSpaceDialog.tsx:97
 #: src/apps/settings/StackChanInstallDialog.tsx:153
@@ -6371,6 +6410,11 @@ msgstr "Close this and open Arrange again."
 #: src/lib/settingCopy.generated.ts:1334
 msgid "setting.robot.face.color.option_label.cloud"
 msgstr "Cloud"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionList.tsx:27
+msgid "Code"
+msgstr "Code"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:138
@@ -6552,7 +6596,7 @@ msgstr "Coming up"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/Routes.tsx:174
+#: src/shell/Routes.tsx:175
 msgid "Commands"
 msgstr "Commands"
 
@@ -6560,6 +6604,11 @@ msgstr "Commands"
 #: src/lib/settingCopy.generated.ts:1924
 msgid "area.Commands"
 msgstr "Commands"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:41
+msgid "Commands the agent runs show here."
+msgstr "Commands the agent runs show here."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:976
@@ -6646,6 +6695,7 @@ msgid "setting.news.default_topics.teen.option.technology"
 msgstr "Computers, phones, the internet, software, artificial intelligence, gadgets and the companies that make them."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:21
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
 #: src/shell/pages/settings/HouseSettings.tsx:50
@@ -6861,6 +6911,7 @@ msgid "setting.companions.allowed.does"
 msgstr "Controls who can see and use the available companions."
 
 #. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:42
 #: src/shell/pages/CompanionsPage.tsx:311
 #: src/shell/pages/CompanionsPage.tsx:317
 msgid "Conversation"
@@ -7178,7 +7229,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:467
+#: src/shell/Routes.tsx:468
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
 
@@ -7581,6 +7632,11 @@ msgid "Could not load your sessions."
 msgstr "Could not load your sessions."
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodePage.tsx:26
+msgid "Could not load your sessions. Try again."
+msgstr "Could not load your sessions. Try again."
+
+#. js-lingui-explicit-id
 #: src/shell/RailProfile.tsx:61
 msgid "Could not log out. Try again."
 msgstr "Could not log out. Try again."
@@ -7632,9 +7688,19 @@ msgid "Could not open the live view of {name}. Check that it is switched on, the
 msgstr "Could not open the live view of {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:89
+msgid "Could not open the pull request. Try again."
+msgstr "Could not open the pull request. Try again."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/PackageAppPage.tsx:291
 msgid "Could not open this app. Check your connection and try again."
 msgstr "Could not open this app. Check your connection and try again."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:60
+msgid "Could not open this session. Try again."
+msgstr "Could not open this session. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:167
@@ -7653,8 +7719,13 @@ msgid "Could not post the note."
 msgstr "Could not post the note."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:89
+msgid "Could not push. Try again."
+msgstr "Could not push. Try again."
+
+#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:369
+#: src/shell/Routes.tsx:370
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -7919,6 +7990,16 @@ msgid "Could not send that to {name}. Check that it is switched on, then try aga
 msgstr "Could not send that to {name}. Check that it is switched on, then try again."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:83
+msgid "Could not send that. Try again."
+msgstr "Could not send that. Try again."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:112
+msgid "Could not send your answer. Try again."
+msgstr "Could not send your answer. Try again."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:124
 msgid "Could not share this synth. Try again from the Synths list."
 msgstr "Could not share this synth. Try again from the Synths list."
@@ -7964,6 +8045,11 @@ msgid "Could not start the camera"
 msgstr "Could not start the camera"
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:45
+msgid "Could not start the session. Try again."
+msgstr "Could not start the session. Try again."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotWifi.tsx:48
 msgid "Could not start the tailnet test. Try again."
 msgstr "Could not start the tailnet test. Try again."
@@ -7984,6 +8070,11 @@ msgid "Could not stop that. Try again."
 msgstr "Could not stop that. Try again."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:103
+msgid "Could not stop. Try again."
+msgstr "Could not stop. Try again."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotSelfTests.tsx:29
 msgid "Could not test that part. Reload the page and try again."
 msgstr "Could not test that part. Reload the page and try again."
@@ -7992,6 +8083,11 @@ msgstr "Could not test that part. Reload the page and try again."
 #: src/lib/hubMutationVerbs.ts:18
 msgid "Could not test the connection."
 msgstr "Could not test the connection."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:89
+msgid "Could not undo that. Try again."
+msgstr "Could not undo that. Try again."
 
 #. js-lingui-explicit-id
 #: src/lib/hubMutationVerbs.ts:19
@@ -8081,7 +8177,7 @@ msgstr "Cover art"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:483
+#: src/shell/Routes.tsx:484
 msgid "Create"
 msgstr "Create"
 
@@ -8692,6 +8788,11 @@ msgid "Delete this file forever?"
 msgstr "Delete this file forever?"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:67
+msgid "Delete this session?"
+msgstr "Delete this session?"
+
+#. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:184
 msgid "Delete timer"
 msgstr "Delete timer"
@@ -8791,6 +8892,16 @@ msgstr "Describe the sound in at least 3 characters to start."
 #: src/shell/pages/musicComposerMode.ts:69
 msgid "Describe the sound you want, like a door creaking or rain on a tin roof."
 msgstr "Describe the sound you want, like a door creaking or rain on a tin roof."
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:52
+msgid "Describe the task"
+msgstr "Describe the task"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:52
+msgid "Describe the task, for example: fix the failing test in the thermostat code."
+msgstr "Describe the task, for example: fix the failing test in the thermostat code."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ChatPage.tsx:1721
@@ -9099,6 +9210,7 @@ msgid "setting.notifications.file_shared.muted_senders.label"
 msgstr "Don't notify me about shares from"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:53
 #: src/apps/people/FaceEnrollmentPage.tsx:603
 #: src/apps/reminders/ComingUpRow.tsx:43
 #: src/apps/reminders/ComingUpRow.tsx:58
@@ -10304,6 +10416,11 @@ msgid "api.error.file_unavailable_to_share"
 msgstr "File unavailable. Ask the owner to share a suitable file."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:90
+msgid "Files"
+msgstr "Files"
+
+#. js-lingui-explicit-id
 #: src/shell/library/LibraryTrash.tsx:33
 msgid "Files in Trash"
 msgstr "Files in Trash"
@@ -10392,7 +10509,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:369
+#: src/shell/Routes.tsx:370
 msgid "Find me"
 msgstr "Find me"
 
@@ -10447,7 +10564,7 @@ msgid "Finish"
 msgstr "Finish"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:72
+#: ../backend/src/routes/settings.ts:73
 msgid "settings.attention.setup.todo"
 msgstr "Finish setting up"
 
@@ -11827,8 +11944,8 @@ msgstr "Holds what some downloads ask for before they start."
 #: src/shell/pages/WikipediaPage.tsx:155
 #: src/shell/pages/WikipediaPage.tsx:179
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:481
-#: src/shell/Routes.tsx:535
+#: src/shell/Routes.tsx:482
+#: src/shell/Routes.tsx:536
 msgid "Home"
 msgstr "Home"
 
@@ -11975,7 +12092,7 @@ msgid "failure.voice.microphone_blocked.adultNoRepairs"
 msgstr "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again. If you never saw a permission prompt, open System Settings > Privacy & Security > Microphone and switch on this browser."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:102
+#: ../backend/src/routes/settings.ts:103
 msgid "settings.attention.search.line"
 msgstr "Home cannot reach your search service yet."
 
@@ -12614,7 +12731,7 @@ msgid "Home uses the best model that fits this level."
 msgstr "Home uses the best model that fits this level."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:76
+#: ../backend/src/routes/settings.ts:77
 msgid "settings.attention.install.running.line"
 msgstr "Home will finish setting up when it can."
 
@@ -13347,7 +13464,7 @@ msgid "setting.person.vision.watch.help"
 msgstr "Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:69
+#: ../backend/src/routes/settings.ts:70
 msgid "settings.attention.backup_key.line"
 msgstr "If this computer breaks, nothing comes back."
 
@@ -13362,7 +13479,7 @@ msgid "If this computer breaks, this key restores your Home on a new one."
 msgstr "If this computer breaks, this key restores your Home on a new one."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:85
+#: ../backend/src/routes/settings.ts:86
 msgid "settings.attention.backups.empty.line"
 msgstr "If this computer breaks, your family has nothing to restore."
 
@@ -13810,6 +13927,11 @@ msgid "It will need to be paired again. This also deletes the robot's memories a
 msgstr "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup."
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:70
+msgid "It will wait until you answer."
+msgstr "It will wait until you answer."
+
+#. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:255
 msgid "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step."
 msgstr "It works once and expires at {toLocaleTimeString}. The command prints a check code. Keep it for the next step."
@@ -14004,6 +14126,11 @@ msgstr "Keep key"
 #: src/apps/settings/RobotWifi.tsx:56
 msgid "Keep network"
 msgstr "Keep network"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:95
+msgid "Keep open"
+msgstr "Keep open"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1603
@@ -14893,6 +15020,8 @@ msgid "setting.coding.api.away.does"
 msgstr "Lets your key connect through your Tailscale when you are out."
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:54
+#: src/apps/code/SessionView.tsx:107
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
 msgstr "Level"
@@ -14933,7 +15062,7 @@ msgstr "Levels and models"
 #: src/shell/pages/personAccessCopy.ts:10
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:484
+#: src/shell/Routes.tsx:485
 msgid "Library"
 msgstr "Library"
 
@@ -16669,6 +16798,7 @@ msgid "setting.ui.look.option_label.mauve"
 msgstr "Mauve"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:74
 #: src/apps/settings/AiGlance.tsx:37
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
@@ -16695,6 +16825,11 @@ msgstr "Max chat checklist"
 #: src/lib/settingCopy.generated.ts:22
 msgid "setting.access.tier.max.label"
 msgstr "Max for"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:108
+msgid "Max from the next message"
+msgstr "Max from the next message"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/aiTierSlots.ts:75
@@ -16747,8 +16882,8 @@ msgstr "Maximum speed used for automatic reference library updates."
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:482
-#: src/shell/Routes.tsx:535
+#: src/shell/Routes.tsx:483
+#: src/shell/Routes.tsx:536
 msgid "Media"
 msgstr "Media"
 
@@ -16870,6 +17005,11 @@ msgid "Memory used by the whole system."
 msgstr "Memory used by the whole system."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:117
+msgid "Message {n} is waiting"
+msgstr "Message {n} is waiting"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:178
 msgid "setting.coding.person.message_minutes.label"
 msgstr "Message minutes"
@@ -16880,9 +17020,19 @@ msgid "setting.chat.paused_message.label"
 msgstr "Message shown while chat is paused"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:120
+msgid "Message the agent"
+msgstr "Message the agent"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1096
 msgid "setting.notifications.telegram.chat_id.help"
 msgstr "Message the household bot once, then paste the chat id it replies with, to receive your notifications on Telegram."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:120
+msgid "Message to the agent"
+msgstr "Message to the agent"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1789
@@ -17696,6 +17846,7 @@ msgid "Needs setup"
 msgstr "Needs setup"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:50
 #: src/shell/pages/CompanionsPage.tsx:331
 #: src/shell/pages/CompanionsPage.tsx:334
 #: src/shell/pages/CompanionsPage.tsx:334
@@ -17869,6 +18020,11 @@ msgstr "New password"
 #: src/apps/settings/SignInSecretSection.tsx:70
 msgid "New PIN"
 msgstr "New PIN"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionList.tsx:28
+msgid "New session"
+msgstr "New session"
 
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:401
@@ -18097,17 +18253,17 @@ msgid "No assistant keys"
 msgstr "No assistant keys"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:68
+#: ../backend/src/routes/settings.ts:69
 msgid "settings.attention.backup_key.title"
 msgstr "No backup key saved."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:91
+#: ../backend/src/routes/settings.ts:92
 msgid "settings.attention.backups.empty.summary"
 msgstr "No backups yet"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:84
+#: ../backend/src/routes/settings.ts:85
 msgid "settings.attention.backups.empty.title"
 msgstr "No backups yet."
 
@@ -18141,6 +18297,11 @@ msgstr "No cap set"
 #: src/shell/pages/settings/SettingsSectionContent.tsx:52
 msgid "No change was made."
 msgstr "No change was made."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:24
+msgid "No changes yet."
+msgstr "No changes yet."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ModelsSection.tsx:146
@@ -18240,7 +18401,7 @@ msgid "No files yet."
 msgstr "No files yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:79
+#: ../backend/src/routes/settings.ts:80
 msgid "settings.attention.ai.no_install"
 msgstr "No install in progress"
 
@@ -18381,6 +18542,11 @@ msgid "No replies timed yet."
 msgstr "No replies timed yet."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:96
+msgid "No repository"
+msgstr "No repository"
+
+#. js-lingui-explicit-id
 #: src/shell/components/dataTableModel.tsx:51
 #: src/shell/pages/useDataTableControls.tsx:89
 msgid "No results found."
@@ -18392,12 +18558,12 @@ msgid "No robot found on your network yet."
 msgstr "No robot found on your network yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:92
+#: ../backend/src/routes/settings.ts:93
 msgid "settings.attention.robots.title"
 msgstr "No robots connected yet."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:100
+#: ../backend/src/routes/settings.ts:101
 msgid "settings.attention.robots.empty"
 msgstr "No robots yet"
 
@@ -19045,6 +19211,11 @@ msgstr "Nothing was idle, so nothing changed."
 #: src/apps/settings/FreeUpSpaceDialog.tsx:69
 msgid "Nothing was removed."
 msgstr "Nothing was removed."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:112
+msgid "Nothing yet. Tell the agent what to do."
+msgstr "Nothing yet. Tell the agent what to do."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:102
@@ -19829,17 +20000,22 @@ msgid "Open {title}"
 msgstr "Open {title}"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:65
+msgid "Open a pull request?"
+msgstr "Open a pull request?"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:104
 msgid "Open a song from your list, then choose Studio."
 msgstr "Open a song from your list, then choose Studio."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:77
+#: ../backend/src/routes/settings.ts:78
 msgid "settings.attention.ai.open"
 msgstr "Open AI and models"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:94
+#: ../backend/src/routes/settings.ts:95
 msgid "settings.attention.apps.open"
 msgstr "Open apps and devices"
 
@@ -19932,7 +20108,12 @@ msgid "Open one to play it and see everything you can do."
 msgstr "Open one to play it and see everything you can do."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:83
+#: src/apps/code/SessionTabs.tsx:28
+msgid "Open pull request"
+msgstr "Open pull request"
+
+#. js-lingui-explicit-id
+#: ../backend/src/routes/settings.ts:84
 msgid "settings.attention.repairs.open"
 msgstr "Open Repairs"
 
@@ -20381,6 +20562,7 @@ msgid "Pause coding requests until you resume. This does not delete keys."
 msgstr "Pause coding requests until you resume. This does not delete keys."
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:52
 #: src/apps/reminders/DeviceSchedulesView.tsx:29
 #: src/apps/settings/AssistantKeysSettings.tsx:65
 #: src/apps/settings/ReferenceLibrarySettings.tsx:88
@@ -20426,7 +20608,7 @@ msgstr "Percent of the normal text size. \"Preset\" follows your ease of use cho
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:169
+#: src/shell/Routes.tsx:170
 msgid "Performance"
 msgstr "Performance"
 
@@ -21115,6 +21297,17 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr "Plain-language health and medicine pages from the US National Library of Medicine."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:47
+#: src/apps/code/SessionView.tsx:92
+msgid "Plan"
+msgstr "Plan"
+
+#. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:23
+msgid "Plan updated: {done} of {total} steps done."
+msgstr "Plan updated: {done} of {total} steps done."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/statusAppHistory.ts:44
 msgid "planned maintenance for {time}"
 msgstr "planned maintenance for {time}"
@@ -21551,6 +21744,21 @@ msgid "Publishing failed. Review the appearance and try again."
 msgstr "Publishing failed. Review the appearance and try again."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:28
+msgid "Pull request #{number}"
+msgstr "Pull request #{number}"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:27
+msgid "Push branch"
+msgstr "Push branch"
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:64
+msgid "Push this branch?"
+msgstr "Push this branch?"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:228
 msgid "setting.companions.ambient_bot.help"
 msgstr "Puts one of the household's robots in the top-right companion spot instead of a companion. Pick it from the companion pane. Leave empty to show your companion."
@@ -21793,6 +22001,11 @@ msgid "Re-enroll"
 msgstr "Re-enroll"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:66
+msgid "Reach a new website?"
+msgstr "Reach a new website?"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:671
 msgid "setting.engines.stack.remote.allow_tailnet.label"
 msgstr "Reach the engine computer when away from home"
@@ -21861,11 +22074,12 @@ msgid "Reading the details…"
 msgstr "Reading the details…"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:78
+#: ../backend/src/routes/settings.ts:79
 msgid "settings.attention.ai.ready"
 msgstr "Ready"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:51
 #: src/apps/library/appPresentation.ts:18
 #: src/apps/settings/AiGlance.tsx:36
 #: src/apps/settings/CodingSettings.tsx:112
@@ -22429,7 +22643,7 @@ msgstr "Repair issues"
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:171
+#: src/shell/Routes.tsx:172
 msgid "Repairs"
 msgstr "Repairs"
 
@@ -23121,7 +23335,7 @@ msgid "Robots found on your network"
 msgstr "Robots found on your network"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:95
+#: ../backend/src/routes/settings.ts:96
 msgid "settings.attention.robots.off"
 msgstr "Robots off"
 
@@ -23225,6 +23439,11 @@ msgstr "Rows per page:"
 #: src/shell/pages/ChatPage.tsx:1646
 msgid "Rules fired:"
 msgstr "Rules fired:"
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:68
+msgid "Run a command?"
+msgstr "Run a command?"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StatusPage.tsx:99
@@ -23386,7 +23605,7 @@ msgid "Save audience"
 msgstr "Save audience"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:70
+#: ../backend/src/routes/settings.ts:71
 msgid "settings.attention.backup_key.action"
 msgstr "Save backup key"
 
@@ -24205,6 +24424,7 @@ msgid "Semitones, -12 to 12. A negative number lowers the voice."
 msgstr "Semitones, -12 to 12. A negative number lowers the voice."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:122
 #: src/shell/library/LibraryViewer.tsx:210
 #: src/shell/library/LibraryViewer.tsx:210
 msgid "Send"
@@ -24267,6 +24487,11 @@ msgid "Service, e.g. turn_off"
 msgstr "Service, e.g. turn_off"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:95
+msgid "Session details"
+msgstr "Session details"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1973
 msgid "area.Session lock"
 msgstr "Session lock"
@@ -24282,6 +24507,7 @@ msgid "Session lock timeout, minutes, for {name}"
 msgstr "Session lock timeout, minutes, for {name}"
 
 #. js-lingui-explicit-id
+#: src/apps/code/CodePage.tsx:33
 #: src/apps/settings/DevicesSection.tsx:190
 msgid "Sessions"
 msgstr "Sessions"
@@ -24357,7 +24583,7 @@ msgid "Set up away access"
 msgstr "Set up away access"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:86
+#: ../backend/src/routes/settings.ts:87
 msgid "settings.attention.backups.open"
 msgstr "Set up backups"
 
@@ -24392,12 +24618,12 @@ msgid "Set up standard coding"
 msgstr "Set up standard coding"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:103
+#: ../backend/src/routes/settings.ts:104
 msgid "settings.attention.search.open"
 msgstr "Set up web search"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:105
+#: ../backend/src/routes/settings.ts:106
 msgid "settings.attention.search.setup"
 msgstr "Set up web search"
 
@@ -24558,7 +24784,7 @@ msgstr "Setting up your AI"
 #: src/shell/pages/FilesPage.tsx:304
 #: src/shell/pages/PersonProfilePage.tsx:236
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
-#: src/shell/Routes.tsx:535
+#: src/shell/Routes.tsx:536
 msgid "Settings"
 msgstr "Settings"
 
@@ -24583,7 +24809,7 @@ msgid "setting.setup.checklist_dismissed.label"
 msgstr "Setup checklist items hidden"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:71
+#: ../backend/src/routes/settings.ts:72
 msgid "settings.attention.setup.complete"
 msgstr "Setup complete"
 
@@ -24808,7 +25034,7 @@ msgid "Show keyboard shortcuts"
 msgstr "Show keyboard shortcuts"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:443
+#: src/shell/Routes.tsx:444
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -25958,6 +26184,7 @@ msgid "Staged"
 msgstr "Staged"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:74
 #: src/apps/settings/AiGlance.tsx:37
 #: src/apps/settings/AiJobSummary.tsx:15
 #: src/apps/settings/AiSlotDialog.tsx:21
@@ -26074,6 +26301,11 @@ msgid "Start over"
 msgstr "Start over"
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:55
+msgid "Start session"
+msgstr "Start session"
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:16
 msgid "api.error.totp_restart_sign_in"
 msgstr "Start signing in again with your PIN or passkey."
@@ -26131,6 +26363,7 @@ msgid "starting"
 msgstr "starting"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:48
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/apps/setup/SetupWizard.tsx:482
 #: src/shell/pages/MusicRemix.tsx:41
@@ -26224,7 +26457,7 @@ msgstr "Starts at (seconds)"
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:37
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:172
+#: src/shell/Routes.tsx:173
 msgid "Status"
 msgstr "Status"
 
@@ -26293,6 +26526,7 @@ msgstr "Stone"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/StopwatchTab.tsx:66
+#: src/apps/code/SessionView.tsx:103
 #: src/apps/settings/AddVoiceBox.tsx:69
 #: src/apps/settings/StackChanInstallDialog.tsx:146
 #: src/apps/settings/VoiceBrowserSection.tsx:99
@@ -26373,6 +26607,31 @@ msgid "Stopped at {formatElapsed}"
 msgstr "Stopped at {formatElapsed}"
 
 #. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:17
+msgid "Stopped because you said no. Send a message to carry on another way."
+msgstr "Stopped because you said no. Send a message to carry on another way."
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:54
+msgid "Stopped by a problem"
+msgstr "Stopped by a problem"
+
+#. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:16
+msgid "Stopped by a problem. Send a message to try again."
+msgstr "Stopped by a problem. Send a message to try again."
+
+#. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:15
+msgid "Stopped: this step took too long. Send a message to carry on."
+msgstr "Stopped: this step took too long. Send a message to carry on."
+
+#. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:14
+msgid "Stopped. Nothing more is running."
+msgstr "Stopped. Nothing more is running."
+
+#. js-lingui-explicit-id
 #: src/shell/pages/musicSongStatus.tsx:26
 msgid "Stopped. Try again to make it."
 msgstr "Stopped. Try again to make it."
@@ -26426,7 +26685,7 @@ msgstr "Stopwatch running"
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:168
+#: src/shell/Routes.tsx:169
 msgid "Storage"
 msgstr "Storage"
 
@@ -26661,6 +26920,11 @@ msgstr "Swearing"
 #: src/apps/settings/AssistantKeysSettings.tsx:88
 msgid "Switch the chat engine only"
 msgstr "Switch the chat engine only"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:73
+msgid "Switched to {tier}"
+msgstr "Switched to {tier}"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:847
@@ -27007,6 +27271,11 @@ msgid "Tempo in beats per minute"
 msgstr "Tempo in beats per minute"
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:91
+msgid "Terminal"
+msgstr "Terminal"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1157
 msgid "setting.persona.active_id.option_label.tessa"
 msgstr "Tessa"
@@ -27167,6 +27436,8 @@ msgstr "That did not send. Try again."
 #: src/apps/clock/AlarmsTab.tsx:71
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
+#: src/apps/code/NewSession.tsx:57
+#: src/apps/code/SessionView.tsx:118
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
 #: src/apps/notifications/NotificationsPage.tsx:114
@@ -27274,7 +27545,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:369
+#: src/shell/Routes.tsx:370
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr "That did not work"
@@ -27376,6 +27647,16 @@ msgid "That message is no longer available. This chat is open at the end."
 msgstr "That message is no longer available. This chat is open at the end."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:117
+msgid "That message is not waiting any more."
+msgstr "That message is not waiting any more."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:86
+msgid "That message is not waiting for Max any more."
+msgstr "That message is not waiting for Max any more."
+
+#. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:452
 msgid "failure.prompt_limit.too_big.minor"
 msgstr "That message is too big for me to read all at once."
@@ -27475,6 +27756,11 @@ msgstr "That robot is not available for this side chat."
 #: src/apps/settings/DevicesSection.tsx:231
 msgid "that session"
 msgstr "that session"
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:60
+msgid "That session was not found. It may have been deleted."
+msgstr "That session was not found. It may have been deleted."
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:101
@@ -27589,6 +27875,46 @@ msgid "setting.home.base_url.help"
 msgstr "The address of your Home Assistant instance, e.g. http://homeassistant.local:8123."
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:70
+msgid "The agent is asking first"
+msgstr "The agent is asking first"
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:67
+msgid "The agent wants to delete this session."
+msgstr "The agent wants to delete this session."
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:66
+msgid "The agent wants to open a connection to a site it has not used in this session."
+msgstr "The agent wants to open a connection to a site it has not used in this session."
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:65
+msgid "The agent wants to open a pull request for its branch."
+msgstr "The agent wants to open a pull request for its branch."
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:68
+msgid "The agent wants to run a command in its workspace."
+msgstr "The agent wants to run a command in its workspace."
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:64
+msgid "The agent wants to send its work to your git host."
+msgstr "The agent wants to send its work to your git host."
+
+#. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:69
+msgid "The agent wants to write to a file in its workspace."
+msgstr "The agent wants to write to a file in its workspace."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:46
+msgid "The agent's plan shows here when it makes one."
+msgstr "The agent's plan shows here when it makes one."
+
+#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:121
 msgid "The AI decides what it will make"
 msgstr "The AI decides what it will make"
@@ -27639,12 +27965,12 @@ msgid "The AI restarted while I was answering. Try again in a minute."
 msgstr "The AI restarted while I was answering. Try again in a minute."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:82
+#: ../backend/src/routes/settings.ts:83
 msgid "settings.attention.health.line"
 msgstr "The AI service needs attention before it can answer."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:74
+#: ../backend/src/routes/settings.ts:75
 msgid "settings.attention.install.failed"
 msgstr "The AI setup did not finish."
 
@@ -27867,6 +28193,11 @@ msgstr "The EQ and Compressor panels let you listen first. Apply makes a new ver
 #: src/apps/people/FaceEnrollmentPage.tsx:780
 msgid "The face samples could not be saved."
 msgstr "The face samples could not be saved."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionTabs.tsx:36
+msgid "The files the agent changes show here."
+msgstr "The files the agent changes show here."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/PackSection.tsx:99
@@ -29904,7 +30235,7 @@ msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:390
-#: src/shell/Routes.tsx:220
+#: src/shell/Routes.tsx:221
 msgid "Turn trace"
 msgstr "Turn trace"
 
@@ -30425,7 +30756,7 @@ msgstr "Updated {when}"
 #: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:170
+#: src/shell/Routes.tsx:171
 msgid "Updates"
 msgstr "Updates"
 
@@ -30573,6 +30904,11 @@ msgstr "Use SearXNG"
 #: src/lib/settingCopy.generated.ts:145
 msgid "setting.coding.engine.option.splash"
 msgstr "Use Splash, a fast engine for some Apple computers."
+
+#. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:86
+msgid "Use Standard for this message"
+msgstr "Use Standard for this message"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/AwayFromHome.tsx:127
@@ -30748,7 +31084,7 @@ msgstr "Used yesterday"
 #: src/apps/settings/UsersSection.tsx:180
 #: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/UsersPage.tsx:12
-#: src/shell/Routes.tsx:175
+#: src/shell/Routes.tsx:176
 msgid "Users"
 msgstr "Users"
 
@@ -31347,6 +31683,7 @@ msgid "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, bi
 msgstr "Waiting in line: chat and voice {reserved}, pictures and tools {warm}, big jobs {burst}"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:47
 #: src/shell/pages/companionFlow/AnimateStep.tsx:29
 msgid "Waiting its turn"
 msgstr "Waiting its turn"
@@ -31477,17 +31814,17 @@ msgid "area.Web search and memory settings"
 msgstr "Web search and memory settings"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:101
+#: ../backend/src/routes/settings.ts:102
 msgid "settings.attention.search.title"
 msgstr "Web search has no address."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:104
+#: ../backend/src/routes/settings.ts:105
 msgid "settings.attention.search.off"
 msgstr "Web search off"
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:106
+#: ../backend/src/routes/settings.ts:107
 msgid "settings.attention.search.ready"
 msgstr "Web search ready"
 
@@ -31638,6 +31975,11 @@ msgstr "What needs doing"
 #: src/shell/library/LibraryViewer.tsx:132
 msgid "What should it sound like?"
 msgstr "What should it sound like?"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:51
+msgid "What should we work on?"
+msgstr "What should we work on?"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:139
@@ -32208,6 +32550,7 @@ msgid "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, p
 msgstr "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 
 #. js-lingui-explicit-id
+#: src/apps/code/codeTranscript.ts:49
 #: src/apps/settings/CodingSettings.tsx:119
 #: src/shell/pages/CompanionsPage.tsx:311
 #: src/shell/pages/CompanionsPage.tsx:326
@@ -32573,6 +32916,11 @@ msgid "You cannot open this profile."
 msgstr "You cannot open this profile."
 
 #. js-lingui-explicit-id
+#: src/apps/code/SessionView.tsx:76
+msgid "You cannot use that level for coding. Pick another level."
+msgstr "You cannot use that level for coding. Pick another level."
+
+#. js-lingui-explicit-id
 #: src/apps/setup/WebSearchStep.tsx:71
 msgid "You changed the address. Test it again, or clear it to skip."
 msgstr "You changed the address. Test it again, or clear it to skip."
@@ -32646,6 +32994,16 @@ msgstr "You may not remove this share. Ask the person who shared it."
 #: src/apps/settings/StackChanInstallDialog.tsx:125
 msgid "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable."
 msgstr "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable."
+
+#. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:30
+msgid "You said no"
+msgstr "You said no"
+
+#. js-lingui-explicit-id
+#: src/apps/code/Transcript.tsx:30
+msgid "You said yes"
+msgstr "You said yes"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SignInSecretSection.tsx:28
@@ -32988,12 +33346,12 @@ msgid "api.error.upload_profile_gone"
 msgstr "Your profile is no longer available. Sign in again."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:93
+#: ../backend/src/routes/settings.ts:94
 msgid "settings.attention.robots.line"
 msgstr "Your robots have not checked in with this home."
 
 #. js-lingui-explicit-id
-#: ../backend/src/routes/settings.ts:65
+#: ../backend/src/routes/settings.ts:66
 msgid "settings.attention.personal.summary"
 msgstr "Your settings"
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T23:49:29.392Z",
+  "generatedAt": "2026-11-22T02:29:59.335Z",
   "kitTag": "ui-v0.5.727",
   "items": [
     {
@@ -355,7 +355,7 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "agent-status.tsx",
@@ -910,7 +910,7 @@
       "group": "confirmation",
       "verdict": "later",
       "verdictReason": "New kit element; Home has no confirmation surface that needs it yet, so it is recorded for when one does.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "connection-state.tsx",
@@ -1111,7 +1111,7 @@
       "group": "canvas/artifacts",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "file.tsx",
@@ -1304,7 +1304,7 @@
       "group": "light",
       "verdict": "support",
       "verdictReason": "The short-text formatter inside the creation header's collapsible description, which the Library viewer adopts through CreationHeader; no separate Home surface.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "light-tile.tsx",
@@ -2028,7 +2028,7 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "thinking-indicator.tsx",

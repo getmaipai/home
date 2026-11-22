@@ -7,7 +7,7 @@ import { requireAuth } from "@/middleware/auth";
 import { CodingSession } from "@maipai/spec/gen/ts/coding-session.js";
 import { CodingEvent } from "@maipai/spec/gen/ts/coding-event.js";
 import {
-  CodingSessionError, createCodingSession, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionTier, codingSessionRefusal,
+  CodingSessionError, createCodingSession, offeredCodingTiers, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionTier, codingSessionRefusal,
 } from "@/lib/codingSessions";
 import { cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
@@ -56,6 +56,16 @@ codingSessionsRoutes.openapi(listR, (c) => {
   const person = c.get("person"); const refusal = codingSessionRefusal(person);
   if (refusal) return c.json({ error: refusal }, 403);
   return c.json(listCodingSessions(person), 200);
+});
+
+const tiersR = createRoute({
+  method: "get", path: "/tiers", tags: ["Code"], summary: "The tiers this person may run for coding, and the one a new session starts on", middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ tiers: z.array(Tier), last: Tier }) } }, description: "Only tiers the person may run now (a tier they cannot use is absent)." }, ...errorResponses({ 401: "Not signed in", 403: "Coding is not available to this person" }) },
+});
+codingSessionsRoutes.openapi(tiersR, (c) => {
+  const person = c.get("person"); const refusal = codingSessionRefusal(person);
+  if (refusal) return c.json({ error: refusal }, 403);
+  return c.json(offeredCodingTiers(person), 200);
 });
 
 const getR = createRoute({

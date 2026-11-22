@@ -100,6 +100,9 @@ function buildFrom(person: PassPerson): Pass {
   const { listInstalledManifests, meetsMinRole } = pluginsModule();
   for (const manifest of listInstalledManifests()) {
     const action = `use:${manifest.id}`;
+    // CODE-APP-01: the bundled Code app is the package `code`, whose id equals the Coding feature's `use:code`. Its role floor must never open Coding,
+    // so the package adds nothing here; `use:code` comes only from the Coding rule below (the adult default, an allow, a deny that wins).
+    if (manifest.id === "code") continue;
     if (denied.has(action)) continue;
     if (meetsMinRole(person.role, manifest.min_role)) { access.add(action); continue; }
     // C7: an allow grant lifts an admin or owner `min_role` for a person in the adult band only (a permission ladder); it never lifts
