@@ -555,6 +555,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, parseBody, personText, DEFAULT_OUTPUT_TOKENS, shapeRequest |
 | `backend/src/lib/codingBridge.ts` | OUTPUT_KEEP, isSessionTainted, markSessionTainted, startTaint, pendingRequestsFor, answerHostRequest |
+| `backend/src/lib/codingChanges.ts` | parseChangeCounts, readChangeCounts |
 | `backend/src/lib/codingEvents.ts` | recordCodingEvent, listCodingEvents |
 | `backend/src/lib/codingGatewayAddress.ts` | DEFAULT_SANDBOX_GATEWAY_HOST, sandboxGatewayUrl |
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
