@@ -39,6 +39,7 @@ import { gateStream } from "@/lib/codeStream";
 import { sessionTierForKey } from "@/lib/codingSessions";
 import { CODER_MODEL_BY_TIER, tierForPersonalKey } from "@/lib/codeGatewayTier";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
+import { ensureSelfTest } from "@/lib/maxAutoSelfTest";
 import { ensureCodingPiecesFresh, missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { AppEnv } from "@/types";
 
@@ -78,7 +79,9 @@ const viaTransport = async (c: Context, next: () => Promise<void>) => {
 };
 const leaseLine = (refusal: string): string => refusal === "max_window" ? "Max coding is not available in this time window. Use maipai-coder, or try again later."
   : refusal === "not_a_holder" ? "Your access does not include Max coding. Use the model name maipai-coder, or ask an admin."
-  : "Max coding is busy with someone else's work right now. Use maipai-coder, or try again in a minute.";
+  : refusal === "stack_busy" ? "Max coding is busy with someone else's work right now. Use maipai-coder, or try again in a minute."
+  : refusal === "not_ready" ? "Max coding is not ready on this computer yet. An admin can finish its setup in Settings, Coding. Use maipai-coder meanwhile."
+  : "Home could not switch to the big model just now. Use maipai-coder, or try again in a minute.";
 const tooLarge = (c: Context) => refuse(c, 413, "This request is too large for the coding service. Start a new conversation or send less at once.", "request_too_large");
 
 function apiDoorOff(c: Context): Response | null {
@@ -168,8 +171,10 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
       if (!endStream) return answer(refuse(c, 429, "You already have as many coding requests running as your access allows. Wait for one to finish, then try again.", "too_many_streams", 5));
       if (!key.sessionId && sessionTier === "max") {
         const lease = getChatLease();
-        const held = await lease.acquire(person, { category: "coding" });
-        if (!held.ok) { letGo(); return answer(refuse(c, held.refusal === "not_a_holder" ? 403 : 429, leaseLine(held.refusal), "max_unavailable", 30)); }
+        let held = await lease.acquire(person, { category: "coding" });
+        // The only missing step may be the quick Max self-test: Home runs it, as the Max chat switch does, then asks once more.
+        if (!held.ok && held.refusal === "not_ready" && (await ensureSelfTest())) held = await lease.acquire(person, { category: "coding" });
+        if (!held.ok) { letGo(); return answer(refuse(c, held.refusal === "not_a_holder" ? 403 : held.refusal === "stack_busy" || held.refusal === "max_window" ? 429 : 503, leaseLine(held.refusal), "max_unavailable", 30)); }
         lease.requestStarted(person.id);
         endLease = () => lease.requestEnded(person.id);
       }

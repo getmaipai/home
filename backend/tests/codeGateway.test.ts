@@ -32,6 +32,8 @@ const PROMPT = "ZEBRA-PROMPT-7731 sort my list";
 let stack: StackFixture | null = null;
 let seen: Array<{ path: string; body: Record<string, unknown>; tier?: string | null }> = [];
 let codingMode: "normal" | "coding" = "normal";
+let selfTestPassed = true;
+let selfTestWorks = true;
 let engine: (path: string, body: Record<string, unknown>) => Response | Promise<Response> = defaultEngine;
 
 function person(role = "adult", displayName = "Willow"): PersonRow {
@@ -103,15 +105,16 @@ beforeEach(() => {
   __resetRateLimiterForTests();
   __resetCodeGateForTests(2);
   __setMissingCodingPieceForTests(null); // The fixture Stack answers only the coding wires; pieces are tested in stackCodingPieces.test.ts.
-  seen = []; engine = defaultEngine; codingMode = "normal";
+  seen = []; engine = defaultEngine; codingMode = "normal"; selfTestPassed = true; selfTestWorks = true;
   stack = startStackFixture({
     "*": async (req) => {
       const path = new URL(req.url).pathname;
       if (req.method === "GET" && path === "/v1/models") return Response.json({ object: "list", data: [{ id: "qwen-coder-27b", role: "coding", context_length: 131072, thinking_budget_ceiling: 2000 }] });
       if (path === "/stack/v1/roles") return Response.json({ roles: [{ id: "coding", label: "Coding", wire: "chat", residency: "swap", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-10-22T00:00:00Z" }, reason: null, model: null, check: { state: "passed", at: null, reason: null, stale: false } }] });
+      if (path === "/stack/v1/coding/mode/self-test") { if (selfTestWorks) selfTestPassed = true; return Response.json({ accepted: selfTestWorks }, { status: selfTestWorks ? 202 : 503 }); }
       if (path === "/stack/v1/coding/mode") {
         if (req.method === "POST") codingMode = ((await req.json()) as { mode: "normal" | "coding" }).mode;
-        return Response.json({ mode: codingMode, target: codingMode, state: "stable", reason: null, available: true, checks: { engine: true, pieces: true, hardware: true, memory: true, bench: true }, memory: { plan_bytes: 1, budget_bytes: 2 }, self_test: { passed_at: "2026-11-01T00:00:00.000Z", stale: false } });
+        return Response.json({ mode: codingMode, target: codingMode, state: "stable", reason: null, available: true, checks: { engine: true, pieces: true, hardware: true, memory: true, bench: true }, memory: { plan_bytes: 1, budget_bytes: 2 }, self_test: { passed_at: selfTestPassed ? "2026-11-01T00:00:00.000Z" : null, stale: false } });
       }
       const body = (await req.json()) as Record<string, unknown>;
       seen.push({ path, body, tier: req.headers.get("x-maipai-coding-tier") });
@@ -953,6 +956,22 @@ describe("a personal key picks its tier by the model name", () => {
     expect(res.status).toBe(429);
     expect(JSON.stringify(await res.json())).toContain("max_unavailable");
     expect(seen.length).toBe(before);
+  });
+
+  test("Max with the self-test never passed: Home runs it and the request goes through", async () => {
+    const { p, secret } = adultWithKey(); give(p, "tier.max:coding");
+    selfTestPassed = false;
+    expect((await ask(secret, "maipai-coder-max")).status).toBe(200);
+    expect(selfTestPassed).toBe(true);
+    expect(seen.at(-1)?.tier).toBe("max");
+  });
+
+  test("Max when the self-test cannot run says it is not ready, not that someone else is using it", async () => {
+    const { p, secret } = adultWithKey(); give(p, "tier.max:coding");
+    selfTestPassed = false; selfTestWorks = false;
+    const res = await ask(secret, "maipai-coder-max");
+    expect(res.status).toBe(503);
+    expect(JSON.stringify(await res.json())).toContain("not ready");
   });
 
   test("models lists the three names", async () => {
