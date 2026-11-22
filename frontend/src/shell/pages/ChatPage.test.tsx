@@ -2598,7 +2598,10 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
       await within(column()).findByText("Dinner ideas");
       const project = (await within(column()).findByText("Garden")).closest('[data-slot="aui_thread-list-project"]') as HTMLElement;
       expect(within(column()).getByLabelText("New project")).toBeTruthy();
-      expect(within(column()).queryByText("Raised beds")).toBeNull();
+      // Open by default (the row chevron is hidden by a token); the name folds and opens the chats.
+      expect(await within(column()).findByText("Raised beds")).toBeTruthy();
+      fireEvent.click(project.querySelector('[data-slot="aui_thread-list-project-trigger"]')!);
+      await waitFor(() => expect(within(column()).queryByText("Raised beds")).toBeNull());
       fireEvent.click(project.querySelector('[data-slot="aui_thread-list-project-trigger"]')!);
       expect(await within(column()).findByText("Raised beds")).toBeTruthy();
       void view;
@@ -2669,13 +2672,34 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
     try {
       renderAs();
       fireEvent.click(await within(column()).findByRole("button", { name: "New project" }));
-      const name = await within(column()).findByPlaceholderText("Project name");
+      const dialog = await within(document.body).findByRole("dialog");
+      const name = within(dialog).getByPlaceholderText("Project name");
       fireEvent.change(name, { target: { value: "Recipes" } });
-      fireEvent.keyDown(name, { key: "Enter" });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
       expect(await within(document.body).findByText("Project settings")).toBeTruthy();
       expect(within(document.body).getByRole("textbox", { name: "Project name" })).toHaveValue("Recipes");
     } finally {
       globalThis.fetch = original;
+    }
+  });
+
+  test("the sliders button browses all projects and a project with no chats says No chats", async () => {
+    const restore = stubProjects([{ id: "folder-garden1", name: "Garden" }], []);
+    try {
+      let path = "";
+      const Probe = () => { path = useLocation().pathname; return null; };
+      renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <Probe />
+          <ChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await within(column()).findByText("No chats")).toBeTruthy();
+      expect(within(column()).queryByText("See all projects")).toBeNull();
+      fireEvent.click(within(column()).getByLabelText("Browse all projects"));
+      await waitFor(() => expect(path).toBe("/chat/projects"));
+    } finally {
+      restore();
     }
   });
 
