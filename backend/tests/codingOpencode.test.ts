@@ -8,6 +8,9 @@ import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import type { ExecChunk, ExecInput, ExecSandbox } from "@/lib/codingSandbox";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { logsDir } from "@/lib/paths";
 import { input, owner, settled, startRig } from "./codingRig";
 
 let rig: ReturnType<typeof startRig>;
@@ -31,6 +34,15 @@ const deps = (sandbox: ExecSandbox, over: Partial<OpenCodeDeps> = {}): OpenCodeD
 function wire(sbx: ReturnType<typeof execSandbox>, over: Partial<OpenCodeDeps> = {}) {
   setCodingRuntime({ agent: createOpenCodeAgent(deps(sbx.sandbox, over)), sandbox: sbx.sandbox, lease: () => rig.lease });
 }
+/** The failure's reason code, which the log and the app tell apart (gateway_unreachable vs agent_exit). */
+async function failureReason(chunks: ExecChunk[], gateway?: { ensure(): Promise<boolean>; release(): void }): Promise<unknown> {
+  const sbx = execSandbox(() => play(chunks));
+  setCodingRuntime({ agent: createOpenCodeAgent(deps(sbx.sandbox)), sandbox: sbx.sandbox, lease: () => rig.lease, ...(gateway ? { gateway } : {}) });
+  const a = owner(); const s = createCodingSession(a, input({ mode: "auto_edit" }));
+  const t = submitTurn(a, s.id, "go"); await turnFinished(t.turn_id); await new Promise((r) => setTimeout(r, 50));
+  const log = readFileSync(join(logsDir, "hub.log"), "utf8").split("\n").filter((l) => l.includes("turn_failed") && l.includes(`session=${s.id}`));
+  return log.at(-1)?.match(/reason=(\w+)/)?.[1];
+}
 async function* play(chunks: ExecChunk[]) { for (const c of chunks) yield c; }
 
 describe("event mapping", () => {
@@ -48,6 +60,20 @@ describe("event mapping", () => {
     const c = JSON.parse(openCodeConfig({ gatewayUrl: "http://192.0.2.1:3000/code/v1", key: "k", tier: "boost", allowEdit: true, allowBash: false }));
     expect(c.provider.maipai.options).toMatchObject({ baseURL: "http://192.0.2.1:3000/code/v1", apiKey: "k", headers: { "x-maipai-coding-tier": "boost" } });
     expect(c.permission).toEqual({ edit: "allow", bash: "deny", webfetch: "deny" }); expect(c.autoupdate).toBe(false); expect(c.share).toBe("disabled");
+  });
+});
+
+describe("a failed turn says why", () => {
+  test("the agent exiting on its own is agent_exit; a refused or empty gateway connection is gateway_unreachable", async () => {
+    rig = startRig();
+    expect(await failureReason([{ stream: "stderr", text: "boom" }, { exit: 1 }])).toBe("agent_exit");
+    expect(await failureReason([{ stream: "stderr", text: "Error: connect ECONNREFUSED 192.168.128.1:3100" }, { exit: 1 }])).toBe("gateway_unreachable");
+    expect(await failureReason([{ stream: "stderr", text: "fetch failed" }, { exit: 1 }])).toBe("gateway_unreachable");
+  });
+  test("a turn whose gateway door will not open fails as gateway_unreachable before the agent runs, and the door is released after", async () => {
+    rig = startRig(); let released = 0;
+    expect(await failureReason([{ exit: 0 }], { ensure: async () => false, release: () => { released++; } })).toBe("gateway_unreachable");
+    expect(released).toBe(1);
   });
 });
 

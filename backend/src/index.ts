@@ -15,6 +15,7 @@ import { setProfileSource } from "@/lib/jobs/admissionFit";
 import { startStackHardwareRefresh } from "@/lib/jobs/stackHardware";
 import { startChatLease } from "@/lib/chatLeaseRuntime";
 import { startCodingRuntime } from "@/lib/codingRuntime";
+import { configureSandboxListener, stopSandboxListener } from "@/lib/codingSandboxListener";
 import { setQuietConfigSource } from "@/lib/jobs/householdQueue";
 import { wireQueuePolicy } from "@/lib/jobs/queuePolicy";
 import { profileSourceFromSettings } from "@/lib/jobs/profileSource";
@@ -470,6 +471,7 @@ let listeners = startHomeListeners({
 });
 
 instanceLock.setPort(listeners.port);
+configureSandboxListener(app.fetch as never); // Code sandboxes reach /code/v1 here, on the sandbox bridge only (lib/codingSandboxListener.ts)
 let servingTls = initialTls !== null;
 function printStartupUrls(): void {
   for (const url of startupUrls(listeners.port, servingTls)) {
@@ -567,6 +569,7 @@ if (wyomingPortSetting === "off") {
 }
 process.on("exit", () => wyomingServer?.stop());
 const exitGracefully = async (): Promise<void> => {
+  stopSandboxListener();
   wyomingServer?.stop();
   stopConfiguredEngineLink();
   await shutdownEngines();

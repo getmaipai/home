@@ -44,7 +44,13 @@ export interface CodingSandbox {
   /** CODE-AGENT-01: a snapshot of the workspace, taken before each turn so Undo has something to go back to. */
   snapshot?(input: { sessionId: string; label: string }): Promise<{ id: string; files: number }>;
 }
-export interface CodingRuntime { agent: CodingAgent; sandbox: CodingSandbox; lease: () => ChatLease }
+/** The sandbox's door to the coding gateway (lib/codingSandboxListener.ts): `ensure` binds it and says whether it is up; `release` lets it go when no turn runs. */
+export interface CodingGatewayDoor { ensure(): Promise<boolean>; release(): void }
+export interface CodingRuntime { agent: CodingAgent; sandbox: CodingSandbox; lease: () => ChatLease; gateway?: CodingGatewayDoor }
+/** A turn failure with a reason code the log and the app can tell apart. */
+export class CodingTurnError extends Error {
+  constructor(readonly reason: "gateway_unreachable" | "agent_exit") { super(reason); this.name = "CodingTurnError"; }
+}
 
 let runtime: CodingRuntime | null = null;
 /** Wires the agent, the sandbox and the Max lease. Until the real ones exist nothing calls this outside tests, so no turn can start in production. */
@@ -188,6 +194,7 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   };
   try {
     await rt.sandbox.start({ sessionId: turn.sessionId, environmentId });
+    if (rt.gateway && !(await rt.gateway.ensure())) throw new CodingTurnError("gateway_unreachable");
     if (rt.sandbox.snapshot && !turn.abort.signal.aborted) {
       // The checkpoint Undo goes back to. A failed snapshot never fails the turn; the person just has no checkpoint for this message (reason code in the log).
       try { const snap = await rt.sandbox.snapshot({ sessionId: turn.sessionId, label: "Before your message" }); addCheckpoint(turn.sessionId, { id: snap.id, label: "Before your message", files: snap.files }); log("checkpoint_taken", turn); }
@@ -217,6 +224,8 @@ const why = String((e as { reason?: unknown }).reason ?? (e as { name?: unknown 
     if (timer) clearTimeout(timer);
     // The kill switch may have stopped the sandbox while this turn was still starting it: stop it again so nothing is left running.
     if (turn.stopReason === "denied") void rt.sandbox.stop(turn.sessionId).catch(() => undefined);
+    // The sandbox listener lives only while a turn runs: the last one out lets it go.
+    if (rt.gateway && ![...turns.values()].some((t) => t.state === "running" && t !== turn)) rt.gateway.release();
   }
   if (turn.state === "done") {
     // CODE-NOTIFY-01: "finished its work" means nothing is left in the message queue; a person who typed ahead is not pinged between messages.

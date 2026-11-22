@@ -4,6 +4,7 @@ import { createStackSandbox } from "@/lib/codingSandbox";
 import { createOpenCodeAgent } from "@/lib/codingOpencode";
 import { setCodingRuntime, watchCodingKillSwitch } from "@/lib/codingTurns";
 import { notifyExpiringWorkspaces, settleSessionsAtStartup } from "@/lib/codingSessions";
+import { ensureSandboxListener, stopSandboxListener } from "@/lib/codingSandboxListener";
 import { getChatLease } from "@/lib/chatLeaseRuntime";
 import { getStackClient } from "@/lib/stackEngine";
 import { createSessionKey } from "@/lib/apiKeys";
@@ -31,6 +32,6 @@ export function startCodingRuntime(): void {
   setInterval(sweep, 60 * 60 * 1000).unref();
   const sandbox = createStackSandbox(() => getStackClient());
   const agent = createOpenCodeAgent({ sandbox, gatewayUrl, canMintKeys: () => true, sessionKey: async (who) => mintSessionKeyFor(who) });
-  setCodingRuntime({ agent, sandbox, lease: getChatLease });
+  setCodingRuntime({ agent, sandbox, lease: getChatLease, gateway: { ensure: ensureSandboxListener, release: stopSandboxListener } });
   watchCodingKillSwitch();
 }

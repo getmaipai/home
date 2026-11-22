@@ -9,7 +9,7 @@
 // "allow" turns that permission on and the run continues (`--continue`) at most MAX_ROUNDS times. So the person is asked about the command or file the agent
 // actually wanted, not about a whole turn. Auto edit asks the brake once up front (a command after outside content asks); plan never writes. Network fetches are
 // always off (the sandbox has no network and a new host is the person's click). Truly mid-run asks need OpenCode's server mode, which needs a port to the sandbox.
-import type { CodingAgent, CodingTurnResult } from "@/lib/codingTurns";
+import { CodingTurnError, type CodingAgent, type CodingTurnResult } from "@/lib/codingTurns";
 import type { AgentEvent, CodingHost } from "@/lib/codingBridge";
 import type { ExecSandbox } from "@/lib/codingSandbox";
 import { listCodingMessages } from "@/lib/codingTranscript";
@@ -74,6 +74,8 @@ export function mapOpenCodeEvent(raw: unknown): { events: AgentEvent[]; tokens?:
 }
 
 export const MAX_ROUNDS = 3;
+/** What OpenCode prints when it cannot reach the gateway at all (refused, reset, timed out, no route, an empty reply): a different fault from the agent itself failing. */
+const GATEWAY_DOWN = /ECONNREFUSED|ConnectionRefused|Unable to connect|ECONNRESET|socket connection was closed|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|fetch failed|empty reply|Cannot connect to API/i;
 const CONTINUE_MESSAGE = "You now have the permission you asked for. Continue the task.";
 
 export function createOpenCodeAgent(deps: OpenCodeDeps): CodingAgent {
@@ -97,7 +99,7 @@ export function createOpenCodeAgent(deps: OpenCodeDeps): CodingAgent {
         const blocked: BlockedAction[] = [];
         const argv = ["opencode", "run", "--format", "json", "--model", `maipai/${GATEWAY_MODEL}`, ...(hadEarlier || round > 0 ? ["--continue"] : []), round === 0 ? input.message : CONTINUE_MESSAGE];
         const env = { OPENCODE_CONFIG_CONTENT: openCodeConfig({ gatewayUrl: gateway, key, tier: input.tier, allowEdit: granted.edit, allowBash: granted.bash }) };
-        let buffer = ""; let exit: number | null = null;
+        let buffer = ""; let exit: number | null = null; let stderrTail = "";
         const feed = (line: string) => {
           if (!line.trim()) return;
           let parsed: unknown; try { parsed = JSON.parse(line); } catch { return; }
@@ -108,13 +110,13 @@ export function createOpenCodeAgent(deps: OpenCodeDeps): CodingAgent {
         };
         for await (const chunk of deps.sandbox.exec({ sessionId: input.sessionId, argv, cwd: "/workspace", env, signal })) {
           if ("exit" in chunk) { exit = chunk.exit; continue; }
-          if (chunk.stream !== "stdout") continue; // stderr can hold anything the tools print; it is not stored
+          if (chunk.stream !== "stdout") { stderrTail = (stderrTail + chunk.text).slice(-2000); continue; } // stderr can hold anything the tools print; it is only matched for a connection failure here, never stored or logged
           buffer += chunk.text;
           let at: number; while ((at = buffer.indexOf("\n")) >= 0) { feed(buffer.slice(0, at)); buffer = buffer.slice(at + 1); }
         }
         feed(buffer);
         if (signal.aborted) return {};
-        if (exit !== 0) throw new Error("agent_exit");
+        if (exit !== 0) throw new CodingTurnError(GATEWAY_DOWN.test(stderrTail) ? "gateway_unreachable" : "agent_exit");
         // Per-action asks: each distinct permission the agent was refused is put to the brake with the action it wanted; an allow turns it on for the next round.
         let newlyGranted = false;
         for (const effect of ["file_write", "command"] as const) {
