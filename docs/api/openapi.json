@@ -8396,6 +8396,485 @@
         }
       }
     },
+    "/api/settings/git-connections": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "List the signed-in person's git connections (never a token)",
+        "responses": {
+          "200": {
+            "description": "The person's git connections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "person_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "github",
+                              "gitea"
+                            ]
+                          },
+                          "host": {
+                            "type": "string"
+                          },
+                          "account": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "expired",
+                              "revoked",
+                              "failing"
+                            ]
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "provenance": {
+                            "type": "string"
+                          },
+                          "hlc": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "person_id",
+                          "kind",
+                          "host",
+                          "account",
+                          "status",
+                          "expires_at",
+                          "created_at",
+                          "provenance",
+                          "hlc"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "connections"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Connect GitHub or Gitea with an access token. The token is checked once, stored encrypted and never returned.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "github",
+                      "gitea"
+                    ]
+                  },
+                  "host": {
+                    "type": "string",
+                    "maxLength": 253
+                  },
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connection": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "person_id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "github",
+                            "gitea"
+                          ]
+                        },
+                        "host": {
+                          "type": "string"
+                        },
+                        "account": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "expired",
+                            "revoked",
+                            "failing"
+                          ]
+                        },
+                        "expires_at": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "provenance": {
+                          "type": "string"
+                        },
+                        "hlc": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "person_id",
+                        "kind",
+                        "host",
+                        "account",
+                        "status",
+                        "expires_at",
+                        "created_at",
+                        "provenance",
+                        "hlc"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "connection"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The details, the token or the person's access do not allow this connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/git-connections/{id}": {
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Revoke one of the signed-in person's git connections and wipe its token",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^gitc-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/git-connections/people/{personId}": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Admin read of a person's git connections: kind, status and dates only (no host, account or repository names)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "personId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person's connections, without names.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "person_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "github",
+                              "gitea"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "expired",
+                              "revoked",
+                              "failing"
+                            ]
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "person_id",
+                          "kind",
+                          "status",
+                          "created_at",
+                          "expires_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "connections"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/git-connections/people/{personId}/{id}": {
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Admin revoke of one git connection for a person",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "personId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^gitc-[a-z0-9]{6,}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person or connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/apps": {
       "get": {
         "tags": [
