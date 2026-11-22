@@ -7,6 +7,7 @@ import { stackMaxWindow } from "./stackWindow";
 import { waitedForRoomLine } from "../fitWording";
 import { fitForAdmission, resetFitHysteresisForTests, admissionFitAskLevels, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 import { isOwnerOrAdmin } from "@/lib/access";
+import type { LeaseQueueSignals } from "@/lib/tierLease/policy";
 import { chatMayGoReduced, MAX_NEEDS_REDUCED_OFF_LINE } from "@/lib/tiers";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
@@ -290,16 +291,16 @@ export function requestTier(request: unknown): "standard" | "boost" | "max" {
 }
 
 /** Counts a chat turn for the quiet window (turn time and in-flight count only) and undoes the in-flight count once, on the lease's own release. */
-let chatTurnObserver: { started: () => void; ended: () => void } | null = null;
+let chatTurnObserver: { started: (personId: string) => void; ended: (personId: string) => void } | null = null;
 /** TIER-HOME-05: the Max chat lease learns when a turn starts and ends, to guard a request in flight. */
-export function setChatTurnObserver(observer: { started: () => void; ended: () => void } | null): void { chatTurnObserver = observer; }
+export function setChatTurnObserver(observer: { started: (personId: string) => void; ended: (personId: string) => void } | null): void { chatTurnObserver = observer; }
 export function trackChatLease<T extends { release(): void }>(personId: string, lease: T, now = Date.now()): T {
   noteChatTurn(personId, now);
   noteChatInFlight(1);
-  try { chatTurnObserver?.started(); } catch { /* the observer is advisory */ }
+  try { chatTurnObserver?.started(personId); } catch { /* the observer is advisory */ }
   const release = lease.release.bind(lease);
   let counted = true;
-  lease.release = () => { if (counted) { counted = false; noteChatInFlight(-1); noteChatTurn(personId, Date.now()); try { chatTurnObserver?.ended(); } catch { /* advisory */ } } release(); };
+  lease.release = () => { if (counted) { counted = false; noteChatInFlight(-1); noteChatTurn(personId, Date.now()); try { chatTurnObserver?.ended(personId); } catch { /* advisory */ } } release(); };
   return lease;
 }
 
@@ -378,6 +379,21 @@ function scheduleDownshiftRecheck(): void {
 let chatLeaseSource: (() => boolean) | null = null;
 /** TIER-HOME-05: where the queue reads whether the Max chat lease is up (`chatLease.holdsGenerators`). Null clears it. */
 export function setChatLeaseSource(source: (() => boolean) | null): void { chatLeaseSource = source; }
+/** TIER-LEASE-01: what the queue says about the Max lease, as counts and kinds only (rule 6a: no person id leaves this function next to activity).
+ * `holderJobs`: jobs that own the lease (running or queued). `waiters`: queued Boost and Max jobs held back with `max_chat`. `heavyRunningElsewhere`:
+ * a Boost or Max job of someone other than `forPersonId` is running, so a take would have to preempt it. */
+export function leaseQueueSignals(forPersonId?: string): LeaseQueueSignals {
+  let holderJobs = 0;
+  const kinds = new Set<string>();
+  let waiting = 0;
+  let heavyRunningElsewhere = false;
+  for (const { job } of currentEntries) {
+    if (job.ownsChatLease && (job.state === "running" || job.state === "queued")) holderJobs += 1;
+    if (job.state === "queued" && job.riseReason === "max_chat") { waiting += 1; kinds.add(job.category ?? job.jobClass); }
+    if (job.state === "running" && (job.tier === "boost" || job.tier === "max") && !job.ownsChatLease && (forPersonId === undefined || job.personId !== forPersonId)) heavyRunningElsewhere = true;
+  }
+  return { holderJobs, waiters: { count: waiting, kinds: [...kinds].sort() }, heavyRunningElsewhere };
+}
 export function resetTierStateForTests(): void { tierState.windowOpenFor = null; tierState.startedSinceMax = []; tierState.lastMaxPersonId = null; }
 
 /** Updates only changed records. The caller supplies its own store writer. */

@@ -3,9 +3,15 @@
 // lease ends by itself when nothing is in flight. This file is the state machine only. The swap (unload residents, load the big model,
 // post-load check, rollback on failure) is injected, so the Stack's coding-mode transaction stays the one implementation. In-memory state,
 // no person text: the record holds a person id, times and a state.
+// TIER-LEASE-01: this file is the engine-swap driver. When to hold and when to release is decided by lib/tierLease/policy.ts (one policy for every
+// degrading tier); this file reads the household queue's signals, asks the policy, and does the swap.
 import { holdsMax, type TierCategory } from "@/lib/tiers";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdmin } from "@/lib/access";
+import {
+  decide, leaseKeyForCategory, LEASE_REGISTRY, mayRenew, mayTake, NO_QUEUE_SIGNALS, releasesInSeconds,
+  type LeaseDecision, type LeaseKey, type LeaseQueueSignals, type LeaseRegistry,
+} from "@/lib/tierLease/policy";
 
 export type LeaseState = "off" | "starting" | "held" | "releasing";
 export type LeaseRefusal = "not_a_holder" | "not_ready" | "swap_failed" | "stack_busy" | "max_window";
@@ -28,6 +34,8 @@ export interface LeaseDeps {
   /** A generator Max window is open: a lease request waits for it (the job's card says so). */
   windowOpen?: () => boolean;
   config?: LeaseConfig;
+  /** TIER-LEASE-01: what the household queue says about this lease (counts and kinds only). `forPersonId` leaves that person's own jobs out of "heavy running elsewhere". */
+  signals?: (forPersonId?: string) => LeaseQueueSignals;
 }
 
 export interface LeaseSnapshot {
@@ -38,6 +46,10 @@ export interface LeaseSnapshot {
   lastActivityAt: number | null;
   /** Seconds until the idle timer would release it, or null when no timer runs (not held, or a request is in flight). */
   releasesInSeconds: number | null;
+  /** TIER-LEASE-01: which lease key the holder took (chat or coding) and the signals the policy last saw; additive for the lease API (-03). */
+  key: LeaseKey;
+  waiters: { count: number; kinds: string[] };
+  holderJobs: number;
 }
 
 type Holder = Pick<PersonRow, "id" | "role">;
@@ -54,13 +66,22 @@ export function createChatLease(deps: LeaseDeps) {
   /** The swap back failed: the lease reads as off, but the Stack may still hold the big model, so the next ticks keep asking it to return. */
   let pendingReturn = false;
 
-  const limitMs = () => (pinned ? config.pinCapMs : config.idleMs);
+  let key: LeaseKey = "chat";
+  /** An explicit config (tests, a later setting) bounds both keys; otherwise each key uses its own registry entry. */
+  const registry: LeaseRegistry = deps.config
+    ? { chat: { graceMs: config.idleMs, pinCapMs: config.pinCapMs }, coding: { graceMs: config.idleMs, pinCapMs: config.pinCapMs } }
+    : { chat: { graceMs: DEFAULT_LEASE.idleMs, pinCapMs: DEFAULT_LEASE.pinCapMs }, coding: LEASE_REGISTRY.coding };
+  const queueSignals = (forPersonId?: string): LeaseQueueSignals => { try { return deps.signals?.(forPersonId) ?? NO_QUEUE_SIGNALS; } catch { return NO_QUEUE_SIGNALS; } };
+  const facts = () => ({ now: deps.now(), lastEngagedAt: lastActivityAt, inFlight, pinned, signals: queueSignals() });
+  /** What the policy says about the lease right now. Only meaningful while held. */
+  const decision = (): LeaseDecision => decide(key, facts(), registry);
 
   function snapshot(): LeaseSnapshot {
-    const timer = state === "held" && inFlight === 0 && lastActivityAt !== null;
+    const f = facts();
     return {
       state, holderId, pinned, inFlight, lastActivityAt,
-      releasesInSeconds: timer ? Math.max(0, Math.ceil((lastActivityAt! + limitMs() - deps.now()) / 1000)) : null,
+      releasesInSeconds: state === "held" ? releasesInSeconds(key, f, registry) : null,
+      key, waiters: f.signals.waiters, holderJobs: f.signals.holderJobs,
     };
   }
 
@@ -73,12 +94,15 @@ export function createChatLease(deps: LeaseDeps) {
     if (person.role === "teen" || !holdsMax(person, opts.category ?? "chat")) return { ok: false, refusal: "not_a_holder" };
     if (state === "held" && holderId === person.id) {
       lastActivityAt = deps.now();
+      key = leaseKeyForCategory(opts.category);
       if (opts.pinned && isOwnerOrAdmin(person)) pinned = true;
       return { ok: true, state: "held" };
     }
     if (deps.windowOpen?.()) return { ok: false, refusal: "max_window" };
     if (transition) return { ok: false, refusal: "stack_busy" };
     if (state !== "off" || pendingReturn) return { ok: false, refusal: "stack_busy" };
+    // Every take is a queue job and never preempts: another person's heavy job that is running keeps the machine until it ends.
+    if (!mayTake(queueSignals(person.id))) return { ok: false, refusal: "stack_busy" };
     if (!(await deps.ready())) return { ok: false, refusal: "not_ready" };
     state = "starting";
     const run = deps.swapToBig();
@@ -93,16 +117,24 @@ export function createChatLease(deps: LeaseDeps) {
     transition = null;
     state = "held";
     holderId = person.id;
+    key = leaseKeyForCategory(opts.category);
     pinned = !!opts.pinned && isOwnerOrAdmin(person);
     lastActivityAt = deps.now();
     return { ok: true, state: "held" };
   }
 
   /** A request on the big model started. While any is in flight the lease cannot end, however long the idle timer says (T7 a). */
-  function requestStarted(): void { inFlight += 1; lastActivityAt = deps.now(); }
+  /** TIER-LEASE-01: only the holder renews the lease. A request by someone else still counts as in flight (it is never cut off) but does not restart the idle timer; no person named is the driver's own call. */
+  function requestStarted(byPersonId?: string): void { inFlight += 1; if (mayRenew(holderId, byPersonId)) lastActivityAt = deps.now(); }
   /** A token arrived: the idle timer counts from the last token (T7 c). */
-  function noteToken(): void { lastActivityAt = deps.now(); }
-  function requestEnded(): void { inFlight = Math.max(0, inFlight - 1); lastActivityAt = deps.now(); }
+  function noteToken(byPersonId?: string): void { if (mayRenew(holderId, byPersonId)) lastActivityAt = deps.now(); }
+  function requestEnded(byPersonId?: string): void { inFlight = Math.max(0, inFlight - 1); if (mayRenew(holderId, byPersonId)) lastActivityAt = deps.now(); }
+  /** TIER-LEASE-01: the holder acted (a key, an attachment, a submit). Renews the grace; false when this person does not hold the lease. Seam for `POST /api/tier-leases/:key/touch` (-03). */
+  function touch(personId: string): boolean {
+    if (state !== "held" || holderId !== personId) return false;
+    lastActivityAt = deps.now();
+    return true;
+  }
 
   async function release(): Promise<void> {
     if (state !== "held" || inFlight > 0) return;
@@ -127,7 +159,7 @@ export function createChatLease(deps: LeaseDeps) {
       return false;
     }
     if (state !== "held" || inFlight > 0 || lastActivityAt === null) return false;
-    if (deps.now() - lastActivityAt < limitMs()) return false;
+    if (decision().action !== "release") return false;
     await release();
     return true;
   }
@@ -142,7 +174,7 @@ export function createChatLease(deps: LeaseDeps) {
     lastActivityAt = null;
   }
 
-  return { acquire, release, tick, evicted, requestStarted, noteToken, requestEnded, snapshot, holdsGenerators };
+  return { acquire, release, tick, touch, decision, evicted, requestStarted, noteToken, requestEnded, snapshot, holdsGenerators };
 }
 
 export type ChatLease = ReturnType<typeof createChatLease>;

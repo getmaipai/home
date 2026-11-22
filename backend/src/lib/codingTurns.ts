@@ -131,7 +131,7 @@ function settle(turn: Turn, state: TurnState): void {
   turn.state = state;
   // The turn's session key ends with the turn, whatever the outcome.
   revokeSessionKeys(turn.sessionId);
-  if (turn.leaseHeld) { turn.leaseHeld = false; try { runtime?.lease().requestEnded(); } catch { /* the lease's own idle timer ends it */ } }
+  if (turn.leaseHeld) { turn.leaseHeld = false; try { runtime?.lease().requestEnded(turn.personId); } catch { /* the lease's own idle timer ends it */ } }
   turn.finish();
 }
 
@@ -160,7 +160,7 @@ async function startTurn(turn: Turn): Promise<void> {
     const lease = runtime.lease();
     const got = await lease.acquire(person, { category: "coding" });
     if (!got.ok) { turn.leaseRefusal = got.refusal; turn.leaseReason = reasonForRefusal(got.refusal); log("lease_refused", turn, `reason=${got.refusal}`); scheduleRetry(); return; }
-    lease.requestStarted(); turn.leaseHeld = true;
+    lease.requestStarted(person.id); turn.leaseHeld = true;
   }
   if (turn.state !== "queued") { settle(turn, turn.state); return; } // stopped while the lease was loading
   turn.state = "running";
@@ -292,6 +292,8 @@ export function submitTurn(person: PersonRow, sessionId: string, message: string
   startTaint(sessionId, (session.repo as { kind?: string }).kind ?? "none");
   appendCodingMessage({ sessionId, personId: person.id, role: "user", parts: [{ type: "text", text: message }] });
   updateSession(sessionId, { state: "queued", lastActivityAt: new Date().toISOString() });
+  // TIER-LEASE-01: sending is the holder acting, so a Max lease this person holds restarts its grace at submit. The take itself is the queue job (`startTurn`).
+  if (turn.tier === "max") { try { runtime.lease().touch(person.id); } catch { /* the lease is advisory here */ } }
   log("turn_queued", turn, `tier=${turn.tier}`);
   refreshHouseholdQueue();
   return { turn_id: turn.id, tier: turn.tier };

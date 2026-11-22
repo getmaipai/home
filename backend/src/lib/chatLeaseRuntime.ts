@@ -4,7 +4,7 @@ import { recordTransition } from "@/lib/chatTransitions";
 import { createChatLease, registerActiveChatLease, type ChatLease } from "@/lib/chatLease";
 import { codingModeReadiness } from "@/lib/codingMode";
 import { getStackClient } from "@/lib/stackEngine";
-import { openMaxWindow, setChatLeaseSource, setChatTurnObserver } from "@/lib/jobs/householdQueue";
+import { leaseQueueSignals, openMaxWindow, setChatLeaseSource, setChatTurnObserver } from "@/lib/jobs/householdQueue";
 
 let lease: ChatLease | null = null;
 let clock: () => number = Date.now;
@@ -14,6 +14,7 @@ export function getChatLease(): ChatLease {
   lease ??= createChatLease({
     now: () => clock(),
     windowOpen: () => openMaxWindow() !== null,
+    signals: (forPersonId) => leaseQueueSignals(forPersonId),
     ready: async () => (await codingModeReadiness()).ready,
     swapToBig: async () => {
       const started = Date.now();
@@ -26,14 +27,15 @@ export function getChatLease(): ChatLease {
   return lease;
 }
 
-/** Startup: the queue reads the lease, and a 15 second timer releases an idle one between requests. */
+/** Startup: the queue reads the lease, and a 5 second timer releases an idle one between requests. */
 export function startChatLease(): void {
   registerActiveChatLease(getChatLease());
   setChatLeaseSource(() => getChatLease().holdsGenerators());
   // While the lease is up every chat turn answers on the big model: a turn in flight keeps the lease, and its end restarts the idle timer.
   setChatTurnObserver({
-    started: () => { if (getChatLease().snapshot().state === "held") getChatLease().requestStarted(); },
-    ended: () => { if (getChatLease().snapshot().state === "held") getChatLease().requestEnded(); },
+    // Only the holder's turns renew the grace; another person's turn on the big model still counts as in flight and is never cut off.
+    started: (personId) => { if (getChatLease().snapshot().state === "held") getChatLease().requestStarted(personId); },
+    ended: (personId) => { if (getChatLease().snapshot().state === "held") getChatLease().requestEnded(personId); },
   });
-  setInterval(() => { void getChatLease().tick().catch(() => { /* the next tick retries */ }); }, 15_000).unref();
+  setInterval(() => { void getChatLease().tick().catch(() => { /* the next tick retries */ }); }, 5_000).unref();
 }
