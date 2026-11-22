@@ -3939,8 +3939,8 @@ msgid "setting.resources.close_apps.no_reopen.label"
 msgstr "Apps que dejar cerradas"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:221
-#: src/apps/chat/chatHeaderBar.tsx:310
+#: src/apps/chat/chatHeaderBar.tsx:226
+#: src/apps/chat/chatHeaderBar.tsx:315
 #: src/apps/code/SessionRow.tsx:90
 #, needs-review
 msgid "Archive"
@@ -5764,7 +5764,7 @@ msgid "setting.resources.preset.option_label.chat_first"
 msgstr "Chat primero"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:218
+#: src/apps/chat/chatHeaderBar.tsx:223
 #, needs-review
 msgid "Chat history"
 msgstr "Historial del chat"
@@ -7652,8 +7652,8 @@ msgid "Conversation"
 msgstr "Conversación"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:215
-#: src/apps/chat/chatHeaderBar.tsx:288
+#: src/apps/chat/chatHeaderBar.tsx:220
+#: src/apps/chat/chatHeaderBar.tsx:293
 #, needs-review
 msgid "Conversation actions"
 msgstr "Acciones de la conversación"
@@ -7957,8 +7957,8 @@ msgid "Could not delete that command."
 msgstr "No se pudo eliminar ese comando."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatProjects.tsx:96
-#: src/apps/chat/chatProjects.tsx:154
+#: src/apps/chat/chatProjects.tsx:90
+#: src/apps/chat/chatProjects.tsx:172
 #: src/shell/pages/ChatPage.tsx:1267
 #: src/shell/pages/ProjectsPage.tsx:127
 #, needs-review
@@ -8479,7 +8479,7 @@ msgid "Could not make a copy. Check your connection and try again."
 msgstr "No se pudo hacer una copia. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatProjects.tsx:82
+#: src/apps/chat/chatProjects.tsx:138
 #: src/shell/pages/ProjectsPage.tsx:107
 #, needs-review
 msgid "Could not make that project. Try again."
@@ -8752,7 +8752,7 @@ msgid "Could not save that change. Check your connection and try again."
 msgstr "No se pudo guardar ese cambio. Revisa tu conexión e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatProjects.tsx:143
+#: src/apps/chat/chatProjects.tsx:161
 #: src/shell/pages/ProjectsPage.tsx:117
 #, needs-review
 msgid "Could not save that project. Try again."
@@ -9002,7 +9002,7 @@ msgid "Could not update reminders."
 msgstr "No se pudieron actualizar los recordatorios."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatProjects.tsx:107
+#: src/apps/chat/chatProjects.tsx:101
 #: src/shell/pages/ChatPage.tsx:1248
 #: src/shell/pages/ChatPage.tsx:1258
 #: src/shell/pages/ProjectsPage.tsx:192
@@ -9120,7 +9120,7 @@ msgid "area.Create a command"
 msgstr "Crear un comando"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:171
+#: src/apps/chat/chatHeaderBar.tsx:172
 #, needs-review
 msgid "Create a companion"
 msgstr "Crear una compañía"
@@ -9681,8 +9681,8 @@ msgid "setting.weather.unit.option.fahrenheit"
 msgstr "Grados Fahrenheit, como 72 F."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:222
-#: src/apps/chat/chatHeaderBar.tsx:313
+#: src/apps/chat/chatHeaderBar.tsx:227
+#: src/apps/chat/chatHeaderBar.tsx:318
 #: src/apps/clock/AlarmEditor.tsx:115
 #: src/apps/clock/TimersTab.tsx:165
 #: src/apps/code/SessionRow.tsx:92
@@ -18631,7 +18631,7 @@ msgid "area.Manage"
 msgstr "Gestionar"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:171
+#: src/apps/chat/chatHeaderBar.tsx:172
 #, needs-review
 msgid "Manage companions"
 msgstr "Gestionar compañías"
@@ -19640,6 +19640,11 @@ msgid "Name the album and say how it sounds. Home adds the cover and the songs i
 msgstr "Nombra el álbum y di cómo suena. Home añade la portada y las canciones en el chat."
 
 #. js-lingui-explicit-id
+#: src/apps/chat/chatProjects.tsx:144
+msgid "Name the project and set its icon and instructions."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/musicCreateForm.ts:165
 msgid "Name your album to start."
 msgstr ""
@@ -19998,6 +20003,11 @@ msgstr "Nueva contraseña"
 #, needs-review
 msgid "New PIN"
 msgstr "Nuevo PIN"
+
+#. js-lingui-explicit-id
+#: src/apps/chat/chatProjects.tsx:143
+msgid "New project"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/code/CodePage.tsx:57
@@ -24452,8 +24462,8 @@ msgid "Read diagnostics only"
 msgstr "Solo leer diagnósticos"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:223
-#: src/apps/chat/chatHeaderBar.tsx:321
+#: src/apps/chat/chatHeaderBar.tsx:228
+#: src/apps/chat/chatHeaderBar.tsx:326
 #: src/shell/AmbientCompanionPane.tsx:338
 #: src/shell/AmbientCompanionPane.tsx:338
 #, needs-review
@@ -25024,9 +25034,9 @@ msgid "Removing…"
 msgstr "Eliminando…"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:219
-#: src/apps/chat/chatHeaderBar.tsx:251
-#: src/apps/chat/chatHeaderBar.tsx:301
+#: src/apps/chat/chatHeaderBar.tsx:224
+#: src/apps/chat/chatHeaderBar.tsx:256
+#: src/apps/chat/chatHeaderBar.tsx:306
 #: src/apps/clock/TimersTab.tsx:164
 #: src/apps/code/SessionRow.tsx:86
 #: src/apps/reminders/ListMenu.tsx:36
@@ -25046,7 +25056,7 @@ msgid "Rename {value}"
 msgstr "Cambiar nombre de {value}"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatHeaderBar.tsx:134
+#: src/apps/chat/chatHeaderBar.tsx:135
 #, needs-review
 msgid "Rename conversation"
 msgstr "Renombrar conversación"
