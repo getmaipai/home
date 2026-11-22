@@ -564,7 +564,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingPullRequest.ts` | __setPullRequestDepsForTests, createCodingPullRequest |
 | `backend/src/lib/codingRedact.ts` | REDACTED, redactCredentials, redactDeep |
 | `backend/src/lib/codingRuntime.ts` | mintSessionKeyFor, startCodingRuntime |
-| `backend/src/lib/codingSandbox.ts` | SandboxClientError, sandboxIdOf, createStackSandbox |
+| `backend/src/lib/codingSandbox.ts` | SandboxClientError, gatewayPortBody, sandboxIdOf, createStackSandbox |
 | `backend/src/lib/codingSessions.ts` | TRASH_DAYS, CodingSessionError, CreateCodingSessionInput, codingSessionRefusal, requireCodingAccess, getSessionRow |
 | `backend/src/lib/codingShare.ts` | setSecretScanner, __setWorkspaceRootForTests, codingWorkspace, __setShareRemoteForTests, checkSecretsBeforeShare, pushCodingSession |
 | `backend/src/lib/codingTranscript.ts` | appendCodingMessage, replaceCodingMessageParts, listCodingMessages |
