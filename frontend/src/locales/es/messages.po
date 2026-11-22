@@ -2451,6 +2451,16 @@ msgid "Add a robot"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:41
+msgid "Add a small feature"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:41
+msgid "Add a small feature: "
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:119
 #: src/apps/settings/StackChanInstallDialog.tsx:123
 #, needs-review
@@ -4019,7 +4029,7 @@ msgid "Ask anything"
 msgstr "Pregunta lo que quieras"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:140
+#: src/apps/code/CodeThread.tsx:116
 msgid "Ask before changes"
 msgstr ""
 
@@ -4203,7 +4213,7 @@ msgid "setting.coding.engine.option_label.auto"
 msgstr "Auto"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:141
+#: src/apps/code/CodeThread.tsx:117
 msgid "Auto edit"
 msgstr ""
 
@@ -8878,7 +8888,7 @@ msgid "Could not start the camera"
 msgstr "No se pudo iniciar la cámara"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:58
+#: src/apps/code/NewSession.tsx:83
 msgid "Could not start the session. Try again."
 msgstr ""
 
@@ -9842,12 +9852,7 @@ msgid "Describe the sound you want, like a door creaking or rain on a tin roof."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:65
-msgid "Describe the task"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:65
+#: src/apps/code/NewSession.tsx:120
 msgid "Describe the task, for example: fix the failing test in the thermostat code."
 msgstr ""
 
@@ -11283,6 +11288,11 @@ msgid "setting.topics.teen.risk.option_label.informative"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:40
+msgid "Explain this code"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1737
 #, needs-review
 msgid "setting.topics.risk.option.gentle"
@@ -11545,7 +11555,7 @@ msgid "Files"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:132
+#: src/apps/code/CodeThread.tsx:145
 msgid "Files I added:"
 msgstr ""
 
@@ -11668,6 +11678,11 @@ msgid "setting.radio.directory.enabled.label"
 msgstr "Buscar estaciones de radio en línea"
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:39
+msgid "Find the failing test, work out why it fails, and fix it."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/WikipediaPage.tsx:65
 #, needs-review
 msgid "Finding articles…"
@@ -11768,6 +11783,11 @@ msgstr "Las primeras visitas pueden abrir una guía, y Ayuda mantiene disponible
 #, needs-review
 msgid "Fix"
 msgstr "Corregir"
+
+#. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:39
+msgid "Fix a failing test"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:91
@@ -16662,8 +16682,7 @@ msgid "setting.coding.api.away.does"
 msgstr "Permite que tu clave se conecte a través de tu Tailscale cuando estás fuera."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:137
-#: src/apps/code/NewSession.tsx:75
+#: src/apps/code/CodeThread.tsx:120
 #: src/apps/code/SessionView.tsx:106
 #: src/shell/library/LibraryViewer.tsx:164
 msgid "Level"
@@ -17920,7 +17939,7 @@ msgid "setting.talent.life.enabled.does_teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:71
+#: src/apps/code/NewSession.tsx:105
 msgid "main"
 msgstr ""
 
@@ -18824,7 +18843,7 @@ msgid "setting.chat.paused_message.label"
 msgstr "Mensaje mostrado mientras el chat está pausado"
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:138
+#: src/apps/code/CodeThread.tsx:114
 msgid "Message the agent. Type @ to point at a file."
 msgstr ""
 
@@ -20437,7 +20456,7 @@ msgid "No replies timed yet."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:68
+#: src/apps/code/NewSession.tsx:102
 msgid "No repository"
 msgstr ""
 
@@ -22448,7 +22467,7 @@ msgid "Owner"
 msgstr "Propietario"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:70
+#: src/apps/code/NewSession.tsx:104
 msgid "owner/name"
 msgstr ""
 
@@ -23490,7 +23509,7 @@ msgid "Plain-language health and medicine pages from the US National Library of 
 msgstr "Páginas de salud y medicina en lenguaje claro de la Biblioteca Nacional de Medicina de EE. UU."
 
 #. js-lingui-explicit-id
-#: src/apps/code/CodeThread.tsx:142
+#: src/apps/code/CodeThread.tsx:118
 #: src/apps/code/SessionTabs.tsx:78
 #: src/apps/code/SessionView.tsx:91
 msgid "Plan"
@@ -25085,12 +25104,12 @@ msgstr "Tiempo de respuesta por día"
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:135
-#: src/apps/code/NewSession.tsx:67
+#: src/apps/code/NewSession.tsx:101
 msgid "Repository"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:70
+#: src/apps/code/NewSession.tsx:104
 msgid "Repository name, for example owner/name"
 msgstr ""
 
@@ -29081,11 +29100,6 @@ msgid "Start over"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:76
-msgid "Start session"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:16
 #, needs-review
 msgid "api.error.totp_restart_sign_in"
@@ -29171,7 +29185,7 @@ msgid "Starting {title}…"
 msgstr "Iniciando {title}…"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:71
+#: src/apps/code/NewSession.tsx:105
 msgid "Starting branch"
 msgstr ""
 
@@ -30338,7 +30352,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/apps/clock/AlarmsTab.tsx:72
 #: src/apps/clock/WorldClocksTab.tsx:168
 #: src/apps/code/CodeThread.tsx:103
-#: src/apps/code/NewSession.tsx:78
+#: src/apps/code/NewSession.tsx:32
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
 #: src/apps/notifications/NotificationsPage.tsx:114
@@ -33655,6 +33669,11 @@ msgid "Type it again"
 msgstr "Escríbelo otra vez"
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:73
+msgid "Type the repository as owner/name, for example willow/thermostat, then send again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:129
 #, needs-review
 msgid "Type what the voice should say."
@@ -35027,6 +35046,11 @@ msgid "area.Wake word"
 msgstr "Palabra de activación"
 
 #. js-lingui-explicit-id
+#: src/apps/code/NewSession.tsx:40
+msgid "Walk me through how this project is laid out and where to start."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleConfirm.tsx:100
 #: src/apps/settings/styles/StyleEditor.tsx:166
 #, needs-review
@@ -35316,8 +35340,8 @@ msgid "What should it sound like?"
 msgstr "¿Cómo debe sonar?"
 
 #. js-lingui-explicit-id
-#: src/apps/code/NewSession.tsx:64
-msgid "What should we work on?"
+#: src/apps/code/NewSession.tsx:112
+msgid "What should we build?"
 msgstr ""
 
 #. js-lingui-explicit-id
