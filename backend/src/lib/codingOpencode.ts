@@ -32,9 +32,11 @@ export interface OpenCodeDeps {
 export function openCodeConfig(input: { gatewayUrl: string; key: string; tier: Tier; allowEdit: boolean; allowBash: boolean }): string {
   return JSON.stringify({
     $schema: "https://opencode.ai/config.json",
-    autoupdate: false, share: "disabled",
+    autoupdate: false, share: "disabled", small_model: `maipai/${GATEWAY_MODEL}`,
     model: `maipai/${GATEWAY_MODEL}`,
     provider: { maipai: { npm: "@ai-sdk/openai-compatible", name: "MaiPai", options: { baseURL: input.gatewayUrl, apiKey: input.key, headers: { "x-maipai-coding-tier": input.tier } }, models: { [GATEWAY_MODEL]: { name: "Coding" } } } },
+    // No separate title request: on one model slot it would run a whole extra completion ahead of the answer; the app titles sessions itself. No model-list fetch either (no network in the sandbox).
+    agent: { title: { disable: true } },
     permission: { edit: input.allowEdit ? "allow" : "deny", bash: input.allowBash ? "allow" : "deny", webfetch: "deny" },
   });
 }

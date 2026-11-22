@@ -109,11 +109,16 @@ export function stageOf(state: CodeState, waitingLine: string | null | undefined
   if (state === "queued") return waitingLine ?? i18n._({ id: "Waiting in line", message: "Waiting in line" });
   if (state === "starting") return i18n._({ id: "Starting the sandbox", message: "Starting the sandbox" });
   if (state === "needs_you") return i18n._({ id: "Waiting for your answer", message: "Waiting for your answer" });
-  const last = [...messages].reverse().find((m) => m.role === "agent");
+  // Only what the agent has done since the person's latest message counts.
+  const lastUser = messages.map((m) => m.role).lastIndexOf("user");
+  const last = [...messages.slice(lastUser + 1)].reverse().find((m) => m.role === "agent");
   const part = last?.parts[last.parts.length - 1];
   if (part?.type === "tool" && part.tool === "command") return i18n._({ id: "Running a command", message: "Running a command" });
   if (part?.type === "tool" && part.tool === "file_write") return i18n._({ id: "Writing a file", message: "Writing a file" });
   if (part?.type === "tool" && part.tool === "read") return i18n._({ id: "Reading the code", message: "Reading the code" });
+  if (part?.type === "text") return i18n._({ id: "Writing the answer", message: "Writing the answer" });
+  // Nothing from the agent yet: the workspace is ready and the model has not said a word.
+  if (!last || !part) return i18n._({ id: "Waiting for the model's first words", message: "Waiting for the model's first words" });
   return i18n._({ id: "Thinking", message: "Thinking" });
 }
 

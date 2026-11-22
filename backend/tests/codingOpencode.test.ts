@@ -63,6 +63,14 @@ describe("event mapping", () => {
   });
 });
 
+describe("the OpenCode config", () => {
+  test("no separate title request, and the permissions are unchanged", () => {
+    const cfg = JSON.parse(openCodeConfig({ gatewayUrl: "http://192.0.2.1:3100/code/v1", key: "k", tier: "standard", allowEdit: false, allowBash: false }));
+    expect(cfg.agent.title.disable).toBe(true);
+    expect(cfg.permission).toEqual({ edit: "deny", bash: "deny", webfetch: "deny" });
+  });
+});
+
 describe("a failed turn says why", () => {
   test("the agent exiting on its own is agent_exit; a refused or empty gateway connection is gateway_unreachable", async () => {
     rig = startRig();
@@ -142,7 +150,7 @@ describe("a turn through the driver", () => {
     const a = owner(); const s = createCodingSession(a, input({ mode: "auto_edit" }));
     const t = submitTurn(a, s.id, "x"); await turnFinished(t.turn_id);
     expect(turnState(t.turn_id)).toBe("failed"); expect(getCodingSession(a, s.id)!.state).toBe("failed");
-    expect(listCodingMessages(a.id, s.id).at(-1)!.parts[0]).toEqual({ type: "stopped", reason: "error" });
+    expect(listCodingMessages(a.id, s.id).at(-1)!.parts[0]).toEqual({ type: "stopped", reason: "error", code: "agent_exit" });
   });
   test("Stop kills the exec and the wall-clock budget does the same", async () => {
     rig = startRig(); let ended = 0;

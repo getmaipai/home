@@ -89,7 +89,7 @@ describe("the Code app page", () => {
     sessionState = "working";
     open("/apps/code/csess-abc123");
     await waitFor(() => expect(document.querySelector('[data-slot="thinking-indicator"]')).toBeTruthy());
-    expect(document.querySelector('[data-slot="thinking-indicator"]')!.textContent).toContain("Thinking");
+    expect(document.querySelector('[data-slot="thinking-indicator"]')!.textContent).toContain("Waiting for the model");
     expect(document.querySelector('button[aria-label="Stop generating"]')).toBeTruthy();
   });
   test("a failed session shows why, from the reason and the ready check, in plain words", async () => {

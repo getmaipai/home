@@ -2,7 +2,7 @@
 // the brake's own ask, Stop and the wall-clock budget end the turn with a stopped-run, and messages typed meanwhile wait in the session's queue.
 import { afterEach, describe, expect, test } from "bun:test";
 import { addCheckpoint, createCodingSession, getCodingSession } from "@/lib/codingSessions";
-import { __setBudgetMsForTests, cancelQueuedMessage, queuedMessageIds, sendMessage, stopCodingSession, submitTurn, turnFinished, turnState, undoToCheckpoint } from "@/lib/codingTurns";
+import { warmCodingSession, __setBudgetMsForTests, cancelQueuedMessage, queuedMessageIds, sendMessage, stopCodingSession, submitTurn, turnFinished, turnState, undoToCheckpoint } from "@/lib/codingTurns";
 import { answerHostRequest, isSessionTainted, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents, recordCodingEvent } from "@/lib/codingEvents";
@@ -153,6 +153,14 @@ describe("Stop, the wall-clock budget and the message queue", () => {
     expect(rig.agent.calls.map((c) => c.message)).toEqual(["one", "three"]); // "two" was taken back
     rig.agent.finishAll(); await settled();
     expect(queuedMessageIds(a, s.id)).toEqual([]);
+  });
+  test("warming starts the sandbox once, shared with a turn that follows, and says false when it cannot", async () => {
+    rig = startRig(); const a = owner(); const s = createCodingSession(a, input());
+    const warm = warmCodingSession(a, s.id); const t = submitTurn(a, s.id, "hello"); // typed while the warm-up is still running
+    expect(await warm).toBe(true); await settled();
+    expect(rig.sandbox.events.filter((e) => e.startsWith("start:"))).toHaveLength(1);
+    rig.agent.finishAll(); await turnFinished(t.turn_id);
+    expect(await warmCodingSession(a, "csess-nothere0")).toBe(false);
   });
   test("Undo recomputes the Changes count from the sandbox after the restore", async () => {
     rig = startRig(); const a = owner(); const s = createCodingSession(a, input());

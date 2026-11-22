@@ -49,7 +49,11 @@ test("the live line says what the agent is doing, and the header never shows a r
   expect(stageOf("queued", null, [])).toBe("Waiting in line");
   expect(stageOf("queued", "Waiting for Max. 2 ahead of you.", [])).toContain("Max");
   expect(stageOf("starting", null, [])).toBe("Starting the sandbox");
-  expect(stageOf("working", null, [])).toBe("Thinking");
+  expect(stageOf("working", null, [])).toBe("Waiting for the model's first words");
+  const user = { id: "u", seq: 1, role: "user" as const, parts: [{ type: "text" as const, text: "hi" }], created_at: "" };
+  const said = { id: "a", seq: 2, role: "agent" as const, parts: [{ type: "text" as const, text: "Hello" }], created_at: "" };
+  expect(stageOf("working", null, [user, said])).toBe("Writing the answer");
+  expect(stageOf("working", null, [user, said, { ...user, id: "u2", seq: 3 }])).toBe("Waiting for the model's first words"); // an earlier turn's answer does not count
   expect(stageOf("working", null, [msg(1, [{ type: "tool", tool: "command", status: "running", summary: "ls" }])])).toBe("Running a command");
   expect(stageOf("working", null, [msg(1, [{ type: "tool", tool: "file_write", status: "done", summary: "a.ts" }])])).toBe("Writing a file");
   expect(repoLine({ kind: "none", work_branch: "maipai/x-abc" })).toBe("Scratch folder");

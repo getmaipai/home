@@ -53,6 +53,8 @@ export function SessionView({ id }: { id: string }) {
   const stoppedCode = lastPart?.type === "stopped" ? lastPart.code : undefined;
   const failed = state === "failed" || (!busyNow && lastPart?.type === "stopped" && lastPart.reason === "error");
   const { refetch: checkReady } = ready;
+  // Warm the sandbox when the session opens: the first message then pays no sandbox start (best effort, nothing waits on it).
+  useEffect(() => { void codeApi.warm(id); }, [id]);
   useEffect(() => { if (failed) void checkReady(); }, [failed, checkReady]);
   useEffect(() => { if (state && !isBusy(state)) setMaxNext(false); }, [state]);
 

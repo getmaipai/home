@@ -9,7 +9,7 @@ import { CodingEvent } from "@maipai/spec/gen/ts/coding-event.js";
 import {
   CodingSessionError, createCodingSession, offeredCodingTiers, CreateCodingSessionInput, getCodingSession, listCodingSessions, setSessionTier, codingSessionRefusal,
 } from "@/lib/codingSessions";
-import { cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
+import { warmCodingSession, cancelQueuedMessage, deleteCodingSession, offersUseStandard, queuedMessageIds, sendMessage, stopCodingSession, turnQueueLine, undoToCheckpoint, useStandardForThisMessage, activeTurnOf } from "@/lib/codingTurns";
 import { answerHostRequest, pendingRequestsFor } from "@/lib/codingBridge";
 import { listCodingMessages } from "@/lib/codingTranscript";
 import { listCodingEvents } from "@/lib/codingEvents";
@@ -120,6 +120,20 @@ codingSessionsRoutes.openapi(transcriptR, (c) => {
   return c.json(listCodingMessages(person.id, id), 200);
 });
 
+const okBody = z.object({ ok: z.literal(true) });
+const warmR = createRoute({
+  method: "post", path: "/{id}/warm", tags: ["Code"], summary: "Start the session's sandbox in the background so the next message pays no start", middleware: [requireAuth] as const,
+  request: { params: sessionIdParam },
+  responses: { 202: { content: { "application/json": { schema: okBody } }, description: "Warming has begun (or was not needed); nothing waits on it." }, ...errorResponses(errors) },
+});
+codingSessionsRoutes.openapi(warmR, (c) => {
+  const person = c.get("person"); const id = c.req.valid("param").id;
+  const refusal = codingSessionRefusal(person); if (refusal) return c.json({ error: refusal }, 403);
+  if (!getCodingSession(person, id)) return c.json({ error: "That session was not found. It may have been deleted." }, 404);
+  void warmCodingSession(person, id);
+  return c.json({ ok: true as const }, 202);
+});
+
 const trailR = createRoute({
   method: "get", path: "/{id}/events", tags: ["Code"], summary: "The person's audit trail for the session", middleware: [requireAuth] as const,
   request: { params: sessionIdParam },
@@ -181,7 +195,6 @@ codingSessionsRoutes.openapi(uploadR, async (c) => {
   } catch (e) { const f = failure(e); if (f) return c.json({ error: f.error }, f.status); throw e; }
 });
 
-const okBody = z.object({ ok: z.literal(true) });
 const stopR = createRoute({
   method: "post", path: "/{id}/stop", tags: ["Code"], summary: "Stop: cancels a queued turn, aborts a running one, clears the message queue", middleware: [requireAuth] as const,
   request: { params: sessionIdParam },

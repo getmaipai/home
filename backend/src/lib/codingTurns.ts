@@ -180,6 +180,32 @@ function noteDenied(turn: Pick<Turn, "id" | "sessionId" | "personId">): void {
   recordCodingEvent({ sessionId: turn.sessionId, personId: turn.personId, kind: "stopped", detail: { reason: "denied" } });
 }
 
+/** Marks the first event and the first text of a turn (relative to the agent start) without changing what the host does. */
+function timedHost(host: CodingHost, mark: (name: string) => void): CodingHost {
+  let first = false; let text = false;
+  return { ...host, emit(event) { if (!first) { first = true; mark("first_event"); } if (!text && event.kind === "text") { text = true; mark("first_text"); } host.emit(event); } };
+}
+
+/** One sandbox start per session at a time: a warm-up and a turn share it, so a person who sends while the warm-up runs does not start a second machine. */
+const sandboxStarts = new Map<string, Promise<void>>();
+function startSandboxOnce(rt: CodingRuntime, sessionId: string, environmentId: string): Promise<void> {
+  const running = sandboxStarts.get(sessionId); if (running) return running;
+  const started = rt.sandbox.start({ sessionId, environmentId }).finally(() => { sandboxStarts.delete(sessionId); });
+  sandboxStarts.set(sessionId, started);
+  return started;
+}
+
+/** Warm-up (CODE-FAST-01): start the session's sandbox in the background when the session is opened or the person starts typing, so the turn that follows pays no start.
+ * The Stack's idle stop ends it after a few quiet minutes. Best effort: a failure here is silent, the turn starts the sandbox itself and reports a real failure. */
+export async function warmCodingSession(person: PersonRow, sessionId: string): Promise<boolean> {
+  if (!runtime || codingSessionRefusal(person)) return false;
+  const row = getSessionRow(person.id, sessionId);
+  if (!row || row.deletedAt) return false;
+  const t0 = Date.now();
+  try { await startSandboxOnce(runtime, sessionId, row.environmentId); log("warmed", { id: "none", sessionId, personId: person.id }, `ms=${Date.now() - t0}`); return true; }
+  catch (e) { log("warm_failed", { id: "none", sessionId, personId: person.id }, `reason=${(e as { reason?: string }).reason ?? "error"}`); return false; }
+}
+
 async function runTurn(turn: Turn, environmentId: string): Promise<void> {
   const rt = runtime!;
   log("turn_started", turn, `tier=${turn.tier}`);
@@ -192,17 +218,24 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
     recordCodingEvent({ sessionId: turn.sessionId, personId: turn.personId, kind: "stopped", detail: { reason } });
     log("turn_stopped", turn, `reason=${reason}`);
   };
+  // Stage timings (milliseconds only, rule 6a): where a turn's time goes, in the log as one `coding stages` line per turn.
+  const t0 = Date.now(); const marks: string[] = [`queue=${t0 - turn.createdAt}`];
+  const mark = (name: string, from: number): number => { const now = Date.now(); marks.push(`${name}=${now - from}`); return now; };
+  const logStages = (): void => log("stages", turn, marks.join(" "));
   try {
-    await rt.sandbox.start({ sessionId: turn.sessionId, environmentId });
+    let at = Date.now();
+    await startSandboxOnce(rt, turn.sessionId, environmentId); at = mark("sandbox", at);
     if (rt.gateway && !(await rt.gateway.ensure())) throw new CodingTurnError("gateway_unreachable");
+    at = mark("gateway", at);
     if (rt.sandbox.snapshot && !turn.abort.signal.aborted) {
       // The checkpoint Undo goes back to. A failed snapshot never fails the turn; the person just has no checkpoint for this message (reason code in the log).
       try { const snap = await rt.sandbox.snapshot({ sessionId: turn.sessionId, label: "Before your message" }); addCheckpoint(turn.sessionId, { id: snap.id, label: "Before your message", files: snap.files }); log("checkpoint_taken", turn); }
       catch (e) { log("checkpoint_failed", turn, `reason=${(e as { reason?: string }).reason ?? "error"}`); }
+      at = mark("snapshot", at);
     }
     if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle" }); stopped(); settle(turn, "cancelled"); clearQueue(turn.sessionId); refreshHouseholdQueue(); return; }
     updateSession(turn.sessionId, { state: "working" });
-    const host = createTurnHost({ sessionId: turn.sessionId, personId: turn.personId, signal: turn.abort.signal });
+    const host = timedHost(createTurnHost({ sessionId: turn.sessionId, personId: turn.personId, signal: turn.abort.signal }), (kind) => { mark(kind, at); });
     const result = await rt.agent.runTurn({ sessionId: turn.sessionId, turnId: turn.id, tier: turn.tier, message: turn.message, signal: turn.abort.signal, host });
     if (turn.abort.signal.aborted) { updateSession(turn.sessionId, { state: "idle", lastActivityAt: new Date().toISOString() }); stopped(); settle(turn, "cancelled"); return; }
     const row = getSessionRow(turn.personId, turn.sessionId);
@@ -212,7 +245,7 @@ async function runTurn(turn: Turn, environmentId: string): Promise<void> {
         usage: { input_tokens: row.usage.input_tokens + (result.usage?.input_tokens ?? 0), output_tokens: row.usage.output_tokens + (result.usage?.output_tokens ?? 0) } });
     }
     if (result.usage && (result.usage.input_tokens > 0 || result.usage.output_tokens > 0)) appendCodingMessage({ sessionId: turn.sessionId, personId: turn.personId, role: "system", parts: [{ type: "usage", input: result.usage.input_tokens, output: result.usage.output_tokens }] });
-    await recordChanges(rt, turn.sessionId);
+    await recordChanges(rt, turn.sessionId); marks.push(`total=${Date.now() - t0}`); logStages();
     log("turn_done", turn, `in=${result.usage?.input_tokens ?? 0} out=${result.usage?.output_tokens ?? 0}`);
     settle(turn, "done");
   } catch (e) {

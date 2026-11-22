@@ -69,6 +69,8 @@ export const codeApi = {
   connections: () => request<{ connections: GitConnection[] }>("/api/settings/git-connections"),
   send: (id: string, text: string) => request<{ turn_id?: string; queued_message_id?: string }>(`${base}/${id}/messages`, json({ text })),
   setTier: (id: string, tier: CodeTier) => request<CodeSession>(`${base}/${id}/tier`, { method: "PUT", body: JSON.stringify({ tier }) }),
+  /** Start the session's sandbox in the background (the next message then pays no start). Best effort. */
+  warm: (id: string) => request<{ ok: true }>(`${base}/${id}/warm`, json({})).catch(() => undefined),
   stop: (id: string) => request<{ ok: true }>(`${base}/${id}/stop`, json({})),
   answer: (id: string, requestId: string, answer: "allow" | "deny") => request<{ ok: true }>(`${base}/${id}/requests/${requestId}`, json({ answer })),
   useStandard: (id: string, turn: string) => request<{ ok: true }>(`${base}/${id}/turns/${turn}/use-standard`, json({})),
