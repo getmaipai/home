@@ -24,6 +24,7 @@ script is for: [../../scripts/INDEX.md](../../scripts/INDEX.md). Where code live
 ## 3. Check
 - `bash scripts/test-changed.sh` runs only the tests that cover your changed files (a few seconds); `--list` shows them.
 - `bash scripts/verify.sh code|ui|docs` is the one command: typecheck, changed-file tests, `check.sh --pre` (or `--docs`). Log: `data-scratch/runs/verify-<mode>.log`.
+- A step that fails only on a problem already on main is skipped loudly if it is listed in `scripts/verify-known.txt` (the result says `KNOWN SKIP`); any other failure exits 1.
 - Full gate `bash scripts/check.sh` takes the machine-wide lock and is for risky surfaces (auth, credentials, migrations, `RULES.md`, `check.sh`, `wt.sh`).
 - Two failures: "settings registry stale against spec" means a key is missing from the pinned spec (list it in `scripts/settings-ahead-of-spec.json` or pin the new tag); a code-map or scripts-index drift means run `python3 scripts/code-map.py` or `python3 scripts/make-scripts-index.py` and commit the file.
 

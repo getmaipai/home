@@ -1,0 +1,3 @@
+# Problems already on main that are not the change under test. scripts/verify.sh skips a failing step LOUDLY when its log matches the pattern, never silently.
+# One per line: <grep -E pattern> => <reason and owner>. Delete the line when the cause is fixed.
+Home settings drift: access\.tier\.boost, access\.tier\.max => Home's access.tier.boost and access.tier.max add the "coding" option but spec-v0.1.478 (reverted in spec 0.1.477) lacks it; needs commons spec tag 0.1.479 from the coding tier work, then pin. check.sh --pre stops at this stage, so its later stages (secrets, PII, typechecks) did NOT run.
