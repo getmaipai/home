@@ -16,7 +16,8 @@ import { getVideoJobFor } from "@/lib/videos/jobs";
 import { phaseLabel } from "@/lib/videos/phaseLabel";
 import { videoJobLockState } from "@/lib/videos/lock";
 import { musicJobLockState } from "@/lib/music/lock";
-import { getMusicJobFor } from "@/lib/music/store";
+import { dropMusicJob, getMusicJobFor } from "@/lib/music/store";
+import type { MusicJob } from "@/lib/music/types";
 import { getPersonSettingValue, readLayerRow, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import { listFilmRunsInStates } from "@/lib/films/store";
@@ -262,7 +263,9 @@ export const isClearable = (item: ActivityItem): boolean => item.state === "done
 const DISMISSAL_KEEP_MS = 60 * 24 * 3_600_000;
 
 /** Hide finished rows from this person's Activity list only. Names a key (or `all`); a key that is not one of the person's own visible
- * finished rows is ignored, so nothing about another person's work or a locked item is stored. The job and its files are never touched. */
+ * finished rows is ignored, so nothing about another person's work or a locked item is stored. Failed ("could not finish") and stopped
+ * (cancelled) job records are removed for good: the cleared failed or stopped rows are deleted, and clearing all also drops the person's
+ * stopped records the list never shows. Done and making rows keep their job record, and files are never touched. */
 export function clearActivity(actor: PersonRow, request: { keys?: string[]; all?: boolean }, now = new Date()): ActivityList {
   const hidden = dismissedKeys(actor);
   const wanted = request.all ? null : new Set(request.keys ?? []);
@@ -271,6 +274,31 @@ export function clearActivity(actor: PersonRow, request: { keys?: string[]; all?
   if (keys.length) db.insert(activityDismissals).values(keys.map((rowKey) => ({ personId: actor.id, rowKey, dismissedAt: at }))).onConflictDoNothing().run();
   // A cleared key only matters while its job can still be listed (30 days), so old ones are dropped.
   db.delete(activityDismissals).where(and(eq(activityDismissals.personId, actor.id), lt(activityDismissals.dismissedAt, new Date(now.getTime() - DISMISSAL_KEEP_MS).toISOString()))).run();
+  // ACTIVITY-CLEAR-02: a cleared failed or stopped row loses its job record too, this person's only and only in those two states.
+  const dead = (table: typeof pictureJobs | typeof videoJobs, id: string) =>
+    db.delete(table).where(and(eq(table.id, id), eq(table.personId, actor.id), inArray(table.state, ["failed", "cancelled"]))).run();
+  const deadMusic = (id: string) => {
+    const job = getMusicJobFor(actor, id);
+    if (job && (job.state === "failed" || job.state === "cancelled")) {
+      dropMusicJob(job);
+      db.delete(musicJobs).where(and(eq(musicJobs.id, id), eq(musicJobs.personId, actor.id), eq(musicJobs.state, job.state))).run();
+    }
+  };
+  for (const key of keys) {
+    const id = key.slice(key.indexOf(":") + 1);
+    if (key.startsWith("picture:")) dead(pictureJobs, id);
+    else if (key.startsWith("video:")) dead(videoJobs, id);
+    else if (key.startsWith("song:")) deadMusic(id);
+  }
+  if (request.all) {
+    // Stopped records never appear in the list, so a clear-all is the only place they get removed; done and running ones stay.
+    const stopped = (table: typeof pictureJobs | typeof videoJobs) => db.delete(table).where(and(eq(table.personId, actor.id), eq(table.state, "cancelled"))).run();
+    stopped(pictureJobs);
+    stopped(videoJobs);
+    const stoppedMusic = db.select().from(musicJobs).where(and(eq(musicJobs.personId, actor.id), eq(musicJobs.state, "cancelled"))).all();
+    for (const row of stoppedMusic) dropMusicJob(row as unknown as MusicJob);
+    if (stoppedMusic.length) db.delete(musicJobs).where(and(eq(musicJobs.personId, actor.id), eq(musicJobs.state, "cancelled"))).run();
+  }
   return activityForViewer(actor);
 }
 
