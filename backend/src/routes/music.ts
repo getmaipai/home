@@ -5,6 +5,7 @@ import { PERSISTED_HOLDS, answerableFitAsk, pendingFitAsk, type PersistedHold } 
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { pictureDenial } from "@/lib/pictures/policy";
 import { startSongCover } from "@/lib/music/cover";
+import { maybeBackfillCovers } from "@/lib/music/coverBackfill";
 import { EFFECT_CHANGES, EFFECT_LABELS, EFFECT_UNAVAILABLE_LINE, EQ_PRESETS, checkEffect, isEffectChange, startMusicEffectJob } from "@/lib/music/effects";
 import { musicAudioTools } from "@/lib/music/mixParts";
 import { EXPORT_FAILED_LINE, EXPORT_FORMATS, EXPORT_MEDIA_TYPE, EXPORT_UNAVAILABLE_LINE, convertSong } from "@/lib/music/exportFormat";
@@ -293,6 +294,7 @@ const listRoute = createRoute({ method: "get", path: "/jobs", tags: ["Music"], s
   responses: { 200: { content: { "application/json": { schema: z.array(cardSchema) } }, description: "Up to 40 song cards." }, ...refusals } });
 musicRoutes.openapi(listRoute, async (c) => {
   const actor = c.get("person");
+  maybeBackfillCovers(actor, "songs");
   const trashed = new Set(db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNotNull(attachments.deletedAt))).all().map((r) => r.id));
   const jobs = jobsForPerson(actor, 40).filter((job) => !job.request.sound && !job.request.speech && !(job.request.takes && job.request.takes.index > 0) && (!job.fileId || !trashed.has(job.fileId)));
   const visible = jobs.filter((job) => !lockedJob(actor, job));
@@ -429,7 +431,11 @@ musicRoutes.openapi(saveSoundRoute, (c) => {
 });
 const soundsRoute = createRoute({ method: "get", path: "/sounds", tags: ["Music"], summary: "List saved sounds", middleware: viewMiddleware,
   responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), title: z.string(), duration_s: z.number().nullable(), file_id: z.string(), job_id: z.string().nullable(), src: z.string(), loop: z.boolean() })) } }, description: "Saved sound items." }, ...refusals } });
-musicRoutes.openapi(soundsRoute, (c) => c.json(savedMadeSounds(c.get("person")), 200));
+musicRoutes.openapi(soundsRoute, (c) => {
+  const actor = c.get("person");
+  maybeBackfillCovers(actor, "sounds");
+  return c.json(savedMadeSounds(actor), 200);
+});
 const makeSpeechBody = z.object({ script: z.string().trim().min(1).max(4000), voice: z.string().min(1).max(500), delivery: z.string().max(240).optional() });
 musicRoutes.openapi(createRoute({ method: "post", path: "/speeches", tags: ["Music"], summary: "Make a speech recording", middleware,
   request: { body: { content: { "application/json": { schema: makeSpeechBody } } } }, responses: { 201: { content: { "application/json": { schema: cardSchema } }, description: "The speech recording job." }, ...refusals, ...errorResponses({ 400: "Invalid script", 403: "The request is refused", 409: "A recording is already running", 422: "Unknown voice" }) } }), async (c) => {

@@ -43,6 +43,7 @@ import { TranscriptError, transcriptRowForItem } from "@/lib/transcripts/store";
 import { artistProfileFor, creditLines, mostCommon } from "./artistProfiles";
 import { songFactFor } from "./songFacts";
 import { getMade } from "@/lib/music/madeRecords";
+import { maybeBackfillCovers } from "@/lib/music/coverBackfill";
 import { MIX_SCOPES, musicMixData } from "./musicMixes";
 import { musicLibraryData } from "./musicLibrary";
 import { memberCandidates, memberPlaylists, ownPlaylists, playlistFor, playlistVisibility } from "./musicPlaylists";
@@ -1103,6 +1104,7 @@ export function promoteMadeSoundFile(person: PersonRow, fileId: string): MediaIt
 }
 
 export function savedMadeSounds(person: PersonRow) {
+  maybeBackfillCovers(person, "sounds");
   // Backfill older completed sounds on the person's first Sounds read. Temporary jobs live only in memory and never enter this query.
   const finished = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.state, "done"))).orderBy(desc(musicJobs.createdAt)).all();
   for (const row of finished) {
@@ -1369,7 +1371,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     return fact ? [{ ...rowsOf(person, [item!])[0]!, title: "Did you know?", channel: `${fact.summary} (Wikipedia)`, source_url: fact.url, thumbnail: null, backdrop: null, playing: false }] : [];
   }
   if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
-  if (dataId === "songs") { saveBandSingles(person); return trackRows(person, musicLibrary(person)); }
+  if (dataId === "songs") { maybeBackfillCovers(person, "songs"); saveBandSingles(person); return trackRows(person, musicLibrary(person)); }
   if (dataId === "albums") {
     const groups = [...groupTracks(musicLibrary(person), "album")];
     // `scope: "recent"` is Listen now's "Recently added": the newest albums first, a dozen of them.
