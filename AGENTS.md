@@ -33,6 +33,7 @@ and tag it yourself, no yes needed (2026-11-01): [docs/PINNING.md](docs/PINNING.
 - Fast check of a change: `bash scripts/test-changed.sh` runs only the tests that cover the changed files (seconds; the lander still runs the suites).
 - Prove a change: `bash scripts/verify.sh code|ui|docs` (one result line, exit code is the verdict, log in `data-scratch/runs/`); name the mode in the commit.
 - Where things are: read [docs/dev/module-map.md](docs/dev/module-map.md) first, then search; screens and package pages are in the generated `docs/dev/code-map.md`.
+- Where do I change X: [docs/dev/recipes.md](docs/dev/recipes.md) (endpoint, setting, migration, turn, screen, package, test).
 - Run: `bun start` / `bun stop` / `bun restart` (main checkout serves 8787; a worktree leases an 88xx port from `scripts/wt.sh port`).
   Tests: `bun test` in `backend/` or `frontend/`. Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend).
 - Land with `bash scripts/land.sh` (the lander runs the 15 s static check and fast-forwards `main`; only the lander pushes `main`). Name finished
