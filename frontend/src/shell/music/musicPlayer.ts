@@ -9,11 +9,14 @@ import { reportPlayerError } from "@/lib/clientErrors";
 import { analyserFor, hasPlayerAudioGraph, resumePlayerAudio, setPlayerTransport, setPlayerVolume, suspendPlayerAudio } from "@/lib/media/audioGraph";
 import { applyEqSettings, loadEqSettings } from "./musicEq";
 import { createMusicHistoryTracker } from "./musicHistory";
+import type { PendingTrack } from "./musicHandoff";
 
 export type { QueueSource, Track } from "./musicQueue";
 
 export interface MusicSnapshot {
   track: Track | null;
+  /** The clicked song shown while its audio loads; a real track or a stop clears it. */
+  pending?: PendingTrack | null;
   queue: readonly Track[];
   index: number;
   playing: boolean;
@@ -27,7 +30,7 @@ export interface MusicSnapshot {
 }
 
 const VOLUME_KEY = "music.volume";
-const EMPTY: MusicSnapshot = { track: null, queue: [], index: -1, playing: false, failed: false, notice: null, manual: [], source: null };
+const EMPTY: MusicSnapshot = { track: null, pending: null, queue: [], index: -1, playing: false, failed: false, notice: null, manual: [], source: null };
 const UNPLAYABLE = "This song could not be played. Check the file and try again.";
 
 function readVolume(): { volume: number; muted: boolean } {
@@ -45,6 +48,8 @@ export interface MusicPlayerStore {
   element(): HTMLAudioElement;
   /** Play `track`; the queue is the songs around it (the list's rows). Pressing the song that plays pauses it. */
   toggle(track: Track, queue?: readonly Track[], source?: QueueSource | null): void;
+  /** Show the clicked song in the bar before any track loads (null clears it). */
+  showPending(pending: PendingTrack | null): void;
   /** SF-08c: Play next puts the song right after the one playing; Add to queue puts it at the end. Both edit this queue, never start a song. */
   playNext(track: Track): void;
   addToQueue(track: Track): void;
@@ -199,7 +204,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
     historyTracker.reset(audio.currentTime);
     stopping = false;
     audio.loop = track.loop === true;
-    set({ track, queue, index, failed: false, notice: null, ...(fresh ? { manual: [], source: null } : {}) });
+    set({ track, pending: null, queue, index, failed: false, notice: null, ...(fresh ? { manual: [], source: null } : {}) });
     clockTick();
     handle?.requestFocus();
     void audio.play().catch((error: unknown) => {
@@ -242,6 +247,7 @@ export function createMusicPlayer(makeElement: () => HTMLAudioElement = () => ne
       load(list, list.findIndex((one) => one.key === track.key), true);
       if (source) set({ source });
     },
+    showPending(pending) { set({ pending }); },
     playNext(track) {
       if (!snap.track) { store.toggle(track); return; }
       apply(insertNext(snap.queue, snap.index, snap.manual, track));

@@ -37,6 +37,17 @@ export function mergeFeed(items: readonly ActivityItemView[], notices: readonly 
   return all.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
 
+/** Jobs plus notices for a page or the popover: mergeFeed's 30-day window trims history, never what nobody has read.
+ * A notice that is still unread and undismissed waits in the list however old it is. */
+export function feedRows(items: readonly ActivityItemView[], notices: readonly NotificationDeliveryView[], now = Date.now()): FeedItem[] {
+  const rows = mergeFeed(items, notices, now);
+  const shown = new Set(rows.map((row) => row.id));
+  const waiting = notices
+    .filter((n) => !n.dismissedAt && !n.readAt && !shown.has(`notice:${n.id}`))
+    .map(noticeToFeedItem);
+  return [...rows, ...waiting].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+}
+
 /** The merged feed for the header bell: the viewer's own making jobs plus their notifications, on the same reads each surface already uses. */
 export function useActivityFeed(enabled = true) {
   const activity = useActivity(enabled);
@@ -52,7 +63,7 @@ export function useActivityFeed(enabled = true) {
     staleTime: 10_000,
     refetchInterval: 60_000,
   });
-  const items = mergeFeed(activity.data?.items ?? [], notices.data ?? []);
+  const items = feedRows(activity.data?.items ?? [], notices.data ?? []);
   return {
     items,
     activity,

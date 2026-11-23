@@ -136,8 +136,8 @@ export function ActivityPage() {
         <StatusCard kind="problem" stateWord={i18n._({ id: "Could not finish", message: "Could not finish" })} title={i18n._({ id: "Activity was not cleared", message: "Activity was not cleared" })} line={i18n._({ id: "Check that this computer is online, then try again.", message: "Check that this computer is online, then try again." })} icon={leadIcon("failed")} />
       ) : null}
       <AsyncState
-        data={feed.activity.data}
-        error={feed.isError}
+        data={feed.activity.data ?? (feed.items.length ? { items: [], seenAt: null, dot: "none" as const } : undefined)}
+        error={feed.isError && feed.items.length === 0}
         isFetching={feed.isFetching}
         onRetry={() => feed.refetch()}
         errorMessage={i18n._({ id: "Activity could not load. Check that this computer is online, then try again.", message: "Activity could not load. Check that this computer is online, then try again." })}

@@ -126,12 +126,8 @@ const SettingsAreaPage = lazyNamed(() => import("@/shell/pages/settings/Settings
 const SettingsHomePage = lazyNamed(() => import("@/shell/pages/settings/SettingsHomePage"), "SettingsHomePage");
 const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), "SetupReviewPage");
 
-// NOTIF-ROUTE-01: the thirty-day history page, reached from the bell's
-// "View history" link and the phone header's bell. Lazy so it stays out
-// of the first bundle, as it was before 6bed798c dropped the route.
 // MEDIA-POLISH-01: package app pages load on demand. They carry the schema interpreter, the kit Player and Media Chrome, which pushed
 // the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
-const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const RemindersPage = lazy(() => import("@/apps/reminders/RemindersPage").then((m) => ({ default: m.RemindersPage })));
 const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ default: m.ClockPage })));
 const HousePage = lazyNamed(() => import("@/shell/pages/HousePage"), "HousePage");
@@ -609,7 +605,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="all-apps" element={<AllAppsPage person={person} />} />
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
             <Route path="media/:id" element={<MediaLinkRedirect />} />
-            <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
+            {/* ACTIVITY-MERGE-01: the Notifications page is gone; the old URL lands on the one Activity page. */}
+            <Route path="notifications" element={<Navigate to="/activity" replace />} />
           <Route path="household" element={<Navigate to="/reminders" replace />} />
           <Route path="household/coming-up" element={<Navigate to="/reminders" replace />} />
             <Route path="reminders" element={<Suspense fallback={null}><RemindersPage /></Suspense>} />

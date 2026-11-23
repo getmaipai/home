@@ -1,4 +1,5 @@
 import type { Track } from "./musicQueue";
+import { artworkUrlOf } from "./artworkUrl";
 
 export interface AudioItemView {
   id: string;
@@ -19,7 +20,7 @@ export function musicTrackOf(item: AudioItemView): Track | null {
     url: item.src,
     title: item.title,
     ...(item.subtitle ? { subtitle: item.subtitle } : {}),
-    artworkUrl: item.poster ?? item.thumbnail ?? null,
+    artworkUrl: artworkUrlOf(item),
     duration: item.duration_s,
     state: "done",
     hasFile: true,
@@ -59,3 +60,24 @@ export function musicListOf({ pathname, search, pageState, item, mediaId }: Musi
   return null;
 }
 
+
+/** A clicked shelf row as the mini player can show it before any audio loads: what the person pressed, until the real track arrives. */
+export interface PendingTrack {
+  key: string;
+  title: string;
+  subtitle?: string;
+  artworkUrl: string | null;
+}
+
+/** The clicked item becomes the pending track: its title, the artist line (the channel, else the subtitle) and the same artwork pick the shelves use. An item without a title gives nothing to show. */
+export function pendingTrackOf(item: { title?: string | null; subtitle?: string | null; channel?: string | null; thumbnail?: string | null; poster?: string | null }, key: string): PendingTrack | null {
+  const title = item.title?.trim();
+  if (!title) return null;
+  const subtitle = item.channel?.trim() || item.subtitle?.trim() || undefined;
+  return {
+    key: key.startsWith("shuffle:") ? key.slice("shuffle:".length) : key,
+    title,
+    ...(subtitle ? { subtitle } : {}),
+    artworkUrl: artworkUrlOf({ thumbnail: item.thumbnail, poster: item.poster }),
+  };
+}

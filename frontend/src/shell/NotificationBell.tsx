@@ -61,14 +61,9 @@ export function usePendingNotificationCount(): number {
   return useNotificationsQuery().data?.length ?? 0;
 }
 
-// ACTIVITY-PAGE-01: the bell's popover is gone - browsing and dismissing
-// live on the Activity page now, opened from the rail's profile menu.
-// The old header bell drew nothing of its own here anymore, so this
-// renders nothing; callers show the pending count through
-// `usePendingNotificationCount` (the avatar dot, HOME-UI-02f).
-export function NotificationBell(): null {
-  return null;
-}
+// ACTIVITY-PAGE-01 / ACTIVITY-MERGE-01: the bell component is gone - browsing and dismissing
+// live on the Activity page now, opened from the rail's profile menu, and the pending count
+// shows through `usePendingNotificationCount` (the avatar dot, HOME-UI-02f).
 
 // A new arrival becoming a Toast - lib/notifications.ts's own `in_app`
 // channel is just a persisted row; this is what turns "a new row
