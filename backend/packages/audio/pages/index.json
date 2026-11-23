@@ -81,6 +81,14 @@
         }
       },
       "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/history"
+          }
+        }
+      },
       "card_radius": "tight",
       "press_scale": true,
       "on_play": {

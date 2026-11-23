@@ -4,15 +4,38 @@
   "title": "Recently played",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "clock",
-      "text": "Songs you played lately will show up here.",
-      "action": {
-        "navigate": {
-          "to": "/apps/audio/search"
+      "type": "media_shelf",
+      "heading": "Recently played",
+      "bind": {
+        "source": "package",
+        "path": "history"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
         }
       },
-      "action_label": "Find songs"
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "clock",
+        "text": "Songs you played lately will show up here.",
+        "action": {
+          "navigate": {
+            "to": "/apps/audio/search"
+          }
+        },
+        "action_label": "Find songs"
+      }
     }
   ]
 }
