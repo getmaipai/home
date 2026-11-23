@@ -31,9 +31,12 @@ export function coreAppsGroup(query: string, apps: readonly AppEntry[]): SearchG
   return results.length ? { kind: "app", heading: i18n._({ id: "Apps", message: "Apps" }), results } : null;
 }
 
-/** One search for the header: the core apps first, then whatever the hub finds. A hub that cannot answer still leaves the apps. */
-export async function searchWithCoreApps(query: string, apps: readonly AppEntry[]): Promise<SearchGroup[]> {
+/** One search for the header: the core apps first, then whatever the hub finds. A hub that cannot answer still leaves the apps.
+ * With `incognito` on, stored chats and memories are dropped because Incognito never surfaces history. */
+export async function searchWithCoreApps(query: string, apps: readonly AppEntry[], incognito = false): Promise<SearchGroup[]> {
   const core = coreAppsGroup(query, apps);
-  const hub = await api.search(query).catch(() => [] as SearchGroup[]);
+  const rawHub = await api.search(query).catch(() => [] as SearchGroup[]);
+  // Incognito hides history: drop the hub's conversation and memory groups entirely.
+  const hub = incognito ? rawHub.filter((group) => group.kind !== "conversation" && group.kind !== "memory") : rawHub;
   return core ? [core, ...hub.filter((group) => group.kind !== "app" || group.results.some((r) => r.href.startsWith("/apps/")))] : hub;
 }

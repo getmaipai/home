@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { INCOGNITO_COMPANION_ID, incognitoHeaderCompanion } from "@/apps/chat/incognitoCompanion";
 
-const selected = { companionId: "rivet", companionName: "Rivet", defaultCompanionId: "rivet", companions: [{ id: "rivet", name: "Rivet", portrait: "rivet/look1" }, { id: "bruno", name: "Bruno" }] };
+const selected = { companionId: "rivet", companionName: "Rivet", defaultCompanionId: "rivet", companions: [{ id: "rivet", name: "Rivet", portrait: "rivet/look1" }, { id: "bruno", name: "Bruno" }] } as { companionId: string | null; companionName?: string; defaultCompanionId?: string | null; companions: Array<{ id: string; name: string; portrait?: string }> };
 
 describe("incognitoHeaderCompanion", () => {
   test("with Incognito off the header data is passed through untouched", () => {

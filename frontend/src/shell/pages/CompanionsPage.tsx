@@ -29,6 +29,7 @@ import { formatRelative } from "@/lib/time";
 import { Status } from "@maipai/ui/src/ui/status";
 import { Input } from "@maipai/ui/src/ui/input";
 import { useCompanionStills } from "@/apps/chat/useCompanionAvatar";
+import { useIncognitoContext } from "@/shell/incognitoContext";
 import { ActivityFeed, type ActivityFeedGroup } from "@maipai/ui/src/elements/activity-feed";
 import { TaskBrowser } from "@maipai/ui/src/elements/task-browser";
 import { Card } from "@maipai/ui/src/primitives/Card";
@@ -86,25 +87,27 @@ function companionMenu({ card, discover = false, onDelete, onRemove, onSetDefaul
   return actions;
 }
 
-function companionCardMeta(card: CompanionCard) {
+function companionCardMeta(card: CompanionCard, incognito = false) {
   const synth = card.synth;
   const lines = synth ? [
-    ...(card.is_default ? [i18n._({ id: "Your companion", message: "Your companion" })] : []),
+    ...(card.is_default && !incognito ? [i18n._({ id: "Your companion", message: "Your companion" })] : []),
     ...(synth.based_on.kind !== "none" && synth.based_on.name ? [i18n._({ id: "Based on {name}", message: "Based on {name}", values: { name: synth.based_on.name } })] : []),
     ...(synth.yours && synth.forked_from ? [i18n._({ id: "Yours, from {name}", message: "Yours, from {name}", values: { name: synth.forked_from_name ?? synth.forked_from } })] : []),
     ...(synth.shows.length ? [i18n._({ id: "On {titles}", message: "On {titles}", values: { titles: synth.shows.slice(0, 2).map((show) => show.title).join(", ") } })] : []),
   ] : [];
-  const activity = (card.working_count ?? 0) + (card.waiting_count ?? 0) > 0
-    ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{i18n._({ id: "{working} working · {waiting} waiting on you", message: "{working} working · {waiting} waiting on you", values: { working: card.working_count ?? 0, waiting: card.waiting_count ?? 0 } })}</Status>
-    : formatRelative(card.latest_activity_at)
-      ? i18n._({ id: "Last active {when} · {chats, plural, one {# chat} other {# chats}}", message: "Last active {when} · {chats, plural, one {# chat} other {# chats}}", values: { when: formatRelative(card.latest_activity_at), chats: card.chat_count ?? card.chats } })
-      : i18n._({ id: "No chats yet", message: "No chats yet" });
+  const activity = incognito ? null
+    : (card.working_count ?? 0) + (card.waiting_count ?? 0) > 0
+      ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{i18n._({ id: "{working} working · {waiting} waiting on you", message: "{working} working · {waiting} waiting on you", values: { working: card.working_count ?? 0, waiting: card.waiting_count ?? 0 } })}</Status>
+      : formatRelative(card.latest_activity_at)
+        ? i18n._({ id: "Last active {when} · {chats, plural, one {# chat} other {# chats}}", message: "Last active {when} · {chats, plural, one {# chat} other {# chats}}", values: { when: formatRelative(card.latest_activity_at), chats: card.chat_count ?? card.chats } })
+        : i18n._({ id: "No chats yet", message: "No chats yet" });
   return <>{lines.map((line, index) => <span key={`${index}-${line}`}>{line}</span>)}{activity}</>;
 }
 
 /** /companions: the synths this person may use, as a card grid. */
 function CompanionsDirectory() {
   useTabItem(i18n._({ id: "Synths", message: "Synths" }));
+  const { on: incognito } = useIncognitoContext();
   const navigate = useNavigate();
   const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   const [discoverFilter, setDiscoverFilter] = useState("All");
@@ -162,7 +165,7 @@ function CompanionsDirectory() {
                 </div>
                 <TabsContent value="Yours">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={companionCardMeta(card)} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}><ChatIcon aria-hidden />{(card.chat_count ?? card.chats) > 0 ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Chat", message: "Chat" })}</Button><Button type="button" variant="outline" size="icon" aria-label={i18n._({ id: "View page", message: "View page" })} onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}><ChevronIcon aria-hidden /></Button></>} />; })}
+                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default && !incognito ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={companionCardMeta(card, incognito)} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}><ChatIcon aria-hidden />{(card.chat_count ?? card.chats) > 0 ? i18n._({ id: "Continue", message: "Continue" }) : i18n._({ id: "Chat", message: "Chat" })}</Button><Button type="button" variant="outline" size="icon" aria-label={i18n._({ id: "View page", message: "View page" })} onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}><ChevronIcon aria-hidden /></Button></>} />; })}
                   </div>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
@@ -171,7 +174,7 @@ function CompanionsDirectory() {
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{label}</Chip>)}
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), ...(card.can_copy ? { onCopy: menuActions.onCopy! } : {}) })} meta={companionCardMeta(card)} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>{i18n._({ id: "Add", message: "Add" })}</Button>} />; })}
+                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default && !incognito ? i18n._({ id: "Your companion", message: "Your companion" }) : card.status === "ready" ? null : card.status === "draft" ? i18n._({ id: "Draft · needs a portrait", message: "Draft · needs a portrait" }) : card.status} menu={companionMenu({ ...menuActions, card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), ...(card.can_copy ? { onCopy: menuActions.onCopy! } : {}) })} meta={companionCardMeta(card, incognito)} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>{i18n._({ id: "Add", message: "Add" })}</Button>} />; })}
                   </div>
                   <p className="mt-4 text-sm text-muted-foreground">{i18n._({ id: "More synths from the catalog are coming soon.", message: "More synths from the catalog are coming soon." })}</p>
                 </TabsContent> : null}
@@ -291,7 +294,8 @@ function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills
     else { next.set("tab", "about"); next.delete("task"); }
     setParams(next, { replace: false });
   };
-  const activityQuery = useQuery<CompanionActivity>({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false });
+  const { on: incognito } = useIncognitoContext();
+  const activityQuery = useQuery<CompanionActivity>({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false, enabled: !incognito });
   const rows = activityQuery.data?.activity ?? [];
   const tasks = rows.filter((row) => row.kind !== "chat");
   const active = params.get("task");
