@@ -200,3 +200,15 @@ test("Image Create level hints add a measured wait only for a level with 3 finis
   const bar = (page.value as { body: Array<unknown> }).body[0] as { tier: { tiers: Array<{ id: string; hint: string }> } };
   expect(bar.tier.tiers.map(({ id, hint }) => [id, hint])).toEqual([["standard", "Fast. About 20 seconds."], ["boost", "More detail."], ["max", "More detail."]]);
 });
+
+test("Browse home shows only what was made: no Templates shelf (templates live under Create), a labeled Recently made rail with See all and an empty state", async () => {
+  const { row } = await owner();
+  const page = getAppPage(row, "image", "index");
+  expect(page.ok).toBe(true);
+  if (!page.ok) return;
+  const body = (page.value as { body: Array<Record<string, unknown>> }).body;
+  expect(body.some((node) => node.heading === "Templates")).toBe(false);
+  expect(body.some((node) => JSON.stringify(node.bind) === JSON.stringify({ source: "package", path: "templates" }))).toBe(false);
+  expect(body).toHaveLength(1);
+  expect(body[0]).toMatchObject({ type: "media_shelf", heading: "Recently made", bind: { source: "package", path: "recent" }, variant: "plain", aspect: "square", on_select: { navigate: { to: "/apps/image/studio", state: { file: "{id}" } } }, see_all: { label: "See all", action: { navigate: { to: "/apps/image/recent" } } }, empty_state: { type: "empty_state", action: { navigate: { to: "/apps/image/create" } } } });
+});

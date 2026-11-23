@@ -5,10 +5,30 @@
   "body": [
     {
       "type": "media_shelf",
-      "heading": "Templates",
+      "heading": "Recently made",
+      "variant": "plain",
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/image/recent"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "image",
+        "text": "Nothing made yet.",
+        "action": {
+          "navigate": {
+            "to": "/apps/image/create"
+          }
+        },
+        "action_label": "Make a picture"
+      },
       "bind": {
         "source": "package",
-        "path": "templates"
+        "path": "recent"
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -19,24 +39,6 @@
       "item_progress_field": "progress",
       "making_field": "making",
       "poll_while": { "field": "making", "values": ["yes"] },
-      "aspect": "square",
-      "on_select": {
-        "navigate": {
-          "to": "/apps/image/templates"
-        }
-      }
-    },
-    {
-      "type": "media_shelf",
-      "heading": "Recently made",
-      "bind": {
-        "source": "package",
-        "path": "recent"
-      },
-      "item_key_field": "id",
-      "item_label_field": "title",
-      "item_subtitle_field": "{subtitle}",
-      "item_media_field": "thumbnail",
       "aspect": "square",
       "on_select": {
         "navigate": {
