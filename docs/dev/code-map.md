@@ -560,6 +560,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codingGitleaks.ts` | GITLEAKS_MISSING_LINE, realGitleaksRunner, findingsFromReport, createGitleaksScanner |
 | `backend/src/lib/codingHealthIssue.ts` | syncCodingHealthIssue |
 | `backend/src/lib/codingMode.ts` | codingModeReadiness, reconcileCodingModeAtStartup |
+| `backend/src/lib/codingModeSwap.ts` | swapToCodingMode |
 | `backend/src/lib/codingOpencode.ts` | MAX_ARG_CHARS, GATEWAY_MODEL, SANDBOX_PROMPT, openCodeConfig, mapOpenCodeEvent, MAX_ROUNDS |
 | `backend/src/lib/codingPause.ts` | codingPausedByAdmin |
 | `backend/src/lib/codingPullRequest.ts` | __setPullRequestDepsForTests, createCodingPullRequest |
