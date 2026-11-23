@@ -2,15 +2,15 @@ import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { StatusCard, type StatusCardKind } from "@maipai/ui/src/elements/status-card";
-import { getIcon, iconNames } from "@maipai/ui/src/icons";
+import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { Button } from "@maipai/ui/src/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { dayHeading, dayKey } from "@maipai/ui/src/relativeTime";
-import { api, type ActivityItemView } from "@/lib/api";
+import { api } from "@/lib/api";
 import { ACTIVITY_KEY } from "@/shell/activity";
 import { useActivityFeed, type FeedItem } from "@/shell/activityFeed";
+import { ACTIVITY_CARD_KIND, actionLabel, feedIcon, isFinished, leadIcon, lineOf, stateWord } from "@/shell/activityRows";
 import { NOTIFICATIONS_HISTORY_QUERY_KEY, NOTIFICATIONS_QUERY_KEY } from "@/shell/NotificationBell";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -18,63 +18,6 @@ import { useTabItem } from "@/shell/tabIdentity";
 // status messages in one list, newest first, grouped by day, each drawn as the kit StatusCard. The hub words every line
 // (`GET /api/activity`), so this page writes no sentence of its own beyond the state words and the action labels. Opening the page
 // marks what finished as seen.
-
-/** Only a finished card can be cleared; a waiting or making one is still running. A notice is always clearable. */
-const isFinished = (item: FeedItem): boolean => item.source === "notice" || item.state === "done" || item.state === "failed" || item.state === "attention";
-
-const KIND: Record<ActivityItemView["state"], StatusCardKind> = { waiting: "waiting", making: "progress", done: "done", attention: "attention", failed: "problem" };
-
-const stateWord = (state: ActivityItemView["state"]): string => ({
-  waiting: i18n._({ id: "Waiting", message: "Waiting" }),
-  making: i18n._({ id: "Making now", message: "Making now" }),
-  done: i18n._({ id: "Done", message: "Done" }),
-  attention: i18n._({ id: "Needs a look", message: "Needs a look" }),
-  failed: i18n._({ id: "Could not finish", message: "Could not finish" }),
-})[state];
-
-const actionLabel = (item: FeedItem): string => {
-  if (item.source === "notice") return i18n._({ id: "Open", message: "Open" });
-  return ({
-    waiting: i18n._({ id: "Open", message: "Open" }),
-    making: i18n._({ id: "Open", message: "Open" }),
-    done: i18n._({ id: "Open", message: "Open" }),
-    attention: i18n._({ id: "Review", message: "Review" }),
-    failed: i18n._({ id: "Try again", message: "Try again" }),
-  })[item.state];
-};
-
-const sourceName = (source: FeedItem["source"]): string => ({
-  picture: i18n._({ id: "Pictures", message: "Pictures" }),
-  video: i18n._({ id: "Videos", message: "Videos" }),
-  song: i18n._({ id: "Music", message: "Music" }),
-  job: i18n._({ id: "Home", message: "Home" }),
-  notice: i18n._({ id: "Home", message: "Home" }),
-})[source];
-
-/** The one muted line: the hub's own words, then how long it usually takes while a figure is not known yet; a finished job names where it was made, a notice says nothing more. */
-function lineOf(item: FeedItem): string {
-  const usually = item.state === "making" && item.percent === null && item.typicalMinutes
-    ? i18n._({ id: "Usually about {minutes, plural, one {# minute} other {# minutes}}.", message: "Usually about {minutes, plural, one {# minute} other {# minutes}}.", values: { minutes: item.typicalMinutes } })
-    : "";
-  if (item.source === "notice") return item.line ?? "";
-  if (item.state === "done" && !item.line) return i18n._({ id: "Made in {app}.", message: "Made in {app}.", values: { app: sourceName(item.source) } });
-  return [item.line, usually].filter(Boolean).join(" ");
-}
-
-const leadIcon = (state: ActivityItemView["state"]) => {
-  const Icon = getIcon(state === "done" ? "check" : state === "failed" || state === "attention" ? "alert-triangle" : state === "waiting" ? "clock" : "loader");
-  return <Icon aria-hidden className="size-5" />;
-};
-
-// ACTIVITY-MERGE-01: what a row is about shows as its lead icon, so a picture, a video, a song and a message read apart at a glance.
-// A name the kit does not ship falls back to the state icon.
-const SOURCE_ICON: Record<FeedItem["source"], string | null> = { picture: "image", video: "video", song: "music", notice: "bell", job: null };
-
-const feedIcon = (item: FeedItem) => {
-  const name = SOURCE_ICON[item.source];
-  const Icon = name && (iconNames as readonly string[]).includes(name) ? getIcon(name) : null;
-  return Icon ? <Icon aria-hidden className="size-5" /> : leadIcon(item.state);
-};
 
 /** Groups already sorted newest first by the local day each last changed. */
 export function groupByDay(items: readonly FeedItem[], now: Date = new Date()): Array<{ key: string; heading: string; items: FeedItem[] }> {
@@ -154,7 +97,7 @@ export function ActivityPage() {
                   {group.items.map((item) => (
                     <li key={item.id}>
                       <StatusCard
-                        kind={KIND[item.state]}
+                        kind={ACTIVITY_CARD_KIND[item.state]}
                         stateWord={stateWord(item.state)}
                         title={item.title}
                         line={lineOf(item)}
