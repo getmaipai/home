@@ -58,7 +58,7 @@ const MoreIcon = getIcon("more-horizontal");
 const SearchIcon = getIcon("search");
 
 /** The app's own search: the palette lists the app's matching songs in place, with a last row to the app's full search page. */
-function AppSearch({ label, searchTo, appTo }: { label: string; searchTo: string; appTo: string }) {
+function AppSearch({ label, appTo }: { label: string; appTo: string }) {
   const remote = useMemo(() => {
     const pkg = appTo.split("/")[2] ?? "";
     const spec = APP_SEARCH_DATA[pkg];
@@ -66,9 +66,9 @@ function AppSearch({ label, searchTo, appTo }: { label: string; searchTo: string
       const q = query.trim();
       if (q.length < 2) return [];
       const rows = spec ? await api.appData<AppSearchRow[]>(pkg, spec.data, { q }).catch(() => []) : [];
-      return appSearchGroups({ to: appTo, label, searchTo }, q, Array.isArray(rows) ? rows : [], spec?.playPage);
+      return appSearchGroups({ to: appTo, label }, q, Array.isArray(rows) ? rows : [], spec?.playPage);
     };
-  }, [appTo, label, searchTo]);
+  }, [appTo, label]);
   return <HeaderSearch scope={{ label }} remote={remote} />;
 }
 
@@ -81,7 +81,7 @@ function PackageAppHeaderCenter() {
   const modes = header?.modes ?? [];
   return (
     <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
-      {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} appTo={state.to} /></div> : null}
+      {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} appTo={state.to} /></div> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs className="max-md:hidden" value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
           <TabsList variant="pill" aria-label={`${state.label} mode`}>
