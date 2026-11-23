@@ -9,6 +9,7 @@ import { createFakeStackClient, type FakeStackClient } from "@maipai/ui/src/stac
 import { StackClientError } from "@maipai/ui/src/stack/StackClient";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { AiModelsPage } from "@/apps/settings/AiModelsPage";
+import { StackAdminLink } from "@/apps/settings/StackAdminLink";
 import { createHomeStackClient } from "@/lib/stackModelsClient";
 import { makePerson } from "@/shell/pages/settings/settingsTestKit";
 
@@ -17,9 +18,11 @@ const realFetch = globalThis.fetch;
 let fake: FakeStackClient;
 let wire: Array<{ method: string; path: string; body: unknown }> = [];
 let stored: Record<string, unknown> = {};
+let adminLink: Record<string, unknown> = { local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: "Open this page on the computer that runs MaiPai, or turn on remote access in the Stack's settings." };
 let migration: Record<string, unknown> = { done: true, refused: [], dismissed: true };
 
 beforeEach(() => {
+  adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: "Open this page on the computer that runs MaiPai, or turn on remote access in the Stack's settings." };
   fake = createFakeStackClient(); wire = []; stored = {}; migration = { done: true, refused: [], dismissed: true };
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
@@ -28,6 +31,7 @@ beforeEach(() => {
       if (method === "PUT") { stored[body.key] = body.value; return Response.json({ key: body.key, value: body.value }); }
       return Response.json(Object.entries(stored).map(([key, value]) => ({ key, value, source: "user" })));
     }
+    if (path === "/api/ai/stack/admin-link") return Response.json(adminLink);
     if (path === "/api/ai/stack/migration") return Response.json(migration);
     if (path === "/api/ai/stack/migration/dismiss") { migration = { ...migration, dismissed: true }; return Response.json(migration); }
     wire.push({ method, path, body });
@@ -141,5 +145,38 @@ describe("the page", () => {
   test("a person who is not an owner or admin sees the actions locked with a sentence", async () => {
     const view = renderWithQueryClient(<MemoryRouter><AiModelsPage person={makePerson("adult")} onPersonChange={() => {}} /></MemoryRouter>);
     expect((await view.findAllByText("Only an adult admin can change the AI and models.")).length).toBeGreaterThan(0);
+  });
+});
+
+describe("the link to the Stack's admin page", () => {
+  const openLink = (hostname: string) => renderWithQueryClient(<StackAdminLink hostname={hostname} />);
+  test("an owner sees one clearly labeled link with a one-line explanation, opening a new tab", async () => {
+    const view = open();
+    const link = (await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+    expect(view.getByTestId("extra-stack-admin")).toBeTruthy();
+  });
+  test("a person who is not an owner or admin does not see it", async () => {
+    const view = renderWithQueryClient(<MemoryRouter><AiModelsPage person={makePerson("adult")} onPersonChange={() => {}} /></MemoryRouter>);
+    await view.findByTestId("feature-chat").catch(() => undefined);
+    expect(view.queryByRole("link", { name: "Open Stack admin" })).toBeNull();
+    expect(view.queryByTestId("extra-stack-admin")).toBeNull();
+  });
+  test("from another device with remote access off it is not a link and says why in plain words", async () => {
+    const view = openLink("hub.example.com");
+    expect(await view.findByText(/turn on remote access in the Stack's settings/)).toBeTruthy();
+    expect(view.queryByRole("link", { name: "Open Stack admin" })).toBeNull();
+  });
+  test("from another device with remote access on it links to the Tailscale address", async () => {
+    adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null };
+    const view = openLink("hub.example.com");
+    expect(((await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement).getAttribute("href")).toBe("http://100.64.0.9:8770/admin/");
+  });
+  test("on the computer itself (localhost) it always links to the local address", async () => {
+    adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null };
+    const view = openLink("localhost");
+    expect(((await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement).getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
   });
 });
