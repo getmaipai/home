@@ -53,6 +53,8 @@ for arg in "$@"; do
   esac
 done
 
+# A stale checkout is reported, never failed here (the lander and watcher run their own copies): scripts/fresh-check.sh.
+if [ "$PRE_ONLY" = 1 ] && [ "${GATE_HEAVY_HELD:-0}" != 1 ]; then FRESH_NO_FETCH=1 bash scripts/fresh-check.sh || true; fi
 GATE_LOCK="${MAIPAI_GATE_LOCK:-../.github/standards/bin/gate-lock.sh}"
 if [ "$PRE_ONLY" = 1 ] && [ "${GATE_HEAVY_HELD:-0}" != 1 ]; then
   if [ -f "$GATE_LOCK" ]; then

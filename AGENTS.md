@@ -29,6 +29,7 @@ and tag it yourself, no yes needed (2026-11-01): [docs/PINNING.md](docs/PINNING.
 `backend/` (Bun, Hono, Zod, Drizzle/SQLite), `frontend/` (React, Vite). Shared shapes live in `getmaipai/commons`'s `spec/`
 (`@maipai/spec`, pinned by tag). Stack standard: STACK.md in `getmaipai/.github`. Full command reference: [docs/dev/commands.md](docs/dev/commands.md).
 
+- First command of a session: `bash scripts/fresh-check.sh` (one line; STALE means start a new worktree before reading code).
 - Run: `bun start` / `bun stop` / `bun restart` (main checkout serves 8787; a worktree leases an 88xx port from `scripts/wt.sh port`).
   Tests: `bun test` in `backend/` or `frontend/`. Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend).
 - Land with `bash scripts/land.sh` (the lander runs the 15 s static check and fast-forwards `main`; only the lander pushes `main`). Name finished
