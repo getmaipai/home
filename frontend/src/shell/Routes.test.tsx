@@ -730,19 +730,17 @@ describe("Routes settings areas", () => {
   });
 });
 
-// NOTIF-ROUTE-01: /notifications is the history page the bell's "View
-// history" link and the phone header's bell point at; it must render
-// inside the rail layout with the household's real deliveries.
-describe("Routes notifications history page", () => {
-  test("/notifications shows the page heading, a seeded delivery and the rail", async () => {
+// ACTIVITY-MERGE-01: /notifications is gone as a page; the old link lands on the one Activity page, inside the rail layout.
+describe("Routes notifications redirect", () => {
+  test("/notifications lands on the Activity page and the rail", async () => {
     const originalFetch = globalThis.fetch;
-    const delivery = { id: "n1", typeId: "repairs.new", level: "time_sensitive", text: "MaiPai Stack is offline", channels: ["in_app"], createdAt: new Date().toISOString(), readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: false };
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/notifications")) return Promise.resolve(Response.json([delivery]));
+      if (url.includes("/api/notifications")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/activity")) return Promise.resolve(Response.json({ items: [], seenAt: null, dot: "none" }));
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
@@ -754,8 +752,7 @@ describe("Routes notifications history page", () => {
           </MemoryRouter>
         </TooltipProvider>,
       );
-      expect(await view.findByRole("heading", { name: "Notifications" })).toBeTruthy();
-      expect((await view.findAllByText("MaiPai Stack is offline")).length).toBeGreaterThan(0);
+      expect(await view.findByTestId("activity-page")).toBeTruthy();
       expect(view.container.querySelector('nav[aria-label="Primary navigation"]')).not.toBeNull();
     } finally {
       globalThis.fetch = originalFetch;

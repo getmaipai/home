@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { Tour } from "@maipai/spec/gen/ts/tour.js";
 import defaultManifest from "../../../backend/packages/default/manifest.json";
 import type { Roster } from "@/lib/api";
@@ -166,4 +166,30 @@ describe("RailProfile settings row", () => {
     }
   });
 
+});
+
+// ACTIVITY-MERGE-01: the profile menu's Notifications row opens the one Activity page, not a separate popover.
+describe("RailProfile notifications row", () => {
+  test("opens /activity", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/notifications") || url.includes("/api/status/apps")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    function Where() { return <div data-testid="where">{useLocation().pathname}</div>; }
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <RailProfile person={person("adult")} incognito={false} onIncognitoChange={() => {}} onSignedOut={() => {}} />
+          <Where />
+        </MemoryRouter>,
+      );
+      fireEvent.click(view.getByRole("button", { name: /Open profile menu for Juniper/ }));
+      fireEvent.click(await view.findByRole("menuitem", { name: /Notifications/ }));
+      await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/activity"));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
