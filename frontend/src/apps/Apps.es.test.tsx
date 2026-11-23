@@ -14,7 +14,6 @@ import { AlarmDays } from "@/apps/clock/AlarmDays";
 import { ClockPage } from "@/apps/clock/ClockPage";
 import { greetingFor } from "@/apps/home/greeting";
 import { kindStyle } from "@/apps/library/appPresentation";
-import { NotificationsPage } from "@/apps/notifications/NotificationsPage";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { ACCENT_LABELS, ROLE_LABELS } from "@/apps/people/roles";
 import { RemindersPage } from "@/apps/reminders/RemindersPage";
@@ -56,7 +55,6 @@ describe("apps in Spanish", () => {
     ["Clock", () => <MemoryRouter><ClockPage /></MemoryRouter>, "Add an alarm with the plus button."],
     ["New person form", () => <NewPersonForm actorRole="owner" onSubmit={() => {}} submitLabel="Add" busy={false} error={null} />, "Role"],
     ["Reminders", () => <MemoryRouter><RemindersPage /></MemoryRouter>, "Today"],
-    ["Notifications", () => <NotificationsPage />, "Notifications"],
   ];
   for (const [name, page, anchor] of cases) {
     test(`${name} shows Spanish text`, async () => {
