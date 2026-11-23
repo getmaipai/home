@@ -42,7 +42,7 @@ test("Image sidebar rows have distinct real icons, labels, and honest placeholde
   expect(new Set(rows.map((page) => page.icon)).size).toBe(rows.length);
   for (const page of rows) expect(iconNames.has(page.icon)).toBe(true);
   expect(contributes.sidebar.groups.map((group) => [group.id, group.title ?? ""])).toEqual([["browse-home", ""], ["browse-library", "Library"], ["create-make", "Make"], ["create-edit", "Edit"]]);
-  expect(contributes.pages.find((page) => page.id === "index")?.label).toBe("Home");
+  expect(contributes.pages.find((page) => page.id === "index")?.label).toBe("Image");
   expect(contributes.pages.find((page) => page.id === "create")?.label).toBe("New picture");
   const placeholders: Record<string, string> = {
     favorites: "Pictures you heart show up here so you can find them again.",

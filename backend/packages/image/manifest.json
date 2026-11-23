@@ -78,7 +78,7 @@
     "pages": [
       {
         "id": "index",
-        "label": "Home",
+        "label": "Image",
         "icon": "image",
         "nav": true,
         "kind": "schema",
