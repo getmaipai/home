@@ -51,4 +51,21 @@ describe("ActivityPage with notifications merged in", () => {
       await waitFor(() => expect(api.calls.some((c) => c.startsWith("POST") && c.includes("/api/notifications/dismiss") && c.includes("n1"))).toBe(true));
     } finally { api.restore(); }
   });
+
+  test("an empty list says messages too, and still has no Older messages link", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/notifications/history")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/activity/seen")) return Promise.resolve(Response.json({ seenAt: now() }));
+      if (url.includes("/api/activity")) return Promise.resolve(Response.json({ seenAt: null, dot: "none", items: [] }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = page();
+      await waitFor(() => expect(view.getByText("Nothing here yet")).toBeTruthy());
+      expect(view.getByText("Pictures, videos, songs and messages show up here.")).toBeTruthy();
+      expect(view.queryByText("Older messages")).toBeNull();
+    } finally { globalThis.fetch = original; }
+  });
 });
