@@ -9,6 +9,7 @@ import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
 import { cancelOrDeleteMusic, cancelOrDeleteSound, fetchSound, getSoundJob, submitSound, deleteStemsJob, deleteVoiceConvertJob, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsAvailable, submitVoiceConvert, getVoiceConvertJob, fetchConverted } from "./stack";
+import { fallbackSongTitle } from "./songTitle";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
 import { partsDoneLine, prepareMusicEdit } from "./tool";
@@ -177,6 +178,10 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
     if (typeof input.request.description !== "string") throw new StackMusicError(422, "bad_description");
     // The persisted request is authoritative. Keep the submitted caption in sync with it.
     input.body.caption = input.request.description;
+  }
+  // AUDIO-TITLE-01: an untitled new song gets a real title from its lyrics or description before the refusal check screens it.
+  if (input.task === "text2music" && !input.request.sound && !input.request.score && !input.request.speech && !input.request.ownedFile && !input.request.title?.trim()) {
+    input.request.title = fallbackSongTitle(input.request);
   }
   // Charge storage before admission, then check actual bytes again when saving. Temporary audio is memory only.
   const cap = checkStorageCap(input.actor.role, input.actor.id, Math.ceil(input.request.seconds * 32_000));
