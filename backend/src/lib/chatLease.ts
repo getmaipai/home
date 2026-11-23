@@ -33,6 +33,8 @@ export interface LeaseDeps {
   ready: () => Promise<boolean>;
   /** A generator Max window is open: a lease request waits for it (the job's card says so). */
   windowOpen?: () => boolean;
+  /** Whether the Stack is really in coding mode right now: true while the big model is loaded for chat. A read failure counts as true (no swap storm). */
+  bigIsUp?: () => Promise<boolean>;
   config?: LeaseConfig;
   /** TIER-LEASE-01: what the household queue says about this lease (counts and kinds only). `forPersonId` leaves that person's own jobs out of "heavy running elsewhere". */
   signals?: (forPersonId?: string) => LeaseQueueSignals;
@@ -95,9 +97,20 @@ export function createChatLease(deps: LeaseDeps) {
     // CODE-TIER-03: a Max Code turn takes this same lease and is checked against its own category's grant (`tier.max:coding`).
     if (person.role === "teen" || !holdsMax(person, opts.category ?? "chat")) return { ok: false, refusal: "not_a_holder" };
     if (state === "held" && holderId === person.id) {
-      lastActivityAt = deps.now();
       key = leaseKeyForCategory(opts.category);
       if (opts.pinned && isOwnerOrAdmin(person)) pinned = true;
+      // The Stack may have left coding mode since the take (restart, watchdog): a held lease then follows the Stack's real mode.
+      let up = true;
+      if (deps.bigIsUp) { try { up = await deps.bigIsUp(); } catch { up = true; } }
+      if (up) { lastActivityAt = deps.now(); return { ok: true, state: "held" }; }
+      if (transition) return { ok: false, refusal: "stack_busy" };
+      state = "starting";
+      const run = deps.swapToBig();
+      transition = run;
+      try { await run; } catch { state = "off"; holderId = null; transition = null; return { ok: false, refusal: "swap_failed" }; }
+      transition = null;
+      state = "held";
+      lastActivityAt = deps.now();
       return { ok: true, state: "held" };
     }
     if (deps.windowOpen?.()) return { ok: false, refusal: "max_window" };

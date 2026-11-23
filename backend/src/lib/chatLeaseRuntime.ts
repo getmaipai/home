@@ -16,6 +16,10 @@ export function getChatLease(): ChatLease {
     windowOpen: () => openMaxWindow() !== null,
     signals: (forPersonId) => leaseQueueSignals(forPersonId),
     ready: async () => (await codingModeReadiness()).ready,
+    bigIsUp: async () => {
+      const m = await getStackClient().getCodingMode();
+      return m.state === "switching" || (m.mode === "coding" && m.target !== "normal");
+    },
     swapToBig: async () => {
       const started = Date.now();
       await getStackClient().setCodingMode("coding");

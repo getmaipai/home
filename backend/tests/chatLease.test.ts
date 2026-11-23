@@ -6,7 +6,7 @@ const owner = { id: "owner", role: "owner" } as const;
 const child = { id: "kid", role: "child" } as const;
 const teen = { id: "teen", role: "teen" } as const;
 
-function rig(over: { ready?: boolean; failBig?: boolean; window?: boolean; failReturns?: number } = {}) {
+function rig(over: { ready?: boolean; failBig?: boolean; window?: boolean; failReturns?: number; bigUp?: { value: boolean } } = {}) {
   let returnFailures = over.failReturns ?? 0;
   let clock = 1_000_000;
   const calls: string[] = [];
@@ -14,6 +14,7 @@ function rig(over: { ready?: boolean; failBig?: boolean; window?: boolean; failR
     now: () => clock,
     ready: async () => over.ready ?? true,
     windowOpen: () => over.window === true,
+    ...(over.bigUp ? { bigIsUp: async () => over.bigUp!.value } : {}),
     swapToBig: async () => { calls.push("big"); if (over.failBig) throw new Error("post-load check failed"); },
     swapToStandard: async () => { calls.push("standard"); if (returnFailures > 0) { returnFailures -= 1; throw new Error("stack unreachable"); } },
   });
@@ -177,5 +178,44 @@ describe("max_chat admission hold", () => {
 
   test("without a lease nothing is held for chat", () => {
     expect(admit([job("b", "boost")], now, base).holds).toEqual({});
+  });
+});
+
+describe("a held lease follows the Stack's real mode (coding Max answered by the 27B, 2026-11-23)", () => {
+  test("when the Stack has left coding mode, the next take swaps to the big model again", async () => {
+    const bigUp = { value: true };
+    const { lease, calls } = rig({ bigUp });
+    expect(await lease.acquire(owner, { category: "coding" })).toEqual({ ok: true, state: "held" });
+    expect(await lease.acquire(owner, { category: "coding" })).toEqual({ ok: true, state: "held" });
+    expect(calls).toEqual(["big"]);
+    bigUp.value = false; // the Stack restarted, or something else put chat back
+    expect(await lease.acquire(owner, { category: "coding" })).toEqual({ ok: true, state: "held" });
+    expect(calls).toEqual(["big", "big"]);
+  });
+
+  test("when the swap back to the big model fails, the lease is off and the request is refused", async () => {
+    const bigUp = { value: true };
+    let fail = false;
+    let clock = 1_000_000;
+    const lease = createChatLease({
+      now: () => clock, ready: async () => true, bigIsUp: async () => bigUp.value,
+      swapToBig: async () => { if (fail) throw new Error("post-load check failed"); },
+      swapToStandard: async () => {},
+    });
+    await lease.acquire(owner, { category: "coding" });
+    bigUp.value = false; fail = true;
+    expect(await lease.acquire(owner, { category: "coding" })).toEqual({ ok: false, refusal: "swap_failed" });
+    expect(lease.snapshot().state).toBe("off");
+  });
+
+  test("a status read that throws is treated as still up (no swap storm)", async () => {
+    const calls: string[] = [];
+    const lease = createChatLease({
+      now: () => 1, ready: async () => true, bigIsUp: async () => { throw new Error("stack unreachable"); },
+      swapToBig: async () => { calls.push("big"); }, swapToStandard: async () => {},
+    });
+    await lease.acquire(owner, { category: "coding" });
+    await lease.acquire(owner, { category: "coding" });
+    expect(calls).toEqual(["big"]);
   });
 });
