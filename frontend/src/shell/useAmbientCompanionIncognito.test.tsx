@@ -69,4 +69,12 @@ describe("useAmbientCompanion and Incognito", () => {
       expect(seen!.still).toBeUndefined();
     }
   });
+
+  test("with Incognito on and the companion turned off in settings nothing shows", async () => {
+    writeIncognitoCache(true);
+    stubApi();
+    spyOn(api, "settingsValues").mockResolvedValue([{ key: "companions.dock", value: false }] as never);
+    const view = mount();
+    await waitFor(() => expect(view.getByTestId("state").textContent).toBe("none"));
+  });
 });
