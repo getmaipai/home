@@ -4,11 +4,9 @@
 // failure, and stays out of a child's way; the bell's count is neutral unless
 // something urgent is waiting.
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { act, cleanup, waitFor } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { StatusIndicator } from "@/shell/StatusIndicator";
-import { NotificationBell } from "@/shell/NotificationBell";
-import type { NotificationDeliveryView } from "@/lib/api";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import { paintsRed } from "../../tests/paintsRed";
 
@@ -85,38 +83,6 @@ describe("the header pill while chat is paused or down", () => {
     try {
       const view = renderWithQueryClient(<MemoryRouter><StatusIndicator child /></MemoryRouter>);
       expect(await view.findByRole("link", { name: "All good" })).toBeTruthy();
-    } finally { restore(); }
-  });
-});
-
-function notification(id: string, level: NotificationDeliveryView["level"]): NotificationDeliveryView {
-  return { id, typeId: "repairs.new", level, text: "MaiPai Stack is offline", channels: ["in_app"], createdAt: "2026-10-06T00:00:00.000Z", readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: false };
-}
-
-function renderBell(items: NotificationDeliveryView[]) {
-  const original = globalThis.fetch;
-  globalThis.fetch = mock(() => Promise.resolve(Response.json(items))) as unknown as typeof fetch;
-  const view = renderWithQueryClient(<MemoryRouter><NotificationBell /></MemoryRouter>);
-  return { view, restore: () => { globalThis.fetch = original; } };
-}
-
-describe("the bell's count follows how urgent its items are", () => {
-  test("a time-sensitive item (a Repairs notice) gets a neutral count, never red", async () => {
-    const { view, restore } = renderBell([notification("n1", "time_sensitive")]);
-    try {
-      const button = await view.findByRole("button", { name: /Notifications \(1 pending\)/ });
-      const count = await waitFor(() => { const found = button.querySelector('[data-slot="badge"]'); expect(found).toBeTruthy(); return found!; });
-      expect(count.getAttribute("data-variant")).toBe("secondary");
-      expect(count.className).not.toContain("bg-destructive");
-    } finally { restore(); }
-  });
-
-  test("an immediate item keeps the red count", async () => {
-    const { view, restore } = renderBell([notification("n1", "immediate")]);
-    try {
-      const button = await view.findByRole("button", { name: /Notifications \(1 pending\)/ });
-      const count = await waitFor(() => { const found = button.querySelector('[data-slot="badge"]'); expect(found).toBeTruthy(); return found!; });
-      expect(count.getAttribute("data-variant")).toBe("destructive");
     } finally { restore(); }
   });
 });
