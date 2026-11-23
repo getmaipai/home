@@ -1,11 +1,11 @@
 import { i18n } from "@lingui/core";
-import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import RailProfileMenu, { type RailProfileMenuProps } from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
 import { api, type Roster } from "@/lib/api";
 import { ROLE_LABELS } from "@/apps/people/roles";
-import { NotificationBell, useNotificationsQuery } from "@/shell/NotificationBell";
+import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { useStatusSummary } from "@/shell/StatusIndicator";
 
 const HELP_URL = "https://github.com/getmaipai/home/blob/main/docs/user/README.md";
@@ -33,7 +33,7 @@ export function RailProfile({
   const pending = Array.isArray(items) ? items.length : 0;
   const urgent = Array.isArray(items) && items.some((n) => n.level === "immediate");
   const { summary } = useStatusSummary();
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const child = person.age_band === "child";
   const problem = summary.level === "degraded" || summary.level === "offline";
@@ -46,7 +46,7 @@ export function RailProfile({
       tourId="shell.profile-menu"
       displayName={person.display_name}
       subtitle={ROLE_LABELS[person.role]}
-      notifications={{ count: pending, urgent, onOpen: () => setNotificationsOpen(true) }}
+      notifications={{ count: pending, urgent, onOpen: () => navigate("/activity") }}
       status={status}
       incognito={{ on: incognito, onChange: onIncognitoChange }}
       settingsHref="/settings"
@@ -60,8 +60,6 @@ export function RailProfile({
           onSignedOut();
         }, () => toast.error(i18n._({ id: "Could not log out. Try again.", message: "Could not log out. Try again." })));
       }}
-    >
-      <NotificationBell anchored open={notificationsOpen} onOpenChange={setNotificationsOpen} />
-    </RailProfileMenu>
+    />
   );
 }

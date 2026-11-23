@@ -6,7 +6,6 @@
     "shell/AlarmRinger.tsx": 3,
     "shell/sessionLockContext.tsx": 4,
     "shell/MediaPickerDialog.tsx": 3,
-    "shell/NotificationBell.tsx": 5,
     "shell/AmbientCompanionPane.tsx": 4,
     "shell/library/LibraryTrash.tsx": 3,
     "shell/library/TranscriptFindReplace.tsx": 4,

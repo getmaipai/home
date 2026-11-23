@@ -37,7 +37,6 @@ import { VoicesIcon } from "@/shell/pages/VoicesPage";
 import { CommandsIcon } from "@/shell/pages/CommandsPage";
 import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
-import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
 import { RemindersIcon } from "@/apps/reminders/remindersIcon";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 import { ClockHeaderAdd } from "@/apps/clock/ClockHeaderTitle";
@@ -73,7 +72,9 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/commands": { icon: CommandsIcon, label: "Commands" },
   "/privacy": { icon: PrivacyIcon, label: "Privacy" },
   "/users": { icon: UsersIcon, label: "Users" },
-  "/notifications": { icon: NotificationsIcon, label: "Notifications" },
+  // ACTIVITY-MERGE-01: the Notifications page is gone (/notifications redirects to /activity); this row keeps the old path's header
+  // valid during the redirect. The bell is the rail's own icon name, not a second copy of the deleted page's constant.
+  "/notifications": { icon: getIcon("bell"), label: "Notifications" },
   "/reminders": { icon: RemindersIcon, label: "Reminders" },
   "/clock": { icon: getIcon("clock"), label: "Clock" },
   "/house": { icon: getIcon("house"), label: "House" },

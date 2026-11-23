@@ -1,16 +1,9 @@
 import { i18n } from "@lingui/core";
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as RadixPopover from "@radix-ui/react-popover";
-import { Link } from "react-router-dom";
-import { Button } from "@maipai/ui/src/ui/button";
-import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
-import { getIcon } from "@maipai/ui/src/icons";
+import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { pauseTvNavForOverlay } from "@maipai/ui/src/tvNav";
 import { NOTIFICATION_COPY } from "@maipai/home-backend/src/lib/notificationCopy";
 import { api, type NotificationDeliveryView } from "@/lib/api";
-import { ACTIVITY_PATH } from "@/shell/activity";
 
 /** ACTIVITY-PAGE-01: a notification that says a job finished opens its result (existing types only; no new notification type). */
 export const NOTIFICATION_RESULT_LINKS: Readonly<Record<string, string>> = { "video.clip_ready": "/apps/video/create" };
@@ -39,20 +32,20 @@ export const NOTIFICATIONS_QUERY_KEY = ["notifications"];
 export const NOTIFICATIONS_HISTORY_QUERY_KEY = ["notifications-history"];
 const QUERY_KEY = NOTIFICATIONS_QUERY_KEY;
 
-// The one place both the bell's own popover and the phone header's
-// avatar dot/count (HOME-UI-02f) read pending notifications from - the
-// same queryKey/queryFn/refetchInterval retyped in each caller was a
-// real drift risk a code review caught (a future change to the query
-// touching one copy and not the other), not just an efficiency nit:
-// react-query already dedupes identical queryKeys to one fetch/poll
-// regardless of how many components call this, so this exists for one
-// definition, not for caching.
+// The one place the shell reads pending notifications from (the rail
+// profile menu's count, the phone header's avatar dot/count,
+// HOME-UI-02f) - the same queryKey/queryFn/refetchInterval retyped in
+// each caller was a real drift risk a code review caught (a future
+// change to the query touching one copy and not the other), not just an
+// efficiency nit: react-query already dedupes identical queryKeys to one
+// fetch/poll regardless of how many components call this, so this exists
+// for one definition, not for caching.
 // getmaipai/home#181: ChatPage.tsx's own ProjectResultReload consumes
 // this exact query too (React Query dedupes an identical queryKey to one
 // fetch/poll, this file's own header comment) - a background project's
 // `project.done`/`project.failed` delivery is what tells the open chat
-// its already-loaded turn just gained an artifact, so it reuses the
-// bell's poll instead of standing up a second one.
+// its already-loaded turn just gained an artifact, so it reuses this
+// poll instead of standing up a second one.
 export function useNotificationsQuery() {
   return useQuery<NotificationDeliveryView[]>({
     queryKey: QUERY_KEY,
@@ -63,21 +56,29 @@ export function useNotificationsQuery() {
 
 // The phone header's own avatar dot (HOME-UI-02f: "the bell's count
 // shows as a dot on the avatar") needs the pending count without
-// mounting this whole bell.
+// mounting a component.
 export function usePendingNotificationCount(): number {
   return useNotificationsQuery().data?.length ?? 0;
+}
+
+// ACTIVITY-PAGE-01: the bell's popover is gone - browsing and dismissing
+// live on the Activity page now, opened from the rail's profile menu.
+// The old header bell drew nothing of its own here anymore, so this
+// renders nothing; callers show the pending count through
+// `usePendingNotificationCount` (the avatar dot, HOME-UI-02f).
+export function NotificationBell(): null {
+  return null;
 }
 
 // A new arrival becoming a Toast - lib/notifications.ts's own `in_app`
 // channel is just a persisted row; this is what turns "a new row
 // exists" into something a person actually notices without having to
-// open the bell. Split out of NotificationBell (a code review, HOME-
-// UI-02f: the phone header fold hides that whole component on phone,
+// open Activity. Split out of the old bell popover (a code review,
+// HOME-UI-02f: the phone header fold hid that whole component on phone,
 // which silently took this toast behavior with it - the only place it
 // lived) and mounted once, unconditionally, in AppShell.tsx, so a toast
-// fires the same way regardless of whether the bell icon itself is
-// visible on screen right now. Renders nothing - `useToast()`'s own
-// provider does the actual on-screen work.
+// fires the same way regardless of where the person is. Renders nothing
+// - `useToast()`'s own provider does the actual on-screen work.
 export function NotificationToaster(): null {
   const query = useNotificationsQuery();
   const seenIds = useRef<Set<string> | null>(null);
@@ -99,9 +100,9 @@ export function NotificationToaster(): null {
         // "Memory updated" chip already shows it there; when it isn't
         // (the judge can finish well after someone has moved on to
         // another page - memoryJudge.ts runs off a background queue),
-        // this bell's own badge and pending list are the fallback - a
-        // real delivery still lands there and in the 30-day history,
-        // only the toast itself is skipped.
+        // the Activity page's pending list is the fallback - a real
+        // delivery still lands there and in the 30-day history, only
+        // the toast itself is skipped.
         if (!n.toast || n.typeId === "alarm.due") continue;
         push(notificationLine(n));
       }
@@ -109,173 +110,4 @@ export function NotificationToaster(): null {
   }, [query.data, push]);
 
   return null;
-}
-
-// The header half of the pending-list surface (getmaipai/.github/docs/
-// NOTIFICATIONS.md: "the shell's notification center") - browsing and
-// dismissing. Not a Dialog (docs/MODALS.md): a non-modal Popover, since
-// doing either never blocks the rest of the page.
-/** RAIL-01: with `anchored`, the bell draws no button of its own. The
- * pending list opens from the rail's profile menu (its Notifications
- * row), anchored beside the avatar; the caller owns `open`. */
-export function NotificationBell({ anchored = false, open: controlledOpen, onOpenChange }: { anchored?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void } = {}) {
-  const queryClient = useQueryClient();
-  const query = useNotificationsQuery();
-  // Only a real list counts: a malformed answer shows nothing pending rather
-  // than crashing the header the bell now sits in (CHAT-CALM-ERRORS-01d).
-  const items = Array.isArray(query.data) ? query.data : [];
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
-  const open = controlledOpen ?? uncontrolledOpen;
-  const setOpen = (next: boolean) => {
-    setUncontrolledOpen(next);
-    onOpenChange?.(next);
-  };
-  // Anchored, the caller opens the list by prop, so Radix's onOpenChange
-  // never sees the open: pause TV navigation from the state itself, once
-  // per open, and release it on close or unmount.
-  useEffect(() => {
-    if (!anchored || !open) return;
-    pauseTvNavForOverlay(true);
-    return () => pauseTvNavForOverlay(false);
-  }, [anchored, open]);
-  const BellIcon = getIcon("bell");
-
-  // Shared by both dismiss mutations below (a review caught them
-  // duplicating this restore-on-error/invalidate-both-caches logic
-  // almost verbatim, the exact kind of drift this file's own header
-  // comment already warns about - a fix applied to only one copy would
-  // reintroduce the stale-row bug that comment describes, for whichever
-  // path didn't get it).
-  function restoreOnError(context: { previous: NotificationDeliveryView[] | undefined } | undefined) {
-    // A failed dismiss restores exactly what was there before, rather
-    // than corrupting local state with an optimistic removal the
-    // server never actually applied.
-    if (context?.previous) queryClient.setQueryData(QUERY_KEY, context.previous);
-  }
-  function invalidateBothCaches() {
-    return Promise.all([
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
-      queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_HISTORY_QUERY_KEY }),
-    ]);
-  }
-
-  // useMutation, not a bare optimistic `setQueryData` plus a hand-rolled
-  // try/catch (a code review, 2026-09-05, found this the one write in
-  // the migrated pages not using the mutation the others had already
-  // established): `onMutate` cancels any poll already in flight before
-  // applying the optimistic removal, and `onSettled` always refetches
-  // once the dismiss call resolves either way - both close the same real
-  // race, a `refetchInterval` tick landing between the optimistic removal
-  // and the dismiss actually reaching the server, which could otherwise
-  // bring a just-dismissed notification back.
-  const dismissMutation = useMutation({
-    mutationFn: (id: string) => api.dismissNotification(id),
-    onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
-      const previous = queryClient.getQueryData<NotificationDeliveryView[]>(QUERY_KEY);
-      queryClient.setQueryData<NotificationDeliveryView[]>(QUERY_KEY, (prev) => (prev ?? []).filter((n) => n.id !== id));
-      return { previous };
-    },
-    onError: (_err, _id, context) => restoreOnError(context),
-    onSettled: invalidateBothCaches,
-  });
-
-  // Lane 15 (Jesse's ask from live use): i18n._({ id: "Dismiss all", message: "Dismiss all" }) for the pending
-  // list here - same optimistic-then-reconcile shape as the single
-  // dismiss above, `{ all: true }` since this popover only ever shows
-  // what's currently pending (no 30-day window the way the history page
-  // has), so "all" here already means exactly what's on screen. Open to
-  // every signed-in person, adults and children alike - a notification
-  // is inherently personal (getmaipai/.github/docs/NOTIFICATIONS.md),
-  // the same posture the single-dismiss route already holds; nothing
-  // here needs a role check.
-  const dismissAllMutation = useMutation({
-    mutationFn: () => api.dismissNotifications({ all: true }),
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
-      const previous = queryClient.getQueryData<NotificationDeliveryView[]>(QUERY_KEY);
-      queryClient.setQueryData<NotificationDeliveryView[]>(QUERY_KEY, []);
-      return { previous };
-    },
-    onError: (_err, _vars, context) => restoreOnError(context),
-    onSettled: invalidateBothCaches,
-  });
-
-  return (
-    <RadixPopover.Root
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!anchored) pauseTvNavForOverlay(next);
-      }}
-    >
-      {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : (
-        <RadixPopover.Trigger asChild>
-          <Button variant="ghost" aria-label={items.length > 0 ? i18n._({ id: "Notifications ({count} pending)", message: "Notifications ({count} pending)", values: { count: items.length } }) : i18n._({ id: "Notifications", message: "Notifications" })}>
-            <BellIcon className="h-5 w-5" aria-hidden />
-            {items.length > 0 ? (
-              // RULE9-WRAPDIV-01: the count is the kit Badge as it ships,
-              // inside the button, not a hand-drawn overlay. CHAT-CALM-
-              // ERRORS-01d (design section 6): destructive only when
-              // something urgent (an `immediate` item) is waiting; a
-              // Repairs notice or any other item gets the neutral count.
-              <Badge variant={items.some((n) => n.level === "immediate") ? "destructive" : "secondary"}>{items.length}</Badge>
-            ) : null}
-          </Button>
-        </RadixPopover.Trigger>
-      )}
-      <RadixPopover.Portal>
-        <RadixPopover.Content
-          aria-label={i18n._({ id: "Notifications", message: "Notifications" })}
-          side={anchored ? "right" : "bottom"}
-          align="end"
-          sideOffset={8}
-          className="motion-reveal z-40 w-80 max-w-[calc(100vw-2rem)] p-2 text-card-foreground"
-        >
-          {items.length === 0 ? (
-            <p className="px-2 py-3 text-base text-muted-foreground">{i18n._({ id: "Nothing pending.", message: "Nothing pending." })}</p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border">
-              <div className="flex items-center justify-end px-2 pb-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => dismissAllMutation.mutate()}
-                  disabled={dismissAllMutation.isPending}
-                  className="text-sm text-muted-foreground"
-                >
-                  {dismissAllMutation.isPending ? i18n._({ id: "Dismissing…", message: "Dismissing…" }) : i18n._({ id: "Dismiss all", message: "Dismiss all" })}
-                </Button>
-              </div>
-              {items.map((n) => (
-                <div key={n.id} className="flex items-start justify-between gap-2 py-2 px-2">
-                  <p className="text-base">{notificationLine(n)}{NOTIFICATION_RESULT_LINKS[n.typeId] ? <> <Link to={NOTIFICATION_RESULT_LINKS[n.typeId]!} className="text-supporting text-primary underline" onClick={() => setOpen(false)}>{i18n._({ id: "Open", message: "Open" })}</Link></> : null}</p>
-                  {/* 48px minimum, not "sm": this is the only way to
-                      dismiss a notification, the same accessibility
-                      floor docs/UI.md's 2026-09-05 audit already
-                      established for a sole-path action. */}
-                  <Button
-                    variant="ghost"
-                    onClick={() => dismissMutation.mutate(n.id)}
-                    className="shrink-0 text-sm text-muted-foreground"
-                  >
-                    {i18n._({ id: "Dismiss", message: "Dismiss" })}</Button>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* The thirty-day history page (session E step 5) - this popover
-              only ever shows what's still pending, never a dismissed or
-              already-read row, so "view history" is the one way to reach
-              those at all. */}
-          <div className="flex flex-wrap gap-x-4 border-t border-border pt-1">
-            <Link to={ACTIVITY_PATH} className="block px-2 py-2 text-supporting text-primary underline" onClick={() => setOpen(false)}>
-              {i18n._({ id: "Activity", message: "Activity" })}</Link>
-            <Link to="/notifications" className="block px-2 py-2 text-sm text-primary underline" onClick={() => setOpen(false)}>
-              {i18n._({ id: "View history", message: "View history" })}</Link>
-          </div>
-        </RadixPopover.Content>
-      </RadixPopover.Portal>
-    </RadixPopover.Root>
-  );
 }
