@@ -1,9 +1,15 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api, type Roster } from "@/lib/api";
+import { api, type CompanionCard, type Roster } from "@/lib/api";
 import { COMPANION_AVATAR_QUERY_KEY, mapCompanionClips } from "@/apps/chat/useCompanionAvatar";
 import { useIncognitoContext } from "@/shell/incognitoContext";
+
+/** Generic companion shown while Incognito is on: no memory, no history, none of the person's companion data is read. */
+const INCOGNITO_COMPANION: CompanionCard = {
+  id: "incognito", name: "Companion", type: "adult", type_label: "Adult", tagline: "", who_can_use: "", dials: [], voice: "",
+  is_default: true, is_household: false, status: "", chats: 0, can_edit: false, can_copy: false,
+};
 
 /** The ambient companion data used by the shell, or null while settings load,
  * when the person turns it off, or when no companion is available. */
@@ -35,7 +41,7 @@ export function useAmbientCompanion(person: Roster) {
   const refetchActivity = activity.refetch;
   useEffect(() => { if (wanted && (robot?.companion_id || companionId) !== undefined) void refetchActivity(); }, [pathname, wanted, robot?.companion_id, companionId, refetchActivity]);
 
-  if (incognito) return null;
+  if (incognito) return { kind: "companion" as const, companion: INCOGNITO_COMPANION, clips: undefined, pack: null, mouthStill: null, portrait: undefined, still: undefined, action: undefined };
   if (!settings.isSuccess || (wanted && robots.isPending)) return undefined;
   if (!wanted) return null;
   if (robot) {
