@@ -4456,7 +4456,7 @@ msgid "setting.backup.max_total_gb.label"
 msgstr "Límite de almacenamiento de copias de seguridad (GB)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:26
+#: src/apps/settings/AiModelsPage.tsx:29
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/Routes.tsx:170
@@ -22241,6 +22241,11 @@ msgid "Open source conversation"
 msgstr "Abrir conversación original"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/StackAdminLink.tsx:19
+msgid "Open Stack admin"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1056
 #, needs-review
 msgid "setting.news.reader_open.label"
@@ -28983,6 +28988,11 @@ msgid "setting.companion.voice.lively_child.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/AiModelsPage.tsx:27
+msgid "Stack admin"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/performance/DiskHardwareBody.tsx:33
 #, needs-review
 msgid "Stack configured, no reading yet"
@@ -29537,7 +29547,7 @@ msgid "Stopwatch running"
 msgstr "Cronómetro en marcha"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:26
+#: src/apps/settings/AiModelsPage.tsx:29
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:99
 #: src/shell/pages/StoragePage.tsx:118
@@ -29568,7 +29578,7 @@ msgid "area.Storage and backups"
 msgstr "Almacenamiento y copias de seguridad"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:26
+#: src/apps/settings/AiModelsPage.tsx:29
 msgid "Storage and backups"
 msgstr ""
 
@@ -31594,7 +31604,7 @@ msgid "setting.chat.search_assist.help"
 msgstr "El modelo decide cuándo buscar en la web; este ajuste solo elige si Home además cuenta las búsquedas omitidas que parecían necesarias (Shadow, el predeterminado), las compensa (Rescue) o no hace ninguna de las dos cosas (Off)."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:25
+#: src/apps/settings/AiModelsPage.tsx:28
 msgid "The model for each level is chosen above. Here you choose which people may use Boost and Max."
 msgstr ""
 
@@ -32020,6 +32030,11 @@ msgstr "La fuente no dice nada sobre la edad, así que sigue bloqueado hasta que
 #, needs-review
 msgid "The source says nothing about age."
 msgstr "El origen no dice nada sobre la edad."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/AiModelsPage.tsx:27
+msgid "The Stack has its own admin page with the same models and more settings. It opens in a new tab."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:98
@@ -35827,7 +35842,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:51
-#: src/apps/settings/AiModelsPage.tsx:25
+#: src/apps/settings/AiModelsPage.tsx:28
 msgid "Who can use each level"
 msgstr ""
 
