@@ -87,7 +87,7 @@ async function releaseMusic(job: MusicJob): Promise<void> {
     const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
     if (!actor) { await dropStackJob(job, submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
     void watch(job, actor, submitted.done);
-    if (job.task !== "stems" && !job.request.sound) void startSongCover(actor, job).catch(() => {});
+    if (job.task !== "stems") void startSongCover(actor, job).catch(() => {});
   } catch (error) { if (error instanceof StackMusicError && (error.code === "queue_full" || (error.code === "no_memory" && holdMaxAfterMemoryRefusal(job.request)))) { job.stage = "queued"; persistMusicJob(job); return; } fail(job, error instanceof StackMusicError ? error.code : "failed"); }
 }
 export function plainMusicFailure(code: string): string {

@@ -15,6 +15,14 @@ import { musicJobLockState } from "./lock";
 import type { PersonRow } from "@/types";
 
 export function coverPromptFor(request: MusicRequest): string {
+  if (request.sound) {
+    // A sound's cover describes the sound only: the model wording and the loop note are dropped, never the title or lyrics.
+    let what = request.description.trim();
+    if (what.startsWith("sound effect, no melody, no singing: ")) what = what.slice("sound effect, no melody, no singing: ".length).trim();
+    if (what.endsWith(", seamless loop")) what = what.slice(0, -", seamless loop".length).trim();
+    const subject = `Cover art for a sound effect: ${what}`;
+    return `${subject.slice(0, 578)}. No text, no letters.`;
+  }
   const title = request.title?.trim();
   const description = request.description.trim();
   const lines = request.instrumental ? [] : (request.lyrics ?? "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^\[.*\]$/.test(line)).slice(0, 2);
