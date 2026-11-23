@@ -183,7 +183,7 @@ const mediaProvider: SearchProvider = {
   heading: "Media",
   async search(query, actor) {
     return searchMedia(actor, query).flatMap((group) => group.rows).slice(0, RESULT_CAP).map((row) => ({
-      kind: "media", id: row.id, title: row.title, ...(row.subtitle ? { subtitle: row.subtitle } : {}), href: row.href,
+      kind: "media", id: row.id, title: row.title, ...(row.subtitle ? { subtitle: row.subtitle } : {}), ...(row.artwork_url ? { thumbnail: row.artwork_url } : {}), href: row.href,
     }));
   },
 };
