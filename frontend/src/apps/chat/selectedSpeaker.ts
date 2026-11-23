@@ -7,7 +7,8 @@ import type { CompanionList, Conversation } from "@/lib/api";
 
 type SettingValue = { key: string; value: unknown };
 
-export function selectedSpeakerFromCache(qc: QueryClient, personId: string, conversationId: string | undefined, tryCompanionId: string | undefined): AnsweredBy | undefined {
+export function selectedSpeakerFromCache(qc: QueryClient, personId: string, conversationId: string | undefined, tryCompanionId: string | undefined, incognito = false): AnsweredBy | undefined {
+  if (incognito) return undefined; // a generic companion is never taken from the cached companion list or the person's pick
   const list = qc.getQueryData<CompanionList>(["companions"]);
   if (!list?.companions?.length) return undefined;
   const conversation = conversationId ? qc.getQueryData<Conversation>(["conversation", conversationId]) : undefined;

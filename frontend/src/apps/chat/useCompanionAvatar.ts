@@ -3,6 +3,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import type { CompanionClips } from "@maipai/ui/src/elements/companion-avatar-machine";
 import { api } from "@/lib/api";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { useIncognitoContext } from "@/shell/incognitoContext";
 
 export const COMPANION_AVATAR_QUERY_KEY = ["companion-avatar"] as const;
 
@@ -17,12 +18,14 @@ export function mapCompanionClips(states: Record<string, { loop: boolean; urls: 
 
 export function useCompanionAvatar(companionId?: string | null) {
   const person = useContext(WakeWordPersonContext);
+  const { on: incognito } = useIncognitoContext();
   const query = useQuery({
     queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, companionId ?? null],
     queryFn: () => api.companionAvatar(companionId ?? undefined),
-    enabled: person !== null,
+    enabled: person !== null && !incognito,
     staleTime: 5 * 60_000,
   });
+  if (incognito) return { avatar: null, clips: null, loading: false };
   const avatar = query.data?.avatar ?? null;
   return { avatar: query.isLoading || query.isPending ? null : avatar, clips: avatar && Object.keys(avatar.states).length ? mapCompanionClips(avatar.states) : null, loading: query.isLoading || query.isPending };
 }
@@ -30,12 +33,13 @@ export function useCompanionAvatar(companionId?: string | null) {
 /** The idle still (else the first state's) of each companion, by id. Shares the avatar query cache. */
 export function useCompanionStills(ids: string[]): Record<string, string | undefined> {
   const person = useContext(WakeWordPersonContext);
+  const { on: incognito } = useIncognitoContext();
   const keys = ids;
   const results = useQueries({
     queries: keys.map((id) => ({
       queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, id],
       queryFn: () => api.companionAvatar(id),
-      enabled: person !== null,
+      enabled: person !== null && !incognito,
       staleTime: 5 * 60_000,
     })),
   });
@@ -44,20 +48,23 @@ export function useCompanionStills(ids: string[]): Record<string, string | undef
     const states = results[index]?.data?.avatar?.states ?? {};
     stills[id] = results[index]?.data?.avatar?.portrait ?? (states.idle ?? Object.values(states)[0])?.urls.still;
   });
+  if (incognito) return Object.fromEntries(ids.map((id) => [id, undefined]));
   return stills;
 }
 
 /** Animated clips for reply faces, sharing the same query cache and keys as the header stills. */
 export function useReplyCompanionClips(ids: string[]): Record<string, CompanionClips | undefined> {
   const person = useContext(WakeWordPersonContext);
+  const { on: incognito } = useIncognitoContext();
   const results = useQueries({
     queries: ids.map((id) => ({
       queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, id],
       queryFn: () => api.companionAvatar(id),
-      enabled: person !== null,
+      enabled: person !== null && !incognito,
       staleTime: 5 * 60_000,
     })),
   });
+  if (incognito) return Object.fromEntries(ids.map((id) => [id, undefined]));
   return Object.fromEntries(ids.map((id, index) => {
     const avatar = results[index]?.data?.avatar;
     return [id, avatar && Object.keys(avatar.states).length ? mapCompanionClips(avatar.states) : undefined];

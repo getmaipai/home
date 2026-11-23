@@ -96,6 +96,7 @@ import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
 import { selectedSpeakerFromCache } from "@/apps/chat/selectedSpeaker";
+import { incognitoHeaderCompanion } from "@/apps/chat/incognitoCompanion";
 import { useTierLease } from "@/shell/tierLease/useTierLease";
 import { composerNoticeFor, consumeMaxPick, dropMaxPick, ensureMaxLeaseForSend, isMaxPicked, useMaxChatNotice } from "@/apps/chat/maxChat";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
@@ -548,7 +549,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           onTurnSent: () => consumeMaxPick(maxQueryClient),
           getAgeBand: () => person.age_band,
           getTryCompanionId: () => tryCompanionIdRef.current,
-          getSelectedSpeaker: () => selectedSpeakerFromCache(maxQueryClient, person.id, visibleConversationIdRef.current, tryCompanionIdRef.current),
+          getSelectedSpeaker: () => selectedSpeakerFromCache(maxQueryClient, person.id, visibleConversationIdRef.current, tryCompanionIdRef.current, temporaryModeRef.current && tryCompanionIdRef.current === undefined),
           consumeRetryWithCurrentCompanion: () => {
             const value = retryWithCurrentCompanionRef.current;
             retryWithCurrentCompanionRef.current = false;
@@ -861,6 +862,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
 }) {
   const aui = useAui();
   const queryClient = useQueryClient();
+  const { on: incognito } = useIncognitoContext();
   const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions });
   const personSettings = useQuery({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
@@ -883,7 +885,8 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     window.addEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
     return () => window.removeEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
   }, [aui]);
-  useSetChatHeaderData({
+  // Incognito shows a generic companion in the header: no selected id, no picker list, no remembered name.
+  useSetChatHeaderData(incognitoHeaderCompanion(incognito && !trying, {
     sheetOpen,
     onToggleSheet,
     inShellBar,
@@ -899,7 +902,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     defaultCompanionId,
     companions: companionChoices,
     ...(trying ? { defaultCompanionId: null } : {}),
-    onCompanionChange: async (companionId) => {
+    onCompanionChange: async (companionId: string | null) => {
       if (trying) return;
       if (!pinnable) return;
       await companionMutation.run(async () => {
@@ -924,7 +927,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     },
     // Same call the row menu makes: updateCustom replaces the whole
     // object, so keep the other keys.
-    onPinChange: async (next) => {
+    onPinChange: async (next: boolean) => {
       try {
         const custom = aui.threadListItem().getState().custom;
         await aui.threadListItem().updateCustom({ ...custom, pinned: next });
@@ -947,7 +950,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     // rename/delete this chat. Try again.")`) - this header's own
     // actions are the same operations on the same runtime and need the
     // same feedback, not a silent no-op the person has no way to notice.
-    onRename: async (next) => {
+    onRename: async (next: string) => {
       try {
         await aui.threadListItem.rename(next);
       } catch (error) {
@@ -970,7 +973,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
       // happens to fall back to.
       await aui.threads.switchToNewThread();
     },
-  });
+  }));
   return null;
 }
 
