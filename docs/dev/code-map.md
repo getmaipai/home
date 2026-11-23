@@ -198,7 +198,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/code/codeShared.tsx` | codeErrorLine, pollDelay, CodeComposerContexts |
 | `frontend/src/apps/code/layout.tsx` | Stack |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
-| `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |
 | `frontend/src/apps/people/FaceEnrollmentBody.tsx` | canViewFaceEnrollment, FaceEnrollmentBody |
 | `frontend/src/apps/people/FaceEnrollmentPage.tsx` | FaceEnrollmentPage |
 | `frontend/src/apps/people/NewPersonForm.tsx` | NewPersonForm |
@@ -327,6 +326,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/SleepMenu.tsx` | SleepMenu |
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
 | `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, ListenStatusContext, MediaDockContext, useMediaDock, MAKING_NOT_READY_LINE |
+| `frontend/src/shell/music/MusicPendingBar.tsx` | MusicPendingBar |
 | `frontend/src/shell/music/MusicPlayerBar.tsx` | LAST_SONG_LINE, keyBelongsToControl, useMusicKeys, MusicPlayerBar |
 | `frontend/src/shell/music/MusicQueuePane.tsx` | musicPaneTabs, openMusicQueue |
 | `frontend/src/shell/music/WaveformSeek.tsx` | barsOf, usePeaks, WaveformSeek |
@@ -975,6 +975,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/shazamHelper.ts` | findShazamPython, wavOf, makeSignature |
 | `backend/src/lib/music/shazamLookup.ts` | SHAZAM_HOST, SHAZAM_USER_AGENT, SHAZAM_QUIET_MS, __resetShazamForTests, shazamQuietUntil, shazamBody |
 | `backend/src/lib/music/songEdit.ts` | SONG_GONE_LINE, runSongEdit |
+| `backend/src/lib/music/songTitle.ts` | fallbackSongTitle |
 | `backend/src/lib/music/sound.ts` | SOUND_NOT_FOUND_LINE, resolveSound |
 | `backend/src/lib/music/soundAudio.ts` | LOOP_FADE_SECONDS, wavOfPcm, crossfadeLoopWav, mixSoundAtWav, m4aToWav, wavToM4a |
 | `backend/src/lib/music/soundMaker.ts` | MAKE_SOUND_TOOL_ID, makeSoundArgs, runMakeSound |
