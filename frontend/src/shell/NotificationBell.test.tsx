@@ -257,3 +257,12 @@ describe("notificationLine", () => {
     expect(notificationLine(row)).toContain("1 vez");
   });
 });
+
+// ACTIVITY-MERGE-01: the bell component is gone; only the query helpers and the toaster stay in this module.
+describe("module surface", () => {
+  test("exports no NotificationBell component", async () => {
+    const mod = await import("@/shell/NotificationBell");
+    expect("NotificationBell" in mod).toBe(false);
+    expect(typeof mod.NotificationToaster).toBe("function");
+  });
+});
