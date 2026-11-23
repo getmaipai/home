@@ -40,16 +40,33 @@ describe("useAmbientCompanion and Incognito", () => {
     await waitFor(() => expect(view.getByTestId("state").textContent).toBe("Marlow Companion"));
   });
 
-  test("with Incognito on no companion shows and none of its data is read", async () => {
+  test("with Incognito on a generic companion shows and none of the person's companion data is read", async () => {
     writeIncognitoCache(true);
     const calls = stubApi();
     const view = mount();
-    await waitFor(() => expect(view.getByTestId("state").textContent).toBe("none"));
+    await waitFor(() => expect(view.getByTestId("state").textContent).toBe("Companion"));
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(view.getByTestId("state").textContent).toBe("none");
+    expect(view.getByTestId("state").textContent).toBe("Companion");
     expect(calls.companions).not.toHaveBeenCalled();
     expect(calls.avatar).not.toHaveBeenCalled();
     expect(calls.robots).not.toHaveBeenCalled();
     expect(calls.activity).not.toHaveBeenCalled();
+  });
+
+  test("the generic Incognito companion has no history link, portrait or clips", async () => {
+    writeIncognitoCache(true);
+    stubApi();
+    let seen: ReturnType<typeof useAmbientCompanion>;
+    function Capture() { seen = useAmbientCompanion(person); return null; }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><IncognitoProvider><MemoryRouter initialEntries={["/chat"]}><Capture /></MemoryRouter></IncognitoProvider></QueryClientProvider>);
+    await waitFor(() => expect(seen).toBeTruthy());
+    expect(seen!.kind).toBe("companion");
+    if (seen!.kind === "companion") {
+      expect(seen!.companion.id).toBe("incognito");
+      expect(seen!.action).toBeUndefined();
+      expect(seen!.clips).toBeUndefined();
+      expect(seen!.still).toBeUndefined();
+    }
   });
 });
