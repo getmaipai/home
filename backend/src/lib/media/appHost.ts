@@ -1130,7 +1130,7 @@ export function savedMadeSounds(person: PersonRow) {
       }
       let loop = false;
       try { const sound = (JSON.parse(job?.request ?? "{}") as { sound?: { loop?: boolean; looped?: boolean } }).sound; loop = !!sound?.loop && sound.looped !== false; } catch { /* malformed job has no loop flag */ }
-      return [{ id: item.id, title: item.title, duration_s: item.duration_s, file_id: item.location.file_id, job_id: job?.id ?? null, src: `/api/files/${encodeURIComponent(item.location.file_id)}/content`, loop }];
+      return [{ id: item.id, title: item.title, duration_s: item.duration_s, file_id: item.location.file_id, job_id: job?.id ?? null, src: `/api/files/${encodeURIComponent(item.location.file_id)}/content`, loop, cover: !!job?.coverFileId }];
     });
 }
 /** MUSIC-LIKE-01: the finished single files of a made band, newest first (the audio jobs that carry its id). */
@@ -1348,7 +1348,8 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
   if (dataId === "songs" && params.scope === "made") return madeFiles(person, "audio").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "track", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", playing: false, like_label: "Like" }));
   if (dataId === "sounds" && params.scope === "library") return savedMadeSounds(person).map((sound) => {
     const loop = sound.loop;
-    return { id: sound.id, title: sound.title, channel: loop ? "Loop" : "Sound effect", summary: "", kind: "sound", thumbnail: null, backdrop: null, duration_s: sound.duration_s, copy_label: "Saved", playing: sound.id === queueCurrent(person) };
+    const thumb = sound.cover ? `/api/files/${sound.file_id}/thumb?w=320` : null;
+    return { id: sound.id, title: sound.title, channel: loop ? "Loop" : "Sound effect", summary: "", kind: "sound", thumbnail: thumb, backdrop: thumb, duration_s: sound.duration_s, copy_label: "Saved", playing: sound.id === queueCurrent(person) };
   }).filter((row) => readableIn(person, "audio", row.id) !== null);
   if (dataId === "songs" && params.scope === "top") return topResult(person, params.query);
   if (dataId === "songs" && params.scope === "categories") return categoryRows(person);
