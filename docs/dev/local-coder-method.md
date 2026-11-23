@@ -4,6 +4,8 @@ The household's own coding model is not a frontier model. It does well on small,
 instructions it is given are short, concrete and ordered. This page is the one source for them. When the method changes, change it here and
 copy the same text into every place below, so the files never contradict each other.
 
+The Pi-based runner that applies these rules with guards is described in [pi-lane.md](pi-lane.md).
+
 ## The method
 
 1. Look first. For "where is" questions, read `docs/dev/code-map.md` before searching: it lists every screen, package page and exported component with its file. Find the relevant files, read what they import and a sibling file for style, and read the acceptance test: it is the spec. Search (grep) before you use a name; never invent one. Read the part of a file you need, not all of it.
