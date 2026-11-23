@@ -37,4 +37,21 @@ describe("swapToCodingMode waits until the Stack is really in coding mode", () =
     const { client, deps } = rig([done], { postThrows: new Error("409 Home is already in coding mode.") });
     await swapToCodingMode(client, deps);
   });
+
+  test("a running switch back to normal that ends first: the swap asks again instead of waiting for ever", async () => {
+    const back: Mode = { mode: "normal", target: "normal", state: "switching", reason: null };
+    const normal: Mode = { mode: "normal", target: "normal", state: "stable", reason: null };
+    const { client, posted, deps } = rig([back, back, normal, sw, done], { postThrows: new Error("409 A Home mode change is already running.") });
+    let calls = 0;
+    const base = client.setCodingMode;
+    client.setCodingMode = async (mode: "normal" | "coding") => { calls += 1; if (calls === 1) return base(mode); posted.push(mode); };
+    await swapToCodingMode(client, deps);
+    expect(posted.length).toBe(2);
+  });
+
+  test("when the Stack stays in normal mode after repeated asks, it fails with a plain reason", async () => {
+    const normal: Mode = { mode: "normal", target: "normal", state: "stable", reason: null };
+    const { client, deps } = rig([normal]);
+    await expect(swapToCodingMode(client, deps)).rejects.toThrow();
+  });
 });
