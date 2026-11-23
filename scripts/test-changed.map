@@ -1,0 +1,7 @@
+# Hand map for files the import scan cannot link to the tests that matter. One rule per line: <changed-path-prefix> => <test file or directory>
+# Used by scripts/test-changed.sh in addition to same-name tests and tests that import the changed file.
+backend/src/app.ts => backend/tests/apps.test.ts
+backend/src/lib/turnMachine/ => backend/tests/chatTurn.test.ts
+backend/src/db/schema.ts => backend/tests/applySkippedMigrations.test.ts
+backend/src/db/migrations/ => backend/tests/applySkippedMigrations.test.ts
+backend/src/settings/ => backend/tests/settingsLayersSpec.test.ts
