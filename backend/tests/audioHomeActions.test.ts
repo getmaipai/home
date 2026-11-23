@@ -31,4 +31,16 @@ describe("Audio home actions", () => {
     const shelf = index.body.find((node) => node.type === "media_shelf" && node.heading === "Recently played");
     expect(shelf?.on_select).toEqual({ play: { media_id: "{id}" } });
   });
+
+  test("the hero's Browse songs opens the Songs page, and a Pick up tile opens the album page with its id", () => {
+    const hero = index.body.find((node) => node.type === "billboard") as { primary?: { label?: string; action?: unknown } } | undefined;
+    expect(hero?.primary?.label).toBe("Browse songs");
+    expect(hero?.primary?.action).toEqual({ navigate: { to: "/apps/audio/songs" } });
+    const tiles = index.body.find((node) => node.type === "quick_tiles");
+    expect(tiles?.on_select).toEqual({ navigate: { to: "/apps/audio/album", state: { id: "{id}" } } });
+  });
+
+  test("the page declares no separate search page link on the home (one search, in the header)", () => {
+    expect(JSON.stringify(index.body)).not.toContain("/apps/audio/search");
+  });
 });

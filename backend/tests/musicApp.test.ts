@@ -257,3 +257,21 @@ test("genre tiles each carry a safe hsl colour and no two tiles share a hue (MUS
   const hues = tiles.map((tile) => { const match = /^hsl\((\d+) 65% 50%\)$/.exec(String(tile.color)); expect(match).not.toBeNull(); return Number(match![1]); });
   for (let a = 0; a < hues.length; a += 1) for (let b = a + 1; b < hues.length; b += 1) { const gap = Math.abs(hues[a]! - hues[b]!); expect(Math.min(gap, 360 - gap)).toBeGreaterThanOrEqual(28); }
 });
+
+test("AUDIO-HOME-CLICK-02: a song with no album or artist (or an empty artist) gets an Unknown album tile that opens and plays", () => {
+  const now = new Date().toISOString();
+  const bare = [["media-bare000001", null], ["media-bare000002", ""], ["media-bare000003", "AC/DC & Co 100% #1?"]] as const;
+  for (const [n, artist] of bare) {
+    db.insert(mediaItems).values({ id: n, sourceId: "msrc-music000001", kind: "track", locRootId: "msrc-music000001", locPath: `${n}.mp3`, title: `Loose ${n}`, artist, album: null, albumArtist: null, bandOk: "child", mediaType: "audio/mpeg", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run(); stampSeededMedia();
+    saveProgress(atlas, "audio", { media_id: n, position_s: 10, duration_s: 10, reason: "ended" });
+  }
+  const unknown = call(atlas, "history", { scope: "quick" }).filter((tile) => tile.title === "Unknown album");
+  expect(unknown.length).toBe(3);
+  for (const tile of unknown) {
+    expect(typeof tile.id).toBe("string");
+    const rows = call(atlas, "album", { id: tile.id });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(call(atlas, "header", { scope: "album", id: tile.id })[0]).toBeDefined();
+    expect(startMusicQueue(atlas, { id: tile.id as string, mode: "album" }).ok).toBe(true);
+  }
+});
