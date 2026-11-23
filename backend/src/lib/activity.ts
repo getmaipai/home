@@ -40,6 +40,8 @@ export interface ActivityItem {
   typicalMinutes: number | null;
   /** Where Open goes: the result, or the app's own page. */
   href: string | null;
+  /** A finished picture or clip: its Library thumbnail; absent otherwise. */
+  thumbnailUrl?: string | null;
   /** True for a song row that is a sound effect (request.sound), so the progress strip says sound, not song. */
   isSound?: boolean;
   /** Epoch-ish ISO time of the last change (what the list sorts and groups by). */
@@ -105,7 +107,7 @@ export function pictureActivityItem(actor: PersonRow, job: NonNullable<ReturnTyp
   if (job.state === "queued") return { ...base, state: "waiting", line: jobQueueCopy("queued", "queue", job.position, null, audience), percent: null, typicalMinutes: null };
   if (job.state === "running") return { ...base, state: "making", line: plainStageLabel(job.phase, audience) ?? "Making your picture.", percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.picture };
   if (job.state === "failed") return { ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The picture did not finish. Try again.", percent: null, typicalMinutes: null };
-  return { ...base, state: "done", line: audience === "child" ? null : job.request.wordsNote ?? null, percent: null, typicalMinutes: null };
+  return { ...base, state: "done", line: audience === "child" ? null : job.request.wordsNote ?? null, percent: null, typicalMinutes: null, thumbnailUrl: job.files[0] ? `/api/files/${job.files[0].id}/thumb?w=320` : null };
 }
 
 function pictureItems(actor: PersonRow): ActivityItem[] {
@@ -140,7 +142,7 @@ function videoItems(actor: PersonRow): ActivityItem[] {
     if (job.state === "queued") out.push({ ...base, state: "waiting", line: phaseLabel(job, audience), percent: null, typicalMinutes: null });
     else if (job.state === "running") out.push({ ...base, state: "making", line: phaseLabel(job, audience), percent: percentOf(job.percent), typicalMinutes: TYPICAL_MINUTES.video });
     else if (job.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : job.error ?? "The video did not finish. Try again.", percent: null, typicalMinutes: null });
-    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
+    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null, thumbnailUrl: job.files[0]?.poster_id ? `/api/files/${job.files[0].poster_id}/thumb?w=320` : null });
   }
   return out;
 }

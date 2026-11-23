@@ -1030,6 +1030,7 @@ export interface ActivityItemView {
   percent: number | null;
   typicalMinutes: number | null;
   href: string | null;
+  thumbnailUrl?: string | null;
   at: string;
 }
 export type ActivityDotState = "none" | "running" | "attention" | "finished";
