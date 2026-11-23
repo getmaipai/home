@@ -254,6 +254,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/SafetyChangesSection.tsx` | SafetyChangesSection |
 | `frontend/src/apps/settings/SignInSecretSection.tsx` | SignInSecretSection |
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
+| `frontend/src/apps/settings/StackAdminLink.tsx` | StackAdminLink |
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
 | `frontend/src/apps/settings/StagedApplyBar.tsx` | StagedApplyBar |
 | `frontend/src/apps/settings/TwoStepSignInSection.tsx` | TwoStepSignInSection |
@@ -1285,6 +1286,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/linkRepairs.ts` | STACK_LINK_ISSUE_SOURCE, STACK_LINK_ISSUE_KEY, STACK_LINK_REPEAT_WINDOW_MS, STACK_LINK_RECOVERY_MS, STACK_LINK_OUTAGE_MS, StackLinkRepairs |
 | `backend/src/lib/stack/stackFetch.ts` | homeTokenProblemCopy, __resetStackFetchForTests, stackFetch |
 | `backend/src/lib/stack/types.ts` | StackVoiceSchema, ROLE_IDS |
+| `backend/src/lib/stackAdminLink.ts` | buildAdminLink, readAdminLink |
 | `backend/src/lib/stackChoiceSnapshot.ts` | stackSlotModel, setStackChoiceSnapshot, __resetChoiceSnapshotForTests, refreshStackChoiceSnapshot, startStackChoiceSync |
 | `backend/src/lib/stackChoicesForward.ts` | StackChoicesError, __setChoicesFetchForTests, forwardToStack, refusalStatus |
 | `backend/src/lib/stackChoicesMigration.ts` | HOME_FEATURE_SWITCHES, collectHomeValues, readMigrationRecord, dismissMigrationNotice, ensureChoicesMigrated |
