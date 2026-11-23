@@ -307,7 +307,12 @@ export function matchScore(result: SearchResult, query: string): number {
   return 4;
 }
 
-/** Orders each group's results by score, marks the title match, and orders groups by their best result (ties keep provider order). */
+// The person's own content: when two groups tie on best score, these kinds
+// rank before every other kind (the person's chats and files beat a Wikipedia
+// article with the same title).
+const OWN_CONTENT = new Set(["conversation", "file", "media", "memory"]);
+
+/** Orders each group's results by score, marks the title match, and orders groups: the reference group last, then by best result (ties: own content first, then provider order). */
 export function rankGroups(groups: SearchGroup[], query: string): SearchGroup[] {
   const q = query.trim().toLowerCase();
   const ranked = groups.map((group) => {
@@ -319,5 +324,17 @@ export function rankGroups(groups: SearchGroup[], query: string): SearchGroup[] 
     });
     return { group: { ...group, results }, best: scored[0]?.score ?? 5 };
   });
-  return ranked.map((entry, index) => ({ ...entry, index })).sort((a, b) => a.best - b.best || a.index - b.index).map((entry) => entry.group);
+  return ranked
+    .map((entry, index) => ({ ...entry, index }))
+    .sort((a, b) => {
+      const aRef = a.group.kind === "reference" ? 1 : 0;
+      const bRef = b.group.kind === "reference" ? 1 : 0;
+      if (aRef !== bRef) return aRef - bRef;
+      if (a.best !== b.best) return a.best - b.best;
+      const aOwn = OWN_CONTENT.has(a.group.kind) ? 0 : 1;
+      const bOwn = OWN_CONTENT.has(b.group.kind) ? 0 : 1;
+      if (aOwn !== bOwn) return aOwn - bOwn;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.group);
 }
