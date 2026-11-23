@@ -8,10 +8,10 @@ export function MusicPendingBar({ pending }: { pending: PendingTrack }) {
     <div data-testid="music-player-pending" className="flex items-center gap-3">
       {pending.artworkUrl ? <img src={pending.artworkUrl} alt="" className="size-10 shrink-0 rounded-md object-cover" /> : null}
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-medium">{pending.title}</span>
-        {pending.subtitle ? <span className="truncate text-xs text-muted-foreground">{pending.subtitle}</span> : null}
+        <span className="truncate text-row">{pending.title}</span>
+        {pending.subtitle ? <span className="truncate text-supporting text-muted-foreground">{pending.subtitle}</span> : null}
       </div>
-      <span role="status" className="text-xs text-muted-foreground">{i18n._({ id: "Loading", message: "Loading" })}</span>
+      <span role="status" className="text-supporting text-muted-foreground">{i18n._({ id: "Loading", message: "Loading" })}</span>
     </div>
   );
 }
