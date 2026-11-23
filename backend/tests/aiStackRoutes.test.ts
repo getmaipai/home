@@ -11,6 +11,7 @@ import { collectHomeValues, ensureChoicesMigrated, readMigrationRecord } from "@
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { readSlot } from "@/lib/tiers";
 import { __resetStackEngineForTests } from "@/lib/stackEngine";
+import { buildAdminLink } from "@/lib/stackAdminLink";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -18,10 +19,11 @@ let calls: Array<{ method: string; path: string; body: unknown }> = [];
 let migrated = false;
 let migrateAnswer: Record<string, unknown> = {};
 let down = false;
+let remoteOn = false;
 let view: Record<string, unknown> = { profile: "p64", memory_gb: 64, categories: [], migration: { done: false } };
 
 beforeEach(() => {
-  resetDb(); calls = []; migrated = false; down = false; __resetChoiceSnapshotForTests();
+  resetDb(); remoteOn = false; calls = []; migrated = false; down = false; __resetChoiceSnapshotForTests();
   migrateAnswer = { dry_run: false, already_done: false, results: [], accepted: 0, refused: [], done_at: "2026-11-22T10:00:00.000Z" };
   view = { profile: "p64", memory_gb: 64, categories: [], migration: { done: false } };
   __setChoicesFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
@@ -31,6 +33,7 @@ beforeEach(() => {
     calls.push({ method, path: url.pathname, body });
     if (url.pathname === "/stack/v1/choices/migrate") { migrated = true; return Response.json(migrateAnswer); }
     if (method === "GET" && url.pathname === "/stack/v1/choices") return Response.json(view);
+    if (method === "GET" && url.pathname === "/stack/v1/settings") return Response.json({ sections: [], settings: [{ key: "stack.admin.tailscale", in_effect: remoteOn }] });
     if (url.pathname.endsWith("/chat/standard") && method === "PUT") return Response.json({ error: "That model does not fit this computer. Pick a smaller one.", code: "does_not_fit" }, { status: 409 });
     if (method === "PUT" && url.pathname.startsWith("/stack/v1/choices/")) return Response.json({ ok: true, ...(body ?? {}) });
     if (method === "POST" && url.pathname.endsWith("/install")) return Response.json({ job: "job-1", part: "nova-8b", joined: false }, { status: 202 });
@@ -182,5 +185,26 @@ describe("the pipeline's cached read of the Stack's choice", () => {
     down = true;
     await refreshStackChoiceSnapshot();
     expect(readSlot("image", "max").model).toBe("recommended");
+  });
+});
+
+describe("the link to the Stack's own admin page", () => {
+  const base = { port: 8770, onThisComputer: true, remoteOn: false, tailscaleAddress: null as string | null };
+  test("buildAdminLink: loopback link always; a remote link only when remote access is on and an address exists; plain reasons otherwise", () => {
+    expect(buildAdminLink(base)).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null });
+    expect(buildAdminLink(base).reason).toContain("turn on remote access");
+    expect(buildAdminLink({ ...base, remoteOn: true, tailscaleAddress: "100.64.0.9" })).toMatchObject({ remote_url: "http://100.64.0.9:8770/admin/" });
+    expect(buildAdminLink({ ...base, remoteOn: true }).remote_url).toBeNull();
+    expect(buildAdminLink({ ...base, remoteOn: true }).reason).toContain("Tailscale");
+    expect(buildAdminLink({ ...base, onThisComputer: false })).toMatchObject({ local_url: null, remote_url: null });
+    expect(buildAdminLink({ ...base, onThisComputer: false }).reason).toContain("another computer");
+  });
+  test("the route is for owners and admins only and answers the local link with the remote flag read from the Stack", async () => {
+    const { client, actor } = await admin();
+    const res = await client.get("/api/ai/stack/admin-link");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null });
+    demote(actor.id, "adult");
+    expect((await client.get("/api/ai/stack/admin-link")).status).toBe(403);
   });
 });

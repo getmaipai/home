@@ -11,6 +11,7 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { forwardToStack, refusalStatus, StackChoicesError, type Forwarded } from "@/lib/stackChoicesForward";
 import { coveredConsent } from "@/lib/stackComponents";
 import { dismissMigrationNotice, ensureChoicesMigrated, HOME_FEATURE_SWITCHES, readMigrationRecord } from "@/lib/stackChoicesMigration";
+import { readAdminLink } from "@/lib/stackAdminLink";
 import { refreshStackChoiceSnapshot } from "@/lib/stackChoiceSnapshot";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetInstallStatusCache } from "@/lib/installStatus";
@@ -108,3 +109,7 @@ aiStackRoutes.openapi(createRoute({ method: "get", path: "/migration", tags: ["A
   async (c) => { await ensureChoicesMigrated().catch(() => null); return c.json(migrationView(), 200) as never; });
 aiStackRoutes.openapi(createRoute({ method: "post", path: "/migration/dismiss", tags: ["AI"], summary: "The admin has read the notice about refused values (they stay in Home)", middleware: [requireRole("owner", "admin")] as const, responses: ok("The recorded result.") }),
   (c) => { dismissMigrationNotice(); return c.json(migrationView(), 200) as never; });
+
+// Where the Stack's own admin page is (its address on this computer, and over Tailscale when the Stack allows it), for the "Open Stack admin" link.
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/admin-link", tags: ["AI"], summary: "Where the Stack's own admin page is", middleware: [requireRole("owner", "admin")] as const, responses: ok("The link and the plain reason.") }),
+  async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readAdminLink(), 200) as never; });
