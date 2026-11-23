@@ -946,6 +946,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/bandActions.ts` | BAND_ACTION_NAMES, runBandAction |
 | `backend/src/lib/music/commercial.ts` | COMMERCIAL_REFUSAL_LINE, provenanceFor, commercialUseOf |
 | `backend/src/lib/music/cover.ts` | coverPromptFor, finishSongCover, startSongCover |
+| `backend/src/lib/music/coverBackfill.ts` | backfillMissingCovers, maybeBackfillCovers, __resetCoverBackfillForTests |
 | `backend/src/lib/music/djLines.ts` | DJ_ANGLES, DJ_LINE_PROMPT, writeDjLine, synthesizeDjLine, saveDjLine, pruneDjLines |
 | `backend/src/lib/music/effects.ts` | EFFECT_CHANGES, isEffectChange, EQ_PRESETS, EQ_BANDS_HZ, EFFECT_LABELS, COMPRESSOR_BOUNDS |
 | `backend/src/lib/music/exportFormat.ts` | EXPORT_FORMATS, EXPORT_MEDIA_TYPE, EXPORT_UNAVAILABLE_LINE, EXPORT_FAILED_LINE, convertSong |
