@@ -44,7 +44,7 @@ function songCoverBusy(actor: PersonRow, job: MusicJob): boolean {
   const previous = job.coverJobId ? getPictureJob(actor, job.coverJobId) : null;
   return starting.has(job.id) || previous?.state === "queued" || previous?.state === "running";
 }
-export async function startSongCover(actor: PersonRow, job: MusicJob, options: { seed?: number; prompt?: string } = {}): Promise<"busy" | void> {
+export async function startSongCover(actor: PersonRow, job: MusicJob, options: { seed?: number; prompt?: string; lowPriority?: boolean } = {}): Promise<"busy" | void> {
   if (songCoverBusy(actor, job)) return "busy";
   starting.add(job.id);
   try {
@@ -63,6 +63,7 @@ export async function startSongCover(actor: PersonRow, job: MusicJob, options: {
     // Covers stay conversation attachments so Files shows them like any made picture.
     const picture = await startPictureJob({ actor, conversationId: job.conversationId, turnId: job.turnId, temporary: false,
       purpose: "cover", kind: "generate", prompt, body: { prompt, size: "1024x1024", n: 1, seed, audience: adultStylesAllowed() ? "adult" : "all-ages" },
+      ...(options.lowPriority ? { lowPriority: true } : {}),
       ...(source ? { edit: { sourceId: source, label: "New cover", method: "instruct" as const } } : {}),
     });
     const latest = getMusicJobFor(actor, job.id);
