@@ -1,3 +1,4 @@
+// Intent: create and sweep the maipai-run-<pid> temp folders that screenshot and demo runs use.
 import { mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";

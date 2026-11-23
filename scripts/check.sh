@@ -349,6 +349,10 @@ echo "== scope: $SCOPE ($SCOPE_WHY)"
 if [ -f scripts/code-map.py ]; then
   python3 scripts/code-map.py --check || exit 1
 fi
+# The scripts index (scripts/INDEX.md) must list every script. Regenerate with: python3 scripts/make-scripts-index.py
+if [ -f scripts/make-scripts-index.py ]; then
+  python3 scripts/make-scripts-index.py --check || echo "WARN: regenerate and commit scripts/INDEX.md (not a failure, so a parallel landing cannot bounce yours)"
+fi
 if [ -z "${GATE_DIFF_BASE:-}" ]; then GATE_DIFF_BASE="$(gate_diff_base 2>/dev/null || true)"; fi
 
 # One check at a time in this exact worktree, including standalone --pre.

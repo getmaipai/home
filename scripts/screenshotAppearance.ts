@@ -1,3 +1,4 @@
+// Intent: prove in a real browser that each look and appearance setting changes the page (SETTINGS-APPEARANCE-01).
 import "runTemp";
 // SETTINGS-APPEARANCE-01: proves, in a real Chromium render against a
 // throwaway seeded demo household (Sage, Marlow, Nova: persona roster names

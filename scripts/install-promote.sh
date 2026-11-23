@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Intent: promote a prepared install to the live location (needs sudo; used by ship.sh, never run by hand on the live hub).
 set -euo pipefail
 usage() { echo "usage: sudo bash scripts/install-promote.sh [--dry-run]" >&2; }
 root="$(id -u)"; [[ "$root" == 0 ]] || { echo "install-promote.sh: run it with sudo." >&2; exit 1; }

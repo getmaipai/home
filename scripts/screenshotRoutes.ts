@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// Intent: list of routes and the capture loop behind bun run screenshots.
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";

@@ -1,3 +1,4 @@
+// Intent: keep guided tours switched off for every capture made with the demo people.
 import type { Database } from "bun:sqlite";
 
 export const TOUR_AUTOSTART_SETTING = "tours.autostart.enabled";

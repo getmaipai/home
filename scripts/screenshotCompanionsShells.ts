@@ -1,3 +1,4 @@
+// Intent: capture the companion shell screens against the seeded demo household.
 import "./runTemp";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

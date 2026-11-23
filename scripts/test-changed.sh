@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Intent: run only the tests a change can affect, so a one-file change gets a verdict in seconds. Never replaces the lander's suites.
+# This is the quick subset of `wt.sh check T1` (which selects the same kind of tests but runs the whole preflight first and waits for a memory slot).
 # Picks, for each changed backend or frontend source file: its same-name test, tests that import it, and rules in scripts/test-changed.map. Changed test files run as they are.
 # Usage: bash scripts/test-changed.sh [--list] [file...]   (no files = changed vs the merge-base with main, plus uncommitted and new files)
 # Prints one result line. Exit 0 pass (or nothing mappable: it says so, it never claims tested), 1 a test failed.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// Intent: seed the demo household (Sage, Marlow, Nova) into a data folder for dev and screenshots.
 import { Database } from "bun:sqlite";
 import { join, resolve } from "node:path";
 import { seedToursDisabledForCapture } from "./screenshotTourSeed";

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Intent: send this branch to the lander's queue, wait for the verdict and print the landed sha (flags: --express, --checked, --done ITEM).
 set -euo pipefail
 umask 077
 

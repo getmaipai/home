@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Intent: change a pinned dependency (commons tag, stack sha, bot version) and land the pin.
 set -euo pipefail
 
 die() { echo "pin.sh: $1" >&2; exit "${2:-1}"; }

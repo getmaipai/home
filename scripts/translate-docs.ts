@@ -1,3 +1,4 @@
+// Intent: translate the user docs into the supported languages through the local Stack.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";

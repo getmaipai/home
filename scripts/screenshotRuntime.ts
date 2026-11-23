@@ -1,3 +1,4 @@
+// Intent: demo data folder ownership and stale-run cleanup for screenshot runs.
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

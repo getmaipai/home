@@ -1,3 +1,4 @@
+// Intent: print the recent voice turn timings from the hub's trace (bun run voice:latency).
 import { voiceTimingReport } from "../backend/src/lib/voiceTiming";
 import { formatVoiceTrace, voiceTraces } from "../backend/src/lib/voiceTrace";
 

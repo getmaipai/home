@@ -1,3 +1,4 @@
+// Intent: wait until a page's animations stop moving, so a screenshot is taken on a still frame.
 export interface AnimationSettleOptions {
   timeoutMs?: number;
   stableMs?: number;

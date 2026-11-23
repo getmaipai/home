@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// Intent: scan the frontend for kit Element use and write frontend/src/dev/elements-adoption.json (bun run elements:scan).
 import { readdir, readFile, realpath } from "node:fs/promises";
 import { join, relative } from "node:path";
 

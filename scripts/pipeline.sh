@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Intent: show the landing queue, last landings and the lander and watcher; start or stop them; wait for a landing.
 set -euo pipefail
 umask 077
 

@@ -1,3 +1,4 @@
+// Intent: prove in a real browser that each ease preset sets its display attributes (EASE-OF-USE-01c).
 import "./runTemp";
 // EASE-OF-USE-01c: proves, in a real headless Chromium render against a throwaway seeded demo household
 // (Sage, Marlow, Nova: persona roster names only), that choosing an ease preset on the person's own
