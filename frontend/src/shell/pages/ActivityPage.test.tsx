@@ -90,13 +90,13 @@ describe("ActivityPage", () => {
     } finally { api.restore(); }
   });
 
-  test("an empty list says so in one kit info card and a link to older messages stays", async () => {
+  test("an empty list says so in one kit info card, and there is no Older messages link", async () => {
     const api = mockActivity({ seenAt: null, dot: "none", items: [] });
     try {
       const view = page();
       await waitFor(() => expect(view.getByText("Nothing here yet")).toBeTruthy(), { timeout: 3000 });
       expect(document.querySelector("[data-status-kind=info]")).toBeTruthy();
-      expect(view.getByRole("link", { name: "Older messages" }).getAttribute("href")).toBe("/notifications");
+      expect(view.queryByRole("link", { name: "Older messages" })).toBeNull();
     } finally { api.restore(); }
   });
 

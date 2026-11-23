@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { StatusCard, type StatusCardKind } from "@maipai/ui/src/elements/status-card";
 import { getIcon, iconNames } from "@maipai/ui/src/icons";
@@ -144,12 +144,7 @@ export function ActivityPage() {
         loadingLabel={i18n._({ id: "Loading activity", message: "Loading activity" })}
       >
         {() => groups.length === 0 ? (
-          <>
-            <StatusCard kind="info" stateWord={i18n._({ id: "Good to know", message: "Good to know" })} title={i18n._({ id: "Nothing here yet", message: "Nothing here yet" })} line={i18n._({ id: "Pictures, videos and songs you make show up here while they are made and after.", message: "Pictures, videos, songs and messages show up here." })} icon={leadIcon("done")} />
-            <p className="text-supporting text-muted-foreground">
-              <Link to="/notifications" className="underline underline-offset-4">{i18n._({ id: "Older messages", message: "Older messages" })}</Link>
-            </p>
-          </>
+          <StatusCard kind="info" stateWord={i18n._({ id: "Good to know", message: "Good to know" })} title={i18n._({ id: "Nothing here yet", message: "Nothing here yet" })} line={i18n._({ id: "Pictures, videos, songs and messages show up here.", message: "Pictures, videos, songs and messages show up here." })} icon={leadIcon("done")} />
         ) : (
           <>
             {groups.map((group) => (
