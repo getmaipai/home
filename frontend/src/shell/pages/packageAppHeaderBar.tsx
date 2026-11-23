@@ -5,6 +5,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import HeaderSearch, { type SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
 import type { AppRow } from "@/lib/api";
+import { api } from "@/lib/api";
+import { APP_SEARCH_DATA, appSearchGroups, type AppSearchRow } from "./appSearchResults";
 import { navigateOf } from "@/shell/useAppSidebar";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -55,13 +57,18 @@ const ArrowLeftIcon = getIcon("arrow-left");
 const MoreIcon = getIcon("more-horizontal");
 const SearchIcon = getIcon("search");
 
-/** The app's own search: one row that opens the app's search page for the typed words. The palette lists nothing of the shell. */
-function AppSearch({ label, searchTo }: { label: string; searchTo: string }) {
-  const remote = useMemo(() => async (query: string): Promise<SearchGroup[]> => [{
-    kind: "app",
-    heading: label,
-    results: [{ kind: "app", id: "search", title: `Search ${label} for "${query.trim()}"`, href: `${searchTo}?q=${encodeURIComponent(query.trim())}` }],
-  }], [label, searchTo]);
+/** The app's own search: the palette lists the app's matching songs in place, with a last row to the app's full search page. */
+function AppSearch({ label, searchTo, appTo }: { label: string; searchTo: string; appTo: string }) {
+  const remote = useMemo(() => {
+    const pkg = appTo.split("/")[2] ?? "";
+    const spec = APP_SEARCH_DATA[pkg];
+    return async (query: string): Promise<SearchGroup[]> => {
+      const q = query.trim();
+      if (q.length < 2) return [];
+      const rows = spec ? await api.appData<AppSearchRow[]>(pkg, spec.data, { q }).catch(() => []) : [];
+      return appSearchGroups({ to: appTo, label, searchTo }, q, Array.isArray(rows) ? rows : [], spec?.playPage);
+    };
+  }, [appTo, label, searchTo]);
   return <HeaderSearch scope={{ label }} remote={remote} />;
 }
 
@@ -74,7 +81,7 @@ function PackageAppHeaderCenter() {
   const modes = header?.modes ?? [];
   return (
     <div className={`flex shrink-0 items-center gap-2 max-md:-ms-4 md:absolute md:left-1/2 md:top-1/2 md:w-max md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:justify-center md:gap-3${state.detail ? " max-sm:hidden" : ""}`} data-testid="app-header-center">
-      {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} /></div> : null}
+      {header?.search && state.searchTo ? <div className="hidden sm:block"><AppSearch label={state.label} searchTo={state.searchTo} appTo={state.to} /></div> : null}
       {modes.length > 1 && state.mode ? (
         <Tabs className="max-md:hidden" value={state.mode} onValueChange={(value) => state.onMode?.(String(value))}>
           <TabsList variant="pill" aria-label={`${state.label} mode`}>
