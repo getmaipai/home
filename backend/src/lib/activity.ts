@@ -41,7 +41,7 @@ export interface ActivityItem {
   typicalMinutes: number | null;
   /** Where Open goes: the result, or the app's own page. */
   href: string | null;
-  /** A finished picture or clip: its Library thumbnail; absent otherwise. */
+  /** A finished picture, clip, or song with a cover: its Library thumbnail; absent otherwise. */
   thumbnailUrl?: string | null;
   /** True for a song row that is a sound effect (request.sound), so the progress strip says sound, not song. */
   isSound?: boolean;
@@ -166,7 +166,7 @@ function songItems(actor: PersonRow): ActivityItem[] {
     if (row.state === "queued") out.push({ ...base, state: "waiting", line: jobQueueCopy("queued", "queue", row.position, null, audience), percent: null, typicalMinutes: null });
     else if (row.state === "running") out.push({ ...base, state: "making", line: plainStageLabel(row.stage, audience) ?? `Making your ${noun}.`, percent: percentOf(row.progress * 100), typicalMinutes: TYPICAL_MINUTES.song });
     else if (row.state === "failed") out.push({ ...base, state: "failed", line: audience === "child" ? CHILD_FAILED_LINE : row.errorLine ?? `The ${noun} did not finish. Open it to try again.`, percent: null, typicalMinutes: null });
-    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null });
+    else out.push({ ...base, state: "done", line: null, percent: null, typicalMinutes: null, thumbnailUrl: row.coverFileId && row.fileId ? `/api/files/${row.fileId}/thumb?w=320` : null });
   }
   return out;
 }
