@@ -7,7 +7,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
-import { SEARCH_PROVIDERS, rankGroups } from "@/lib/search/providers";
+import { SEARCH_PROVIDERS, runProviders } from "@/lib/search/providers";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { clearSearchAddress, testOrSaveSearchAddress } from "@/lib/searchAddressSave";
 import { webSourcesPicked } from "@/lib/retrieval/webSources";
@@ -96,20 +96,7 @@ searchRoutes.openapi(searchRoute, async (c) => {
   // provider - the same "one definition" reasoning the providers
   // themselves already follow for their own data.
   if (q.trim().length === 0) return c.json({ groups: [] }, 200);
-  const settled = await Promise.allSettled(SEARCH_PROVIDERS.map((provider) => provider.search(q, actor)));
-  const groups = SEARCH_PROVIDERS.map((provider, i) => {
-    const outcome = settled[i]!;
-    // A provider that throws is dropped from the response with a
-    // warning in the log, never a failed request (the design's own
-    // rule) - one broken provider (a bad query, a store temporarily
-    // down) never takes the other three's real results down with it.
-    if (outcome.status === "rejected") {
-      console.warn(`[search] provider ${provider.kind} failed: ${outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)}`);
-      return null;
-    }
-    return outcome.value.length > 0 ? { kind: provider.kind, heading: provider.heading, results: outcome.value } : null;
-  }).filter((g): g is NonNullable<typeof g> => g !== null);
-  return c.json({ groups: rankGroups(groups, q) }, 200);
+  return c.json({ groups: await runProviders(SEARCH_PROVIDERS, q, actor) }, 200);
 });
 
 const SearchCheckSchema = z.object({

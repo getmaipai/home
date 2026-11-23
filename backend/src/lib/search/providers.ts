@@ -293,6 +293,53 @@ const referenceProvider: SearchProvider = {
 
 export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider, mediaProvider, memoriesProvider, alarmsProvider, companionsProvider, commandsProvider, filesProvider, referenceProvider];
 
+// Default per-kind timeout when the caller sets none: the offline reference
+// search is the slow one (an unindexed book can take several seconds to
+// scan), everything else answers in milliseconds.
+const KIND_DEFAULT_TIMEOUT_MS: Record<string, number> = { reference: 1500 };
+const FALLBACK_TIMEOUT_MS = 5000;
+
+// SEARCH-EXPORT-01: run every provider in parallel, each raced against its
+// own timer, so one hanging provider (an offline Wikipedia) never delays
+// the rest of the response. A provider that rejects or times out is dropped
+// with a log warning; empty results are left out; the survivors are ranked.
+export async function runProviders(
+  providers: readonly SearchProvider[],
+  query: string,
+  actor: PersonRow,
+  opts?: { timeoutMs?: Record<string, number>; defaultTimeoutMs?: number },
+): Promise<SearchGroup[]> {
+  const settled = await Promise.all(
+    providers.map(async (provider) => {
+      const timeout = opts?.timeoutMs?.[provider.kind] ?? opts?.defaultTimeoutMs ?? (KIND_DEFAULT_TIMEOUT_MS[provider.kind] ?? FALLBACK_TIMEOUT_MS);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const results = await Promise.race([
+          provider.search(query, actor),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`timed out after ${timeout} ms`)), timeout);
+          }),
+        ]);
+        return { provider, results, error: undefined as unknown };
+      } catch (error) {
+        return { provider, results: [] as SearchResult[], error };
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
+    }),
+  );
+  const groups: SearchGroup[] = [];
+  for (const outcome of settled) {
+    if (outcome.error !== undefined) {
+      const reason = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+      console.warn(`[search] provider ${outcome.provider.kind} failed: ${reason}`);
+      continue;
+    }
+    if (outcome.results.length > 0) groups.push({ kind: outcome.provider.kind, heading: outcome.provider.heading, results: outcome.results });
+  }
+  return rankGroups(groups, query);
+}
+
 // SEARCH-MODERN-02: one score over every provider's matches. Exact title 0,
 // title starts with the query 1, a word in the title starts with it 2, the
 // query appears elsewhere in the title 3, subtitle only 4. Lower is better;
