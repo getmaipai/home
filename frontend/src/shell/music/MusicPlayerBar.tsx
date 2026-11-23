@@ -29,6 +29,7 @@ import { say } from "./MusicQueuePane.helpers";
 import { isMusicTab, musicPane, QUEUE_TAB, useMusicPane, type MusicPaneTab } from "./musicPane";
 import { useMediaAnalyser } from "@/shell/media/useMediaAnalyser";
 import { createSpectrum } from "./musicSpectrum";
+import { MusicPendingBar } from "./MusicPendingBar";
 import { useLike } from "./musicLike";
 import { useLyricsFollow } from "./useLyricsFollow";
 import { EQ_PRESETS, playerAudioAvailable } from "@/lib/media/audioGraph";
@@ -221,6 +222,15 @@ export function MusicPlayerBar() {
       </dl>
     </DialogContent>
   </Dialog>;
+  // A10: while a clicked song loads, the pressed song's pending bar takes the bar's place (with or without a track already playing).
+  if (snap.pending) return (
+    <>
+      {shortcutsDialog}
+      <div data-slot="global-mini-player" data-testid="music-player-bar" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:start-14 md:ps-4 md:pe-4 md:pb-4 print:hidden">
+        <div className="pointer-events-auto surface-float relative overflow-hidden"><MusicPendingBar pending={snap.pending} /></div>
+      </div>
+    </>
+  );
   if (!track) return shortcutsDialog;
   const eqReason = i18n._({ id: "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support.", message: "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support." });
   const equalizer = <Popover open={eqOpen} onOpenChange={setEqOpen}>

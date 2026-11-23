@@ -38,8 +38,8 @@ import { offlineIdOf, reportKeptSongs, toggleKeptSong } from "@/shell/media/kept
 import { seedEqPreset, setEqWriter, useEqPreset } from "@/shell/media/eqPreset";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { musicPlayer } from "@/shell/music/musicPlayer";
-import { trackIsPlayable } from "@/shell/music/musicQueue";
-import { musicListOf, musicTrackOf, type AudioItemView } from "@/shell/music/musicHandoff";
+import { trackIsPlayable, type Track } from "@/shell/music/musicQueue";
+import { musicListOf, musicTrackOf, pendingTrackOf, type AudioItemView } from "@/shell/music/musicHandoff";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -253,23 +253,33 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
         const offline = offlineIdOf(mediaId);
         if (offline !== null) { pushRef.current(await toggleKeptSong(offline)); return; }
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.
+        // A10: the pressed song shows in the mini player at once, before any of the fetches below has answered.
+        if (item.kind === "track") musicPlayer.showPending(pendingTrackOf(item, mediaId));
         const kind = typeof item.kind === "string" ? item.kind : (await api.mediaItem(mediaId)).item.kind;
         // Music playback has one owner. Resolve the clicked row and its visible source list into the Music store instead of
         // opening the legacy Audio player page; deep links from cards take this same path.
         if (kind === "track") {
           const selectedId = mediaId.startsWith("shuffle:") ? mediaId.slice("shuffle:".length) : mediaId;
-          const context = musicListOf({ pathname: pathRef.current, search: location.search, pageState: (location.state as { pageState?: Record<string, unknown> } | null)?.pageState, item, mediaId });
-          const rows = context ? await api.appData<Array<Record<string, unknown>>>("audio", context.dataId, { ...(context.id ? { id: context.id } : {}), ...(context.query ? { q: context.query } : {}), ...(context.scope ? { scope: context.scope } : {}), ...(context.sort ? { sort: context.sort } : {}), ...(context.kind ? { kind: context.kind } : {}) }) : [];
-          const rowIds = Array.isArray(rows) ? rows.map((row) => typeof row.id === "string" ? row.id : "").filter(Boolean) : [];
-          const targetId = item.queue_mode && !mediaId.startsWith("shuffle:") ? rowIds[0] : selectedId;
-          const ids = [...new Set([targetId, ...rowIds])].filter(Boolean);
-          const views = await Promise.all(ids.map(async (id) => {
-            const view = await api.appData<AudioItemView | []>("audio", "item", { id });
-            return Array.isArray(view) ? null : musicTrackOf(view);
-          }));
-          const queue = views.filter((track): track is NonNullable<typeof track> => !!track && trackIsPlayable(track));
-          const target = queue.find((track) => track.mediaId === selectedId) ?? (item.queue_mode ? queue[0] : undefined);
-          if (!target) throw new Error(i18n._({ id: "This song is not available. Go back to Music and choose another.", message: "This song is not available. Go back to Music and choose another." }));
+          let context: { dataId: string; id?: string; query?: string; scope?: string; sort?: string; kind?: string; name?: string } | null = null;
+          let queue: Track[] = [];
+          let target: Track | undefined;
+          try {
+            context = musicListOf({ pathname: pathRef.current, search: location.search, pageState: (location.state as { pageState?: Record<string, unknown> } | null)?.pageState, item, mediaId });
+            const rows = context ? await api.appData<Array<Record<string, unknown>>>("audio", context.dataId, { ...(context.id ? { id: context.id } : {}), ...(context.query ? { q: context.query } : {}), ...(context.scope ? { scope: context.scope } : {}), ...(context.sort ? { sort: context.sort } : {}), ...(context.kind ? { kind: context.kind } : {}) }) : [];
+            const rowIds = Array.isArray(rows) ? rows.map((row) => typeof row.id === "string" ? row.id : "").filter(Boolean) : [];
+            const targetId = item.queue_mode && !mediaId.startsWith("shuffle:") ? rowIds[0] : selectedId;
+            const ids = [...new Set([targetId, ...rowIds])].filter(Boolean);
+            const views = await Promise.all(ids.map(async (id) => {
+              const view = await api.appData<AudioItemView | []>("audio", "item", { id });
+              return Array.isArray(view) ? null : musicTrackOf(view);
+            }));
+            queue = views.filter((track): track is NonNullable<typeof track> => !!track && trackIsPlayable(track));
+            target = queue.find((track) => track.mediaId === selectedId) ?? (item.queue_mode ? queue[0] : undefined);
+            if (!target) throw new Error(i18n._({ id: "This song is not available. Go back to Music and choose another.", message: "This song is not available. Go back to Music and choose another." }));
+          } catch (error) {
+            musicPlayer.showPending(null);
+            throw error;
+          }
           const shuffled = mediaId.startsWith("shuffle:");
           const playQueue = [...queue];
           if (shuffled) for (let index = playQueue.length - 1; index > 0; index -= 1) {
@@ -279,6 +289,7 @@ export function MediaHostProvider({ children, personId, ageBand }: { children: R
           musicPlayer.toggle(shuffled ? playQueue[0]! : target, playQueue, context?.name ? { name: context.name } : null);
           return;
         }
+        musicPlayer.showPending(null);
         const to = playRoute(kind, mediaId);
         if (!to) throw new Error("This item cannot be played from here. Open it from its app.");
         // A second press on what is already open resumes it; it never navigates again (that stacked history and re-ran the page).
