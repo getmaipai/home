@@ -73,11 +73,8 @@
       "aspect": "square",
       "variant": "plain",
       "on_select": {
-        "navigate": {
-          "to": "/apps/audio/album",
-          "state": {
-            "id": "{album_id}"
-          }
+        "play": {
+          "media_id": "{id}"
         }
       },
       "hide_when_empty": true,
