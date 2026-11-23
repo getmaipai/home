@@ -37,7 +37,7 @@ const generatedPictureCallbacks = new Map<string, (fileId: string) => Promise<vo
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;
   const phaseHold = PERSISTED_HOLDS.find((reason) => job.phase === `held:${reason}`) as QueueJob["riseReason"] | undefined;
-  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, tier: requestTier(job.request), createdAt: job.createdAt, headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
+  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, tier: requestTier(job.request), createdAt: job.createdAt, adminBoost: ((job.request as PictureJob["request"]).lowPriority ? -1000 : undefined), headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
     position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason ?? phaseHold, typicalSeconds: job.kind === "edit" ? 20 : 44 };
   return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
     applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; savePictureJob(job); },
@@ -119,6 +119,8 @@ export interface StartPictureInput {
   sources?: readonly MarkSource[];
   /** TIER-WIRE-01: the allowed tier (`jobTier`); Standard or absent adds nothing to the request. */
   tier?: "standard" | "boost" | "max";
+  /** COVER-BACKFILL-01: queued below every request a person makes themselves. */
+  lowPriority?: boolean;
   /** IMGEDIT-01: this job changes a picture already in the chat; the result is saved as its next version. */
   edit?: { sourceId: string; label: string; method: "instruct" | "tool" };
   /** IMGEDIT-01: how the Stack is asked (default: a generation). An edit sends the picture and the instruction to POST /v1/images/edits. */
@@ -162,7 +164,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.words?.length ? { words: input.words } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, ...(mark.madeAudience === "adult-only" ? { adultLock: mark.lock } : {}), quality: "quick", ...(input.subjectIds?.length ? { subject_ids: input.subjectIds } : {}), ...(input.words?.length ? { words: input.words } : {}), ...(input.tier === "boost" || input.tier === "max" ? { tier: input.tier } : {}), ...(input.lowPriority ? { lowPriority: true } : {}), stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: "instruct" } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
