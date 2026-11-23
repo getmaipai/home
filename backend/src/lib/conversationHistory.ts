@@ -862,10 +862,11 @@ export function discardTemporarySessions(personId: string): number {
   return discarded;
 }
 
-function createTemporaryConversation(actor: PersonRow, surface: Surface, companionId?: string | null, placement: Conversation["placement"] = "chat"): Conversation {
+function createTemporaryConversation(actor: PersonRow, surface: Surface, _companionId?: string | null, placement: Conversation["placement"] = "chat"): Conversation {
   pruneTemporarySessions(Date.now());
   evictOldestTemporarySessionIfFull();
-  const record = buildNewConversationRecord(actor, surface, companionId, "temporary", placement);
+  // A temporary (incognito) conversation carries no companion: never the caller's id, never the person's persona pick.
+  const record = buildNewConversationRecord(actor, surface, null, "temporary", placement);
   temporarySessions.set(record.id, { conversation: record, turns: [], lastActivityAt: Date.now() });
   return record;
 }

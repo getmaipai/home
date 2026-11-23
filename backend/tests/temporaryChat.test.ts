@@ -224,3 +224,26 @@ describe("temporary conversations - the open-questions writer an independent rev
     expect(getPendingAsk(result.value.id)).toBeNull();
   });
 });
+
+describe("temporary conversations never carry the person's selected companion", () => {
+  test("the record has no companion_id even when the person picked one or a caller passes one", async () => {
+    const { client, actor } = await owner();
+    const picked = await client.put("/api/settings", { scope: `person:${actor.id}`, key: "persona.active_id", value: "default" });
+    expect(picked.status).toBe(200);
+    const plain = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    if (!plain.ok) throw new Error("Could not create a temporary chat");
+    expect(plain.value.mode).toBe("temporary");
+    expect(plain.value.companion_id).toBeNull();
+    const withId = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true, companionId: "incognito" });
+    if (!withId.ok) throw new Error("Could not create a temporary chat");
+    expect(withId.value.companion_id).toBeNull();
+  });
+
+  test("an ordinary chat still follows the person's pick", async () => {
+    const { client, actor } = await owner();
+    await client.put("/api/settings", { scope: `person:${actor.id}`, key: "persona.active_id", value: "default" });
+    const ordinary = resolveOrCreateConversation(actor, "chat");
+    if (!ordinary.ok) throw new Error("Could not create a chat");
+    expect(ordinary.value.companion_id).toBe("default");
+  });
+});
