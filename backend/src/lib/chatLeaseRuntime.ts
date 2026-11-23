@@ -3,6 +3,7 @@
 import { recordTransition } from "@/lib/chatTransitions";
 import { createChatLease, registerActiveChatLease, type ChatLease } from "@/lib/chatLease";
 import { codingModeReadiness } from "@/lib/codingMode";
+import { swapToCodingMode } from "@/lib/codingModeSwap";
 import { getStackClient } from "@/lib/stackEngine";
 import { leaseQueueSignals, openMaxWindow, setChatLeaseSource, setChatTurnObserver } from "@/lib/jobs/householdQueue";
 
@@ -22,7 +23,8 @@ export function getChatLease(): ChatLease {
     },
     swapToBig: async () => {
       const started = Date.now();
-      await getStackClient().setCodingMode("coding");
+      // The Stack answers 202 and loads the big model in the background; wait for coding/stable before Home sends coding requests.
+      await swapToCodingMode(getStackClient());
       recordTransition("max_load", Date.now() - started);
     },
     swapToStandard: () => getStackClient().setCodingMode("normal"),
