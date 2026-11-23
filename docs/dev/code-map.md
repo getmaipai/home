@@ -1203,7 +1203,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/schedules/reconcile.ts` | reconcileSchedules, registerScheduleReconcile, hasActiveAutomationTasks, reconcileAllInstances, registerScheduleRecheck, __resetReconcileForTests |
 | `backend/src/lib/schedules/store.ts` | pendingAutomationIds, automationDeps, defaultZone, recordOf, wallClock, automationSpecOf |
 | `backend/src/lib/scoreJobs.ts` | scoreNotesOf, startScoreJob, resumeScoreJob |
-| `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS, matchScore, rankGroups |
+| `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS, runProviders, matchScore, rankGroups |
 | `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, testOrSaveSearchAddress, clearSearchAddress |
 | `backend/src/lib/searchAssist/counters.ts` | SEARCH_ASSIST_COUNTER_NAMES, bumpSearchAssistCounter, searchAssistCounters, __resetSearchAssistCountersForTests |
 | `backend/src/lib/searchAssist/eligible.ts` | MINOR_RESCUE_ENABLED, cappedSearchAssistMode, searchAssistEligibility |
