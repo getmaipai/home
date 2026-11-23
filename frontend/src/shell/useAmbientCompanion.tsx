@@ -41,7 +41,12 @@ export function useAmbientCompanion(person: Roster) {
   const refetchActivity = activity.refetch;
   useEffect(() => { if (wanted && (robot?.companion_id || companionId) !== undefined) void refetchActivity(); }, [pathname, wanted, robot?.companion_id, companionId, refetchActivity]);
 
-  if (incognito) return { kind: "companion" as const, companion: INCOGNITO_COMPANION, clips: undefined, pack: null, mouthStill: null, portrait: undefined, still: undefined, action: undefined };
+  // While settings load the generic companion shows; once loaded, respect the person turning the companion off.
+  if (incognito) {
+    const off = settings.isSuccess && (valueOf("companions.allowed") === false || valueOf("companions.dock") === false);
+    if (off) return null;
+    return { kind: "companion" as const, companion: INCOGNITO_COMPANION, clips: undefined, pack: null, mouthStill: null, portrait: undefined, still: undefined, action: undefined };
+  }
   if (!settings.isSuccess || (wanted && robots.isPending)) return undefined;
   if (!wanted) return null;
   if (robot) {
