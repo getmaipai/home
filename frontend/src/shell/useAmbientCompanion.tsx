@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api, type Roster } from "@/lib/api";
 import { COMPANION_AVATAR_QUERY_KEY, mapCompanionClips } from "@/apps/chat/useCompanionAvatar";
+import { useIncognitoContext } from "@/shell/incognitoContext";
 
 /** The ambient companion data used by the shell, or null while settings load,
  * when the person turns it off, or when no companion is available. */
 export function useAmbientCompanion(person: Roster) {
+  const { on: incognito } = useIncognitoContext();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const scope = `person:${person.id}`;
@@ -14,7 +16,7 @@ export function useAmbientCompanion(person: Roster) {
   const values = Array.isArray(settings.data) ? settings.data : [];
   const valueOf = (key: string) => values.find((setting) => setting.key === key)?.value;
   const settingsResolved = settings.isSuccess || settings.isError;
-  const wanted = settings.isSuccess && valueOf("companions.allowed") !== false && valueOf("companions.dock") !== false;
+  const wanted = settings.isSuccess && valueOf("companions.allowed") !== false && valueOf("companions.dock") !== false && !incognito;
   const companions = useQuery({ queryKey: ["companions"], queryFn: api.companions, enabled: wanted });
   const robots = useQuery({ queryKey: ["devices", "robots"], queryFn: api.robotDevices, enabled: wanted });
   const refetchRobots = robots.refetch;
@@ -33,6 +35,7 @@ export function useAmbientCompanion(person: Roster) {
   const refetchActivity = activity.refetch;
   useEffect(() => { if (wanted && (robot?.companion_id || companionId) !== undefined) void refetchActivity(); }, [pathname, wanted, robot?.companion_id, companionId, refetchActivity]);
 
+  if (incognito) return null;
   if (!settings.isSuccess || (wanted && robots.isPending)) return undefined;
   if (!wanted) return null;
   if (robot) {
