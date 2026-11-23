@@ -315,13 +315,10 @@ describe("Your songs list", () => {
     fireEvent.click(play);
     await waitFor(() => expect(view.getByRole("button", { name: /Play Neon Rain|Pause Neon Rain/ })).toBeTruthy());
   });
-  test("search and the Sounds chip narrow the list, and an empty result says so with a way back", async () => {
+  test("the Make page has no second search box (the header search is the one search) and the Sounds chip still narrows the list", async () => {
     const view = open();
     await view.findByRole("button", { name: "Open Neon Rain" });
-    fireEvent.change(view.getByLabelText("Search your songs"), { target: { value: "zzz" } });
-    expect(await view.findByText("No song matches that.")).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Clear the search" }));
-    expect(await view.findByRole("button", { name: "Open Neon Rain" })).toBeTruthy();
+    expect(view.queryByLabelText("Search your songs")).toBeNull();
     fireEvent.click(view.getByRole("button", { name: "Sounds" }));
     await waitFor(() => expect(view.queryByRole("button", { name: "Open Neon Rain" })).toBeNull());
   });

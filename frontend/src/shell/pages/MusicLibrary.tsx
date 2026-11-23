@@ -10,7 +10,6 @@ import { StudioPickerBody } from "@/shell/MediaPickerDialog";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
-import { Input } from "@maipai/ui/src/ui/input";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@maipai/ui/src/ui/drawer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { SplitView } from "@maipai/ui/src/primitives/SplitView";
@@ -147,13 +146,12 @@ export function MusicLibrary({ selected, remix, onSelect, onAddSound, firstSteps
   const player = useMusicPlayer();
   const list = useSongList();
   const sounds = useQuery({ queryKey: ["music-sounds"], queryFn: () => musicApi.listSounds(), staleTime: 2_000 });
-  const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [takes, setTakes] = useState<Record<string, string>>({});
   const [video, setVideo] = useState<MusicVersion | null>(null);
   const cards = useMemo(() => list.data ?? [], [list.data]);
   const hasLocked = cards.some(isLockedTile);
-  const rows = useMemo(() => libraryRows(cards, sounds.data ?? [], filter, query), [cards, sounds.data, filter, query]);
+  const rows = useMemo(() => libraryRows(cards, sounds.data ?? [], filter, ""), [cards, sounds.data, filter]);
   const queue = useMemo(() => queueOf(rows, takes, i18n._({ id: "Untitled song", message: "Untitled song" })), [rows, takes]);
 
   const refresh = () => { void queryClient.invalidateQueries({ queryKey: ["music-songs"] }); };
@@ -178,12 +176,12 @@ export function MusicLibrary({ selected, remix, onSelect, onAddSound, firstSteps
     : isMaking(row.card) || row.card.state === "failed" || row.card.state === "cancelled" ? songStatusCard({ card: row.card, onOpen: () => onSelect(row.card.id) })
       : <SongRow key={row.key} card={row.card} selected={row.card.id === selected} player={player} queue={queue} take={takes[row.card.id] ?? null} onTake={(id) => setTakes((current) => ({ ...current, [row.card.id]: id }))} actions={actions} />;
 
-  const emptyText = query.trim() || filter !== "all"
+  const emptyText = filter !== "all"
     ? i18n._({ id: "No song matches that.", message: "No song matches that." })
     : (firstSteps ?? i18n._({ id: "No songs yet. Describe one in the bar above and press Generate. It shows up here.", message: "No songs yet. Describe one in the bar above and press Generate. It shows up here." }));
   const listBody = list.isPending ? <ul className="flex list-none flex-col gap-2 p-0" role="status" aria-label={i18n._({ id: "Loading your songs", message: "Loading your songs" })} data-testid="music-songs-loading">{[0, 1, 2, 3].map((n) => <li key={n}><Skeleton shape="row" /></li>)}</ul>
     : list.isError && !list.data ? <EmptyState icon="music" text={i18n._({ id: "Your songs could not be loaded. Check your connection and open this page again.", message: "Your songs could not be loaded. Check your connection and open this page again." })} actionLabel={i18n._({ id: "Try again", message: "Try again" })} onAction={() => void list.refetch()} />
-      : rows.length === 0 && !hasLocked ? <EmptyState icon="music" text={emptyText} {...(query.trim() || filter !== "all" ? { actionLabel: i18n._({ id: "Clear the search", message: "Clear the search" }), onAction: () => { setQuery(""); setFilter("all"); } } : {})} />
+      : rows.length === 0 && !hasLocked ? <EmptyState icon="music" text={emptyText} {...(filter !== "all" ? { actionLabel: i18n._({ id: "Clear the search", message: "Clear the search" }), onAction: () => { setFilter("all"); } } : {})} />
         : <ul className="flex list-none flex-col gap-1 p-0" aria-label={i18n._({ id: "Your songs", message: "Your songs" })}>
           {hasLocked && filter !== "sounds" ? <li className="text-muted-foreground flex items-center gap-3 rounded-xl p-3 text-supporting" data-testid="music-locked-row">{icon("lock", "size-5")}{i18n._({ id: "Some of your songs are locked. Unlock them from the Library to see them here.", message: "Some of your songs are locked. Unlock them from the Library to see them here." })}</li> : null}
           {rows.map(rowsView)}
@@ -194,7 +192,6 @@ export function MusicLibrary({ selected, remix, onSelect, onAddSound, firstSteps
   const mainColumn = (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex flex-col gap-3">
-        <Input type="search" aria-label={i18n._({ id: "Search your songs", message: "Search your songs" })} placeholder={i18n._({ id: "Search your songs", message: "Search your songs" })} value={query} onChange={(event) => setQuery(event.currentTarget.value)} />
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto" role="group" aria-label={i18n._({ id: "Show", message: "Show" })}>
           {FILTERS().map((one) => <Chip key={one.id} selected={filter === one.id} onClick={() => setFilter(one.id)}>{one.label}</Chip>)}
         </div>
