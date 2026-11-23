@@ -18,4 +18,9 @@ describe("activityPopoverItems", () => {
     const [item] = activityPopoverItems([row({ line: null, percent: null, href: null })]);
     expect(item).toMatchObject({ subtitle: undefined, progress: undefined, href: undefined });
   });
+  test("a finished row carries its thumbnail, and a notice row is a plain done row with no kind", () => {
+    const out = activityPopoverItems([row({ state: "done", thumbnailUrl: "/api/files/f1/thumb?w=320" }), row({ id: "notice:n1", source: "notice", state: "done", thumbnailUrl: undefined })]);
+    expect(out[0]!.thumbnailUrl).toBe("/api/files/f1/thumb?w=320");
+    expect(out[1]).toMatchObject({ state: "done", kind: undefined });
+  });
 });
