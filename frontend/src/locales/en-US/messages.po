@@ -419,11 +419,6 @@ msgid "{count} notes at {tempo} beats per minute"
 msgstr "{count} notes at {tempo} beats per minute"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:93
-msgid "{count} of {total} could be cleared - the rest were already gone."
-msgstr "{count} of {total} could be cleared - the rest were already gone."
-
-#. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:358
 msgid "{count} of {total} could not be forgotten: {reason}"
 msgstr "{count} of {total} could not be forgotten: {reason}"
@@ -540,7 +535,7 @@ msgid "{free} free of {total}"
 msgstr "{free} free of {total}"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:235
+#: src/shell/music/MusicPlayerBar.tsx:245
 msgid "{frequency} Hz"
 msgstr "{frequency} Hz"
 
@@ -2051,7 +2046,7 @@ msgid "Access"
 msgstr "Access"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:142
+#: src/shell/music/MusicPlayerBar.tsx:143
 msgid "Acoustic"
 msgstr "Acoustic"
 
@@ -2075,15 +2070,14 @@ msgstr "Active"
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:19
 #: src/shell/InstallDock.tsx:265
-#: src/shell/NotificationBell.tsx:273
-#: src/shell/pages/ActivityPage.tsx:74
+#: src/shell/pages/ActivityPage.tsx:92
 #: src/shell/pages/CompanionsPage.tsx:329
 #: src/shell/pages/CompanionsPage.tsx:331
 msgid "Activity"
 msgstr "Activity"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:118
+#: src/shell/pages/ActivityPage.tsx:143
 msgid "Activity could not load. Check that this computer is online, then try again."
 msgstr "Activity could not load. Check that this computer is online, then try again."
 
@@ -2093,7 +2087,7 @@ msgid "setting.ui.activity_seen_at.label"
 msgstr "Activity last seen (advanced)"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:111
+#: src/shell/pages/ActivityPage.tsx:136
 msgid "Activity was not cleared"
 msgstr "Activity was not cleared"
 
@@ -2828,7 +2822,7 @@ msgid "All adults"
 msgstr "All adults"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:114
+#: src/shell/pageHeaderTitle.tsx:115
 #: src/shell/pages/AllAppsPage.tsx:103
 #: src/shell/pages/AllAppsPage.tsx:122
 #: src/shell/pages/AllAppsPage.tsx:124
@@ -3815,10 +3809,10 @@ msgstr "Azelma"
 #: src/apps/people/FaceEnrollmentPage.tsx:95
 #: src/apps/settings/EngineLinkCredentialSection.tsx:285
 #: src/apps/setup/SetupReviewPage.tsx:65
-#: src/shell/pageHeaderTitle.tsx:148
+#: src/shell/pageHeaderTitle.tsx:149
 #: src/shell/pages/companionFlow/AnimateStep.tsx:155
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:200
-#: src/shell/pages/packageAppHeaderBar.tsx:94
+#: src/shell/pages/packageAppHeaderBar.tsx:101
 #: src/shell/pages/PackageAppPage.tsx:284
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
@@ -3832,7 +3826,7 @@ msgid "Back 10 seconds"
 msgstr "Back 10 seconds"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:263
+#: src/shell/music/MusicPlayerBar.tsx:273
 msgid "Back to current line"
 msgstr "Back to current line"
 
@@ -3933,8 +3927,8 @@ msgstr "Backup storage limit (GB)"
 #. js-lingui-explicit-id
 #: src/apps/settings/AiModelsPage.tsx:26
 #: src/apps/settings/BackupsSection.tsx:204
-#: src/shell/pageHeaderTitle.tsx:103
-#: src/shell/Routes.tsx:174
+#: src/shell/pageHeaderTitle.tsx:104
+#: src/shell/Routes.tsx:170
 msgid "Backups"
 msgstr "Backups"
 
@@ -4018,7 +4012,7 @@ msgstr "Bass"
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:10
-#: src/shell/music/MusicPlayerBar.tsx:140
+#: src/shell/music/MusicPlayerBar.tsx:141
 #: src/shell/pages/MusicStudioView.tsx:39
 msgid "Bass boost"
 msgstr "Bass boost"
@@ -4633,7 +4627,7 @@ msgstr "Can use it now"
 #: src/apps/setup/StorageStep.tsx:32
 #: src/apps/setup/StorageStep.tsx:190
 #: src/shell/components/DataTableRowActions.tsx:53
-#: src/shell/pages/ActivityPage.tsx:156
+#: src/shell/pages/ActivityPage.tsx:182
 #: src/shell/pages/ChatPage.tsx:1716
 #: src/shell/pages/ChatPage.tsx:1732
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
@@ -4863,7 +4857,7 @@ msgid "Change PIN"
 msgstr "Change PIN"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:125
+#: src/shell/music/MusicPlayerBar.tsx:126
 msgid "Change repeat"
 msgstr "Change repeat"
 
@@ -4990,7 +4984,7 @@ msgstr "Charles"
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/AmbientCompanionPane.tsx:329
 #: src/shell/coreLabels.ts:8
-#: src/shell/pageHeaderTitle.tsx:95
+#: src/shell/pageHeaderTitle.tsx:96
 #: src/shell/pages/ChatPage.tsx:1786
 #: src/shell/pages/CompanionsPage.tsx:165
 #: src/shell/pages/CompanionsPage.tsx:170
@@ -5186,7 +5180,7 @@ msgstr "Chat settings"
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:177
+#: src/shell/Routes.tsx:173
 msgid "Chat showcase"
 msgstr "Chat showcase"
 
@@ -5258,7 +5252,7 @@ msgid "failure.advice.unreachable.next_step"
 msgstr "Check that the MaiPai Stack is running in Repairs."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:111
+#: src/shell/pages/ActivityPage.tsx:136
 msgid "Check that this computer is online, then try again."
 msgstr "Check that this computer is online, then try again."
 
@@ -5478,7 +5472,7 @@ msgid "setting.person.robot.topics.option_label.chit_chat"
 msgstr "Chit Chat"
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:512
+#: src/shell/mediaHost.tsx:523
 msgid "Choose a clip"
 msgstr "Choose a clip"
 
@@ -5716,7 +5710,7 @@ msgid "Choose one computer, or add a bigger one for the AI."
 msgstr "Choose one computer, or add a bigger one for the AI."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:513
+#: src/shell/mediaHost.tsx:524
 msgid "Choose one of your own pictures, or add a new one."
 msgstr "Choose one of your own pictures, or add a new one."
 
@@ -6060,9 +6054,8 @@ msgstr "Clear {name}"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:414
-#: src/apps/notifications/NotificationsPage.tsx:159
-#: src/shell/pages/ActivityPage.tsx:107
-#: src/shell/pages/ActivityPage.tsx:157
+#: src/shell/pages/ActivityPage.tsx:132
+#: src/shell/pages/ActivityPage.tsx:183
 #: src/shell/pages/StoragePage.tsx:227
 #: src/shell/pages/StoragePage.tsx:237
 msgid "Clear all"
@@ -6074,7 +6067,7 @@ msgid "Clear All"
 msgstr "Clear All"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:152
+#: src/shell/pages/ActivityPage.tsx:178
 msgid "Clear all finished activity?"
 msgstr "Clear all finished activity?"
 
@@ -6120,7 +6113,7 @@ msgid "Clear the search"
 msgstr "Clear the search"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:138
+#: src/shell/pages/ActivityPage.tsx:164
 msgid "Clear this"
 msgstr "Clear this"
 
@@ -6157,7 +6150,7 @@ msgstr "Climate, weather, nature, wildlife, energy and conservation."
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:17
-#: src/shell/pageHeaderTitle.tsx:110
+#: src/shell/pageHeaderTitle.tsx:111
 msgid "Clock"
 msgstr "Clock"
 
@@ -6440,8 +6433,8 @@ msgstr "Coming up"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
-#: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/Routes.tsx:175
+#: src/shell/pageHeaderTitle.tsx:106
+#: src/shell/Routes.tsx:171
 msgid "Commands"
 msgstr "Commands"
 
@@ -6993,11 +6986,6 @@ msgid "Could not clear the note."
 msgstr "Could not clear the note."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:98
-msgid "Could not clear those notifications."
-msgstr "Could not clear those notifications."
-
-#. js-lingui-explicit-id
 #: src/lib/hubMutationVerbs.ts:14
 msgid "Could not complete engine setup."
 msgstr "Could not complete engine setup."
@@ -7072,14 +7060,9 @@ msgid "Could not delete this voice. Try again."
 msgstr "Could not delete this voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:468
+#: src/shell/Routes.tsx:464
 msgid "Could not discard Incognito chats. Try again."
 msgstr "Could not discard Incognito chats. Try again."
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:81
-msgid "Could not dismiss that notification."
-msgstr "Could not dismiss that notification."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:93
@@ -7093,8 +7076,8 @@ msgstr "Could not export those memories. Check your connection and try again."
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:261
-#: src/shell/pages/ActivityPage.tsx:29
-#: src/shell/pages/ActivityPage.tsx:111
+#: src/shell/pages/ActivityPage.tsx:32
+#: src/shell/pages/ActivityPage.tsx:136
 #: src/shell/pages/musicSongStatus.tsx:30
 msgid "Could not finish"
 msgstr "Could not finish"
@@ -7440,11 +7423,6 @@ msgid "Could not load your memories."
 msgstr "Could not load your memories."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:121
-msgid "Could not load your notification history."
-msgstr "Could not load your notification history."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/HomeShelves.tsx:49
 msgid "Could not load your recent items. Refresh Home to try again."
 msgstr "Could not load your recent items. Refresh Home to try again."
@@ -7568,7 +7546,7 @@ msgstr "Could not push. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:370
+#: src/shell/Routes.tsx:366
 msgid "Could not reach {name}. Try again."
 msgstr "Could not reach {name}. Try again."
 
@@ -8026,7 +8004,7 @@ msgstr "Cover art"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:484
+#: src/shell/Routes.tsx:480
 msgid "Create"
 msgstr "Create"
 
@@ -8301,7 +8279,7 @@ msgstr "Daily Utilities minutes"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotActions.tsx:44
-#: src/shell/music/MusicPlayerBar.tsx:143
+#: src/shell/music/MusicPlayerBar.tsx:144
 msgid "Dance"
 msgstr "Dance"
 
@@ -8957,10 +8935,8 @@ msgstr "Disk space"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:201
-#: src/apps/notifications/NotificationsPage.tsx:216
 #: src/shell/library/LibraryUploads.tsx:75
 #: src/shell/library/LibraryUploads.tsx:76
-#: src/shell/NotificationBell.tsx:262
 #: src/shell/pages/RepairsPage.tsx:160
 msgid "Dismiss"
 msgstr "Dismiss"
@@ -8969,31 +8945,6 @@ msgstr "Dismiss"
 #: src/shell/pages/RepairsPage.tsx:162
 msgid "Dismiss \"{title}\"?"
 msgstr "Dismiss \"{title}\"?"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:212
-msgid "Dismiss {text}"
-msgstr "Dismiss {text}"
-
-#. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:247
-msgid "Dismiss all"
-msgstr "Dismiss all"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:151
-msgid "Dismiss selected"
-msgstr "Dismiss selected"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:193
-msgid "Dismissed"
-msgstr "Dismissed"
-
-#. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:247
-msgid "Dismissing…"
-msgstr "Dismissing…"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1687
@@ -9067,7 +9018,7 @@ msgstr "Don't notify me about shares from"
 #: src/apps/setup/SetupReviewPage.tsx:66
 #: src/shell/AlarmRinger.tsx:60
 #: src/shell/InstallDock.tsx:261
-#: src/shell/pages/ActivityPage.tsx:27
+#: src/shell/pages/ActivityPage.tsx:30
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:97
 #: src/shell/pages/settings/SettingsAreaPage.tsx:257
@@ -9329,7 +9280,7 @@ msgid "Each take is a different song from the same words."
 msgstr "Each take is a different song from the same words."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:68
+#: src/shell/pages/ActivityPage.tsx:86
 msgid "Earlier"
 msgstr "Earlier"
 
@@ -9724,18 +9675,18 @@ msgid "EQ preset"
 msgstr "EQ preset"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:227
-#: src/shell/music/MusicPlayerBar.tsx:227
+#: src/shell/music/MusicPlayerBar.tsx:237
+#: src/shell/music/MusicPlayerBar.tsx:237
 msgid "Equalizer"
 msgstr "Equalizer"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:231
+#: src/shell/music/MusicPlayerBar.tsx:241
 msgid "Equalizer preset"
 msgstr "Equalizer preset"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:228
+#: src/shell/music/MusicPlayerBar.tsx:238
 msgid "Equalizer settings"
 msgstr "Equalizer settings"
 
@@ -10147,7 +10098,7 @@ msgstr "Fall-through rate"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:9
-#: src/shell/pageHeaderTitle.tsx:96
+#: src/shell/pageHeaderTitle.tsx:97
 #: src/shell/pages/FamilyPage.tsx:23
 #: src/shell/pages/FamilyPage.tsx:47
 msgid "Family"
@@ -10339,7 +10290,7 @@ msgstr "Find anything across your household."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:370
+#: src/shell/Routes.tsx:366
 msgid "Find me"
 msgstr "Find me"
 
@@ -10457,7 +10408,7 @@ msgstr "Flash attention override"
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:13
-#: src/shell/music/MusicPlayerBar.tsx:140
+#: src/shell/music/MusicPlayerBar.tsx:141
 msgid "Flat"
 msgstr "Flat"
 
@@ -11436,7 +11387,7 @@ msgid "Good morning, {displayName}"
 msgstr "Good morning, {displayName}"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:122
+#: src/shell/pages/ActivityPage.tsx:147
 msgid "Good to know"
 msgstr "Good to know"
 
@@ -11772,16 +11723,17 @@ msgstr "Holds what some downloads ask for before they start."
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:72
 #: src/shell/coreLabels.ts:7
-#: src/shell/pageHeaderTitle.tsx:94
-#: src/shell/pages/ActivityPage.tsx:44
+#: src/shell/pageHeaderTitle.tsx:95
+#: src/shell/pages/ActivityPage.tsx:50
+#: src/shell/pages/ActivityPage.tsx:51
 #: src/shell/pages/DashboardPage.tsx:31
 #: src/shell/pages/settings/settingsBackLink.ts:55
 #: src/shell/pages/status/StatusComponents.tsx:32
 #: src/shell/pages/WikipediaPage.tsx:155
 #: src/shell/pages/WikipediaPage.tsx:179
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:482
-#: src/shell/Routes.tsx:536
+#: src/shell/Routes.tsx:478
+#: src/shell/Routes.tsx:532
 msgid "Home"
 msgstr "Home"
 
@@ -12613,7 +12565,7 @@ msgstr "Hot: gestures paused"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:10
-#: src/shell/pageHeaderTitle.tsx:111
+#: src/shell/pageHeaderTitle.tsx:112
 #: src/shell/pages/HousePage.tsx:21
 #: src/shell/pages/HousePage.tsx:45
 msgid "House"
@@ -13736,7 +13688,7 @@ msgid "setting.tts.voice_id.option_label.javert"
 msgstr "Javert"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:143
+#: src/shell/music/MusicPlayerBar.tsx:144
 msgid "Jazz"
 msgstr "Jazz"
 
@@ -14137,7 +14089,7 @@ msgid "Key: {value}"
 msgstr "Key: {value}"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:216
+#: src/shell/music/MusicPlayerBar.tsx:217
 #: src/shell/pages/ChatShortcutReference.tsx:25
 #: src/shell/pages/settings/ChatShortcutsView.tsx:11
 msgid "Keyboard shortcuts"
@@ -14283,11 +14235,6 @@ msgstr "Large"
 #: src/lib/settingCopy.generated.ts:578
 msgid "setting.ease.text_size.option.140"
 msgstr "Large."
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:138
-msgid "Last 30 days"
-msgstr "Last 30 days"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:69
@@ -14803,7 +14750,7 @@ msgstr "Level: {toFixed} percent"
 #: src/shell/pages/personAccessCopy.ts:10
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:485
+#: src/shell/Routes.tsx:481
 msgid "Library"
 msgstr "Library"
 
@@ -14889,14 +14836,14 @@ msgstr "Lights"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
-#: src/shell/music/MusicPlayerBar.tsx:182
+#: src/shell/music/MusicPlayerBar.tsx:183
 #: src/shell/pages/MusicLibrary.tsx:96
 #: src/shell/pages/MusicSongDetails.tsx:132
 msgid "Like"
 msgstr "Like"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:123
+#: src/shell/music/MusicPlayerBar.tsx:124
 msgid "Like or unlike"
 msgstr "Like or unlike"
 
@@ -15149,11 +15096,12 @@ msgstr "Loaded"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:138
+#: src/shell/music/MusicPendingBar.tsx:14
 msgid "Loading"
 msgstr "Loading"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:119
+#: src/shell/pages/ActivityPage.tsx:144
 msgid "Loading activity"
 msgstr "Loading activity"
 
@@ -15294,11 +15242,6 @@ msgstr "Loading memories"
 #: src/shell/pages/FilesPage.tsx:346
 msgid "Loading more files"
 msgstr "Loading more files"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:122
-msgid "Loading notifications"
-msgstr "Loading notifications"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:211
@@ -15680,7 +15623,7 @@ msgstr "Loops without a seam"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:133
-#: src/shell/music/MusicPlayerBar.tsx:142
+#: src/shell/music/MusicPlayerBar.tsx:143
 msgid "Loud"
 msgstr "Loud"
 
@@ -15804,8 +15747,8 @@ msgstr "LTX-2.5"
 #: src/apps/chat/MusicCardView.tsx:91
 #: src/shell/media/NowPlayingStage.tsx:148
 #: src/shell/media/NowPlayingStage.tsx:199
-#: src/shell/music/MusicPlayerBar.tsx:257
-#: src/shell/music/MusicPlayerBar.tsx:257
+#: src/shell/music/MusicPlayerBar.tsx:267
+#: src/shell/music/MusicPlayerBar.tsx:267
 #: src/shell/pages/MusicComposer.tsx:212
 #: src/shell/pages/MusicComposer.tsx:216
 #: src/shell/pages/MusicSongDetails.tsx:111
@@ -15857,7 +15800,7 @@ msgid "Made from"
 msgstr "Made from"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:52
+#: src/shell/pages/ActivityPage.tsx:60
 msgid "Made in {app}."
 msgstr "Made in {app}."
 
@@ -16290,7 +16233,7 @@ msgid "Making animations"
 msgstr "Making animations"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:26
+#: src/shell/pages/ActivityPage.tsx:29
 #: src/shell/pages/musicSongStatus.tsx:30
 msgid "Making now"
 msgstr "Making now"
@@ -16554,12 +16497,12 @@ msgstr "Maximum speed used for automatic reference library updates."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/DevicesSection.tsx:164
-#: src/shell/pageHeaderTitle.tsx:113
+#: src/shell/pageHeaderTitle.tsx:114
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:483
-#: src/shell/Routes.tsx:536
+#: src/shell/Routes.tsx:479
+#: src/shell/Routes.tsx:532
 msgid "Media"
 msgstr "Media"
 
@@ -17127,7 +17070,7 @@ msgstr "Much lower"
 #. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:9
 #: src/shell/library/LibraryViewer.tsx:131
-#: src/shell/pages/ActivityPage.tsx:43
+#: src/shell/pages/ActivityPage.tsx:49
 #: src/shell/pages/settings/MediaCardViews.tsx:83
 msgid "Music"
 msgstr "Music"
@@ -17183,7 +17126,7 @@ msgid "setting.music.dj.label"
 msgstr "Music DJ"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:215
+#: src/shell/music/MusicPlayerBar.tsx:216
 msgid "Music keyboard shortcuts"
 msgstr "Music keyboard shortcuts"
 
@@ -17218,7 +17161,7 @@ msgid "mute"
 msgstr "mute"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:134
+#: src/shell/music/MusicPlayerBar.tsx:135
 msgid "Mute"
 msgstr "Mute"
 
@@ -17230,7 +17173,7 @@ msgid "Mute microphone"
 msgstr "Mute microphone"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:122
+#: src/shell/music/MusicPlayerBar.tsx:123
 msgid "Mute or unmute"
 msgstr "Mute or unmute"
 
@@ -17412,7 +17355,7 @@ msgstr "needs a look"
 #: src/apps/settings/RobotBody.tsx:241
 #: src/apps/settings/RobotBody.tsx:252
 #: src/apps/settings/RobotPasswordSection.tsx:104
-#: src/shell/pages/ActivityPage.tsx:28
+#: src/shell/pages/ActivityPage.tsx:31
 msgid "Needs a look"
 msgstr "Needs a look"
 
@@ -17563,11 +17506,6 @@ msgstr "Never leaves your house"
 #: src/lib/settingCopy.generated.ts:1717
 msgid "setting.topics.family_stories.option.keep"
 msgstr "Never says a story is real or not, and plays along."
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:197
-msgid "New"
-msgstr "New"
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionRow.tsx:27
@@ -18105,7 +18043,7 @@ msgid "No places yet"
 msgstr "No places yet"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:40
+#: src/shell/music/MusicPlayerBar.tsx:41
 msgid "No playable songs are left. Check the song files and try again."
 msgstr "No playable songs are left. Check the song files and try again."
 
@@ -18657,7 +18595,7 @@ msgid "Nothing has finished yet."
 msgstr "Nothing has finished yet."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:122
+#: src/shell/pages/ActivityPage.tsx:147
 msgid "Nothing here yet"
 msgstr "Nothing here yet"
 
@@ -18682,19 +18620,9 @@ msgid "Nothing in {label} yet."
 msgstr "Nothing in {label} yet."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:133
-msgid "Nothing in the last 30 days."
-msgstr "Nothing in the last 30 days."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:16
 msgid "Nothing in the pictures or the personality would scare or confuse a young child."
 msgstr "Nothing in the pictures or the personality would scare or confuse a young child."
-
-#. js-lingui-explicit-id
-#: src/shell/ActivityBell.tsx:34
-msgid "Nothing is being made right now."
-msgstr "Nothing is being made right now."
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:161
@@ -18727,14 +18655,14 @@ msgid "Nothing needs you right now."
 msgstr "Nothing needs you right now."
 
 #. js-lingui-explicit-id
+#: src/shell/ActivityBell.tsx:36
+msgid "Nothing new right now."
+msgstr "Nothing new right now."
+
+#. js-lingui-explicit-id
 #: src/apps/reminders/ListMain.tsx:57
 msgid "Nothing on the list yet"
 msgstr "Nothing on the list yet"
-
-#. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:236
-msgid "Nothing pending."
-msgstr "Nothing pending."
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:247
@@ -18803,15 +18731,7 @@ msgid "setting.engines.turn_signal.choice.help"
 msgstr "Choose the model for the Turn Signal role. Auto follows the selected setup plan. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:179
-msgid "Notification history"
-msgstr "Notification history"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:111
-#: src/shell/NotificationBell.tsx:214
-#: src/shell/NotificationBell.tsx:229
-#: src/shell/pageHeaderTitle.tsx:108
+#: src/shell/pageHeaderTitle.tsx:109
 #: src/shell/routeHeader.ts:25
 msgid "Notifications"
 msgstr "Notifications"
@@ -18820,11 +18740,6 @@ msgstr "Notifications"
 #: src/lib/settingCopy.generated.ts:1954
 msgid "area.Notifications"
 msgstr "Notifications"
-
-#. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:214
-msgid "Notifications ({count} pending)"
-msgstr "Notifications ({count} pending)"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:210
@@ -18843,7 +18758,7 @@ msgid "Now all ages."
 msgstr "Now all ages."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:264
+#: src/shell/music/MusicPlayerBar.tsx:274
 msgid "Now playing"
 msgstr "Now playing"
 
@@ -19165,11 +19080,6 @@ msgstr "Older backups can keep their data for up to three months. Restoring a wh
 #: src/apps/settings/UsersSection.tsx:235
 msgid "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days."
 msgstr "Older backups still hold their data for up to three months, until those backups age out. Restoring a whole older backup would bring them back. The hub's logs still mention them, without anything they said, for 7 days."
-
-#. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:162
-msgid "Older messages"
-msgstr "Older messages"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/QueuesBody.tsx:12
@@ -19550,10 +19460,10 @@ msgstr "Only when I ask"
 #: src/shell/InstallDock.tsx:264
 #: src/shell/library/LibraryItems.tsx:35
 #: src/shell/library/useSaveAsCharacter.tsx:63
-#: src/shell/NotificationBell.tsx:252
-#: src/shell/pages/ActivityPage.tsx:33
-#: src/shell/pages/ActivityPage.tsx:34
-#: src/shell/pages/ActivityPage.tsx:35
+#: src/shell/pages/ActivityPage.tsx:36
+#: src/shell/pages/ActivityPage.tsx:38
+#: src/shell/pages/ActivityPage.tsx:39
+#: src/shell/pages/ActivityPage.tsx:40
 #: src/shell/pages/dashboard/HomeHero.tsx:22
 #: src/shell/pages/FilesPage.tsx:358
 #: src/shell/pages/musicSongStatus.tsx:37
@@ -19608,7 +19518,7 @@ msgid "Open DNS settings"
 msgstr "Open DNS settings"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:126
+#: src/shell/music/MusicPlayerBar.tsx:127
 msgid "Open equalizer"
 msgstr "Open equalizer"
 
@@ -19630,8 +19540,8 @@ msgid "Open in Library"
 msgstr "Open in Library"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:96
-#: src/shell/music/MusicPlayerBar.tsx:96
+#: src/shell/music/MusicPlayerBar.tsx:97
+#: src/shell/music/MusicPlayerBar.tsx:97
 #: src/shell/pages/MakeSongPage.tsx:98
 #: src/shell/pages/MusicLibrary.tsx:102
 #: src/shell/pages/MusicSongDetails.tsx:158
@@ -20180,9 +20090,9 @@ msgid "setting.ease.text_size.help"
 msgstr "Percent of the normal text size. \"Preset\" follows your ease of use choice."
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:100
+#: src/shell/pageHeaderTitle.tsx:101
 #: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:170
+#: src/shell/Routes.tsx:166
 msgid "Performance"
 msgstr "Performance"
 
@@ -20461,7 +20371,7 @@ msgid "Pick one and it goes into the bar above."
 msgstr "Pick one and it goes into the bar above."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:513
+#: src/shell/mediaHost.tsx:524
 msgid "Pick one of your own clips to put after this one."
 msgstr "Pick one of your own clips to put after this one."
 
@@ -20660,7 +20570,7 @@ msgstr "pictures"
 #. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:9
 #: src/apps/settings/styles/StyleBrowser.tsx:148
-#: src/shell/pages/ActivityPage.tsx:41
+#: src/shell/pages/ActivityPage.tsx:47
 #: src/shell/pages/settings/MediaCardViews.tsx:60
 msgid "Pictures"
 msgstr "Pictures"
@@ -20751,9 +20661,9 @@ msgid "setting.access.tier.max.option.image"
 msgstr "Pictures with full power."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:122
-msgid "Pictures, videos and songs you make show up here while they are made and after."
-msgstr "Pictures, videos and songs you make show up here while they are made and after."
+#: src/shell/pages/ActivityPage.tsx:147
+msgid "Pictures, videos, songs and messages show up here."
+msgstr "Pictures, videos, songs and messages show up here."
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionRow.tsx:88
@@ -20907,7 +20817,7 @@ msgid "Play in the player"
 msgstr "Play in the player"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:118
+#: src/shell/music/MusicPlayerBar.tsx:119
 msgid "Play or pause"
 msgstr "Play or pause"
 
@@ -21053,8 +20963,8 @@ msgid "Powered by Stability AI"
 msgstr "Powered by Stability AI"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:234
-#: src/shell/music/MusicPlayerBar.tsx:234
+#: src/shell/music/MusicPlayerBar.tsx:244
+#: src/shell/music/MusicPlayerBar.tsx:244
 msgid "Preamp"
 msgstr "Preamp"
 
@@ -21197,7 +21107,7 @@ msgid "Previous"
 msgstr "Previous"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:120
+#: src/shell/music/MusicPlayerBar.tsx:121
 msgid "Previous or next song"
 msgstr "Previous or next song"
 
@@ -21213,7 +21123,7 @@ msgstr "Print"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:12
-#: src/shell/pageHeaderTitle.tsx:106
+#: src/shell/pageHeaderTitle.tsx:107
 #: src/shell/pages/PrivacyPage.tsx:45
 msgid "Privacy"
 msgstr "Privacy"
@@ -21373,7 +21283,7 @@ msgstr "Questions and answers on cooking, repairs, gardens and computers."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/PerformanceCustomize.tsx:80
-#: src/shell/music/MusicPlayerBar.tsx:212
+#: src/shell/music/MusicPlayerBar.tsx:213
 msgid "Queue"
 msgstr "Queue"
 
@@ -21529,7 +21439,7 @@ msgid "setting.tts.voice_id.option_label.rafael"
 msgstr "Rafael"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:121
+#: src/shell/music/MusicPlayerBar.tsx:122
 msgid "Raise or lower volume"
 msgstr "Raise or lower volume"
 
@@ -21559,11 +21469,6 @@ msgstr "Reach a new website?"
 #: src/lib/settingCopy.generated.ts:671
 msgid "setting.engines.stack.remote.allow_tailnet.label"
 msgstr "Reach the engine computer when away from home"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:195
-msgid "Read"
-msgstr "Read"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:528
@@ -21771,7 +21676,7 @@ msgstr "Reel"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:11
-#: src/shell/pageHeaderTitle.tsx:115
+#: src/shell/pageHeaderTitle.tsx:116
 #: src/shell/pages/ReferencePage.tsx:28
 #: src/shell/pages/ReferencePage.tsx:37
 #: src/shell/pages/ReferencePage.tsx:37
@@ -21858,7 +21763,7 @@ msgstr "Reminder: {task}"
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:16
-#: src/shell/pageHeaderTitle.tsx:109
+#: src/shell/pageHeaderTitle.tsx:110
 msgid "Reminders"
 msgstr "Reminders"
 
@@ -22166,10 +22071,10 @@ msgstr "Repair issues"
 
 #. js-lingui-explicit-id
 #: src/shell/InstallDock.tsx:317
-#: src/shell/pageHeaderTitle.tsx:102
+#: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:172
+#: src/shell/Routes.tsx:168
 msgid "Repairs"
 msgstr "Repairs"
 
@@ -22191,7 +22096,7 @@ msgstr "Repeat"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:101
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Repeat all songs"
 msgstr "Repeat all songs"
 
@@ -22207,7 +22112,7 @@ msgstr "Repeat ends"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:101
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Repeat off"
 msgstr "Repeat off"
 
@@ -22218,7 +22123,7 @@ msgstr "Repeat on"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:125
-#: src/shell/music/MusicPlayerBar.tsx:101
+#: src/shell/music/MusicPlayerBar.tsx:102
 msgid "Repeat one song"
 msgstr "Repeat one song"
 
@@ -22586,7 +22491,7 @@ msgid "Reverting"
 msgstr "Reverting"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:36
+#: src/shell/pages/ActivityPage.tsx:41
 #: src/shell/pages/CompanionsPage.tsx:317
 msgid "Review"
 msgstr "Review"
@@ -22885,7 +22790,7 @@ msgid "Robots: {list}."
 msgstr "Robots: {list}."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:143
+#: src/shell/music/MusicPlayerBar.tsx:144
 msgid "Rock"
 msgstr "Rock"
 
@@ -23556,7 +23461,7 @@ msgid "area.Search"
 msgstr "Search"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/packageAppHeaderBar.tsx:107
+#: src/shell/pages/packageAppHeaderBar.tsx:114
 #: src/shell/pages/PackageAppPage.tsx:284
 msgid "Search {name}"
 msgstr "Search {name}"
@@ -23889,17 +23794,16 @@ msgstr "Seed {seed}. Take {index} of {total}."
 #. js-lingui-explicit-id
 #: src/shell/GlobalMiniPlayer.tsx:127
 #: src/shell/media/NowPlayingStage.tsx:179
-#: src/shell/music/MusicPlayerBar.tsx:150
+#: src/shell/music/MusicPlayerBar.tsx:151
 msgid "Seek"
 msgstr "Seek"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:119
+#: src/shell/music/MusicPlayerBar.tsx:120
 msgid "Seek 5 seconds"
 msgstr "Seek 5 seconds"
 
 #. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:156
 #: src/shell/pages/FilesPage.tsx:402
 msgid "Select"
 msgstr "Select"
@@ -23916,7 +23820,6 @@ msgstr "Select {name}, {minutes} min"
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:92
-#: src/apps/notifications/NotificationsPage.tsx:186
 msgid "Select {text}"
 msgstr "Select {text}"
 
@@ -23924,12 +23827,6 @@ msgstr "Select {text}"
 #: src/apps/clock/TimersTab.tsx:133
 msgid "Select {text}, {displayTime} remaining"
 msgstr "Select {text}, {displayTime} remaining"
-
-#. js-lingui-explicit-id
-#: src/apps/notifications/NotificationsPage.tsx:170
-#: src/apps/notifications/NotificationsPage.tsx:173
-msgid "Select all"
-msgstr "Select all"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/AnimateStep.tsx:142
@@ -24324,11 +24221,11 @@ msgstr "Setting up your AI"
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:338
 #: src/shell/coreLabels.ts:13
-#: src/shell/pageHeaderTitle.tsx:97
+#: src/shell/pageHeaderTitle.tsx:98
 #: src/shell/pages/FilesPage.tsx:304
 #: src/shell/pages/PersonProfilePage.tsx:236
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
-#: src/shell/Routes.tsx:536
+#: src/shell/Routes.tsx:532
 msgid "Settings"
 msgstr "Settings"
 
@@ -24376,7 +24273,7 @@ msgstr "Setup progress unavailable"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupReviewPage.tsx:59
-#: src/shell/pageHeaderTitle.tsx:112
+#: src/shell/pageHeaderTitle.tsx:113
 msgid "Setup review"
 msgstr "Setup review"
 
@@ -24584,12 +24481,12 @@ msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:127
+#: src/shell/music/MusicPlayerBar.tsx:128
 msgid "Show keyboard shortcuts"
 msgstr "Show keyboard shortcuts"
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:444
+#: src/shell/Routes.tsx:440
 msgid "Show me around"
 msgstr "Show me around"
 
@@ -24795,7 +24692,7 @@ msgstr "Shows your companion at the top right of every page. Hover or tap it to 
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:184
-#: src/shell/music/MusicPlayerBar.tsx:103
+#: src/shell/music/MusicPlayerBar.tsx:104
 msgid "Shuffle"
 msgstr "Shuffle"
 
@@ -25983,14 +25880,14 @@ msgstr "Starts at (seconds)"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:187
-#: src/shell/pageHeaderTitle.tsx:99
+#: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/EnginesPage.tsx:47
 #: src/shell/pages/EnginesPage.tsx:71
 #: src/shell/pages/performance/EnginesHealthBody.tsx:37
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:37
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:173
+#: src/shell/Routes.tsx:169
 msgid "Status"
 msgstr "Status"
 
@@ -26192,12 +26089,12 @@ msgstr "Stopwatch running"
 #. js-lingui-explicit-id
 #: src/apps/settings/AiModelsPage.tsx:26
 #: src/shell/library/LibraryStorage.tsx:24
-#: src/shell/pageHeaderTitle.tsx:98
+#: src/shell/pageHeaderTitle.tsx:99
 #: src/shell/pages/StoragePage.tsx:118
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:169
+#: src/shell/Routes.tsx:165
 msgid "Storage"
 msgstr "Storage"
 
@@ -26915,8 +26812,8 @@ msgid "api.error.companion_unavailable"
 msgstr "That companion is not available to you. Choose another from the list."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:205
-#: src/shell/music/MusicPlayerBar.tsx:254
+#: src/shell/music/MusicPlayerBar.tsx:206
+#: src/shell/music/MusicPlayerBar.tsx:264
 #: src/shell/pages/MusicSongDetails.tsx:133
 msgid "That could not be saved. Try again."
 msgstr "That could not be saved. Try again."
@@ -26945,7 +26842,6 @@ msgstr "That did not send. Try again."
 #: src/apps/clock/WorldClocksTab.tsx:168
 #: src/apps/memory/PersonMemories.tsx:220
 #: src/apps/memory/PersonMemories.tsx:398
-#: src/apps/notifications/NotificationsPage.tsx:114
 #: src/apps/people/FaceEnrollmentPage.tsx:781
 #: src/apps/people/ProfileForm.tsx:180
 #: src/apps/people/ProfileForm.tsx:191
@@ -27045,7 +26941,7 @@ msgstr "That did not send. Try again."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:370
+#: src/shell/Routes.tsx:366
 #: src/shell/sessionLockContext.tsx:124
 msgid "That did not work"
 msgstr "That did not work"
@@ -28353,7 +28249,7 @@ msgid "The song goes under the video as a new version. Your first video is kept.
 msgstr "The song goes under the video as a new version. Your first video is kept."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:265
+#: src/shell/music/MusicPlayerBar.tsx:275
 msgid "The song, its words and the player controls."
 msgstr "The song, its words and the player controls."
 
@@ -28732,7 +28628,7 @@ msgid "this book"
 msgstr "this book"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:225
+#: src/shell/music/MusicPlayerBar.tsx:235
 msgid "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support."
 msgstr "This browser cannot run the Equalizer because Web Audio is unavailable. Use a browser with Web Audio support."
 
@@ -28908,7 +28804,7 @@ msgid "This makes a new voice based on the recording. It is not a copy of the vo
 msgstr "This makes a new voice based on the recording. It is not a copy of the voice."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:153
+#: src/shell/pages/ActivityPage.tsx:179
 msgid "This only removes the list. Your pictures, videos and songs stay where they are."
 msgstr "This only removes the list. Your pictures, videos and songs stay where they are."
 
@@ -29048,7 +28944,7 @@ msgid "This song could not be made. Open it to try again."
 msgstr "This song could not be made. Open it to try again."
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:198
+#: src/shell/music/MusicPlayerBar.tsx:199
 msgid "This song could not be played. Check the file and try again."
 msgstr "This song could not be played. Check the file and try again."
 
@@ -29068,7 +28964,7 @@ msgid "This song is locked. Unlock it from the Library to open it."
 msgstr "This song is locked. Unlock it from the Library to open it."
 
 #. js-lingui-explicit-id
-#: src/shell/mediaHost.tsx:272
+#: src/shell/mediaHost.tsx:278
 msgid "This song is not available. Go back to Music and choose another."
 msgstr "This song is not available. Go back to Music and choose another."
 
@@ -29274,7 +29170,7 @@ msgid "Today's items"
 msgstr "Today's items"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:124
+#: src/shell/music/MusicPlayerBar.tsx:125
 msgid "Toggle shuffle"
 msgstr "Toggle shuffle"
 
@@ -29492,7 +29388,7 @@ msgstr "Treble"
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:11
-#: src/shell/music/MusicPlayerBar.tsx:141
+#: src/shell/music/MusicPlayerBar.tsx:142
 #: src/shell/pages/MusicStudioView.tsx:39
 msgid "Treble boost"
 msgstr "Treble boost"
@@ -29533,7 +29429,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/shell/InstallDock.tsx:316
 #: src/shell/InstallStrip.tsx:96
 #: src/shell/library/LibraryUploads.tsx:75
-#: src/shell/pages/ActivityPage.tsx:37
+#: src/shell/pages/ActivityPage.tsx:42
 #: src/shell/pages/companionFlow/AnimateStep.tsx:133
 #: src/shell/pages/companionFlow/PackSection.tsx:106
 #: src/shell/pages/dashboard/ArrangeHome.tsx:94
@@ -29698,7 +29594,7 @@ msgstr "Turn this feature off?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:405
-#: src/shell/Routes.tsx:221
+#: src/shell/Routes.tsx:217
 msgid "Turn trace"
 msgstr "Turn trace"
 
@@ -29978,7 +29874,7 @@ msgstr "Unknown browser"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:195
-#: src/shell/music/MusicPlayerBar.tsx:182
+#: src/shell/music/MusicPlayerBar.tsx:183
 #: src/shell/pages/MusicLibrary.tsx:96
 #: src/shell/pages/MusicSongDetails.tsx:132
 msgid "Unlike"
@@ -30035,7 +29931,7 @@ msgid "unmute"
 msgstr "unmute"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:134
+#: src/shell/music/MusicPlayerBar.tsx:135
 msgid "Unmute"
 msgstr "Unmute"
 
@@ -30207,10 +30103,10 @@ msgid "Updated {when}"
 msgstr "Updated {when}"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:101
+#: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:171
+#: src/shell/Routes.tsx:167
 msgid "Updates"
 msgstr "Updates"
 
@@ -30444,7 +30340,7 @@ msgid "Use the starter list"
 msgstr "Use the starter list"
 
 #. js-lingui-explicit-id
-#: src/shell/music/MusicPlayerBar.tsx:216
+#: src/shell/music/MusicPlayerBar.tsx:217
 msgid "Use these keys while Music is active and focus is outside a text field."
 msgstr "Use these keys while Music is active and focus is outside a text field."
 
@@ -30495,9 +30391,9 @@ msgstr "Used in chat"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/UsersSection.tsx:180
-#: src/shell/pageHeaderTitle.tsx:107
+#: src/shell/pageHeaderTitle.tsx:108
 #: src/shell/pages/UsersPage.tsx:12
-#: src/shell/Routes.tsx:176
+#: src/shell/Routes.tsx:172
 msgid "Users"
 msgstr "Users"
 
@@ -30572,7 +30468,7 @@ msgid "Using a password? Tap \"Use a password instead\"."
 msgstr "Using a password? Tap \"Use a password instead\"."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:50
+#: src/shell/pages/ActivityPage.tsx:57
 msgid "Usually about {minutes, plural, one {# minute} other {# minutes}}."
 msgstr "Usually about {minutes, plural, one {# minute} other {# minutes}}."
 
@@ -30688,7 +30584,7 @@ msgstr "videos"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/styles/StyleBrowser.tsx:148
-#: src/shell/pages/ActivityPage.tsx:42
+#: src/shell/pages/ActivityPage.tsx:48
 #: src/shell/pages/settings/MediaCardViews.tsx:67
 msgid "Videos"
 msgstr "Videos"
@@ -30744,11 +30640,6 @@ msgid "View"
 msgstr "View"
 
 #. js-lingui-explicit-id
-#: src/shell/NotificationBell.tsx:275
-msgid "View history"
-msgstr "View history"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:165
 msgid "View page"
 msgstr "View page"
@@ -30777,7 +30668,7 @@ msgstr "Visualizer: {name}"
 
 #. js-lingui-explicit-id
 #: src/shell/media/EqualizerMenu.tsx:12
-#: src/shell/music/MusicPlayerBar.tsx:141
+#: src/shell/music/MusicPlayerBar.tsx:142
 msgid "Vocal"
 msgstr "Vocal"
 
@@ -30939,7 +30830,7 @@ msgid "Voiceover"
 msgstr "Voiceover"
 
 #. js-lingui-explicit-id
-#: src/shell/pageHeaderTitle.tsx:104
+#: src/shell/pageHeaderTitle.tsx:105
 #: src/shell/pages/settings/settingsViews.tsx:94
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
@@ -30969,7 +30860,7 @@ msgstr "Voices with full power."
 
 #. js-lingui-explicit-id
 #: src/shell/media/MusicVisualizerSection.tsx:71
-#: src/shell/music/MusicPlayerBar.tsx:135
+#: src/shell/music/MusicPlayerBar.tsx:136
 #: src/shell/pages/MusicStudioView.tsx:34
 msgid "Volume"
 msgstr "Volume"
@@ -31000,7 +30891,7 @@ msgid "setting.stack.engines.stt.smart_turn.label"
 msgstr "Wait for the end of a sentence before replying"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/ActivityPage.tsx:25
+#: src/shell/pages/ActivityPage.tsx:28
 #: src/shell/pages/musicSongStatus.tsx:30
 #: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Waiting"
