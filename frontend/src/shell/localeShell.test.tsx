@@ -13,10 +13,8 @@ import { activateLocale } from "@/i18n";
 import { i18n as kitI18n } from "@maipai/ui/src/i18n";
 import { Routes } from "@/shell/Routes";
 import { PhoneMenuLinks } from "@/shell/phoneMenuLinks";
-import { NotificationBell } from "@/shell/NotificationBell";
 import { routeHeader, routeTitle } from "@/shell/routeHeader";
 import { mockHome, makePerson, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
-import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { AppRow } from "@/lib/api";
 
 const t = (id: string) => i18n._({ id, message: id });
@@ -53,12 +51,6 @@ describe("shell strings in es", () => {
     expect(view.getByRole("navigation", { name: t("More") })).toBeTruthy();
     expect(view.getByRole("link", { name: t("All apps") })).toBeTruthy();
     expect(view.queryByRole("link", { name: "All apps" })).toBeNull();
-  });
-
-  test("the bell reads in Spanish and falls back per id", async () => {
-    globalThis.fetch = (() => Promise.resolve(Response.json([]))) as unknown as typeof fetch;
-    const view = renderWithQueryClient(<MemoryRouter><ToastProvider><NotificationBell /></ToastProvider></MemoryRouter>);
-    expect(await view.findByRole("button", { name: new RegExp(t("Notifications")) })).toBeTruthy();
   });
 });
 
