@@ -69,7 +69,10 @@ Use the path of `home` main once this branch has landed.
 
 ## Status of this build
 
-On branch `disk-keeper`; nothing shipped to the live hub; nothing deleted. Tested: dry-run classification (merged, squash-merged, pushed,
-unpushed, dirty), `check`, the download guard. **Not run:** the `--apply` paths (worktree removal, weight deletion) and their two tests; the
-auto-mode classifier refused to run them, so they need a run by Jesse's approval before anyone relies on `--apply`. Follow-ups: a
-`wt.sh reap` change in `.github` to use the same cherry test (a separate repo and a gate); a WORKTREE size cap for `data-scratch` folders.
+On branch `disk-keeper`; nothing shipped to the live hub. Six tests pass (run from outside the worktree until its dependencies are installed): dry-run
+classification (merged, squash-merged, pushed, unpushed, dirty), `--apply` for worktrees and weights in a throwaway repo, keep globs, `check`, the
+download guard. The tests set `MAIPAI_DISK_ORG` and `MAIPAI_DISK_HOME` so they never scan the real machine. Installed 2026-11-24 with Jesse's yes: copies
+of both scripts in `~/.claude/hooks/` (refresh them after a change here) and two entries in `~/.claude/settings.json` (backup `settings.json.bak-disk-keeper`).
+
+Known limits: the full-machine worktree scan is slow (`git status --ignored` on 100k-file trees; minutes for hundreds of worktrees) and its numbers
+were not yet verified against wt-scan.tsv. Follow-ups: change `wt.sh reap` in `.github` to use the same cherry test (separate repo, full gate).

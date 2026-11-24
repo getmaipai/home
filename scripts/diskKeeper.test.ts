@@ -22,7 +22,7 @@ function fixture() {
     unpushed: wt("unpushed", `echo u > u && git add u && git commit -qm u`),
     dirty: wt("dirty", `echo d > d`),
   };
-  const env = `MAIPAI_DISK_ORG=${org} MAIPAI_DISK_REPOS=${home} MAIPAI_DISK_LOG=${root}/log.tsv MAIPAI_DISK_ACTIVE_SECS=0 MAIPAI_DISK_KEEP=`;
+  const env = `MAIPAI_DISK_ORG=${org} MAIPAI_DISK_HOME=${root}/nohome MAIPAI_DISK_REPOS=${home} MAIPAI_DISK_LOG=${root}/log.tsv MAIPAI_DISK_ACTIVE_SECS=0 MAIPAI_DISK_KEEP=`;
   return { root, org, home, p, env, script: join(import.meta.dir, "disk-keeper.sh") };
 }
 

@@ -96,7 +96,7 @@ cmd_worktrees() {
     *) echo "worktrees: unknown option $1" >&2; return 2;; esac; shift; done
   LSOF_CWD="$(lsof -d cwd -Fn 2>/dev/null)" && LSOF_OK=1 || LSOF_OK=0   # computed here: classify runs in subshells and cannot cache
   local repo line path branch cls reason n_safe=0 n_other=0 safe_kb=0 kb
-  local out_other=""
+  local other_f; other_f="$(mktemp)"; trap 'rm -f "$other_f"' RETURN
   for repo in $REPOS; do
     [[ -d "$repo/.git" ]] || continue
     path=""; branch=""
@@ -123,7 +123,7 @@ cmd_worktrees() {
               fi
             else
               n_other=$((n_other + 1))
-              out_other+="$(printf '%-9s %-10s %s [%s] %s\n' "$cls" "$(gb "$kb")" "$path" "${branch:-no branch}" "$reason")"$'\n'
+              printf '%-9s %-10s %s [%s] %s\n' "$cls" "$(gb "$kb")" "$path" "${branch:-no branch}" "$reason" >> "$other_f"
             fi
           fi
           path=""; branch="";;
@@ -132,7 +132,7 @@ cmd_worktrees() {
   done
   echo
   echo "Needs a person (never touched by this command):"
-  printf '%s' "${out_other:-  none\n}" | sort
+  sort "$other_f"; echo; awk '{c[$1]++} END {for (k in c) printf "  %s: %d\n", k, c[k]}' "$other_f"
   echo
   if (( apply )); then echo "Removed or kept: $n_safe safe worktrees ($(gb "$safe_kb")); $n_other left for a person. Log: $LOG"
   else echo "Dry run: $n_safe worktrees are safe to remove ($( ((sizes)) && gb "$safe_kb" || echo 'add --sizes for GB')); $n_other need a person. Add --apply to remove the safe ones."; fi
@@ -151,13 +151,13 @@ assigned_text() {
 
 weight_roots() {
   local d
-  for d in "$ORG"/*/data-scratch "$ORG"/wt/*/data-scratch "$HOME/video-bench" "$SCRATCH"; do [[ -d "$d" && ! -L "$d" ]] && echo "$d"; done
+  for d in "$ORG"/*/data-scratch "$ORG"/wt/*/data-scratch "${MAIPAI_DISK_HOME:-$HOME}/video-bench" "$SCRATCH"; do [[ -d "$d" && ! -L "$d" ]] && echo "$d"; done
 }
 
 # experiment dir of a weight file: first folder under a data-scratch or scratch root
 experiment_of() {
   local f="$1" root rest
-  for root in "$ORG"/*/data-scratch "$ORG"/wt/*/data-scratch "$SCRATCH" "$HOME/video-bench"; do
+  for root in "$ORG"/*/data-scratch "$ORG"/wt/*/data-scratch "$SCRATCH" "${MAIPAI_DISK_HOME:-$HOME}/video-bench"; do
     case "$f" in "$root"/*) rest="${f#"$root"/}"; echo "$root/${rest%%/*}"; return;; esac
   done
   dirname "$f"
@@ -178,7 +178,7 @@ cmd_weights() {
       case "$f" in "$LIVE"/*) continue;; esac
       base="$(basename "$f")"; stem="${base%.*}"
       # assigned if the file name, its stem, or its folder name appears in an assigned source
-      if printf '%s' "$text" | grep -qiF -- "$(printf '%s' "$stem" | tr 'A-Z' 'a-z')" || printf '%s' "$text" | grep -qiF -- "$(basename "$(dirname "$f")" | tr 'A-Z' 'a-z')"; then
+      if printf '%s' "$text" | grep -qiwF -- "$(printf '%s' "$stem" | tr 'A-Z' 'a-z')" || printf '%s' "$text" | grep -qiwF -- "$(basename "$(dirname "$f")" | tr 'A-Z' 'a-z')"; then
         printf '  assigned  (kept)  %s\n' "$f"; continue
       fi
       kb=$(( $(stat -f %z "$f" 2>/dev/null || echo 0) / 1024 ))
@@ -196,7 +196,7 @@ cmd_weights() {
       else
         printf '  keep for now %-10s %s (%s)\n' "$(gb "$kb")" "$f" "${why:+younger than $older days}${why:-experiment not marked finished: add RESULTS.md when done}"
       fi
-    done < <(find "$root" -type f -size +"${min_mb}"M 2>/dev/null | grep -E "\.(${WEIGHT_EXT})$" | head -500)
+    done < <(find "$root" -type f -size +"${min_mb}"M 2>/dev/null | grep -E "\.(${WEIGHT_EXT})$" | grep -vE "/(site-packages|venv|\.venv|node_modules)/" | head -500)
   done < <(weight_roots)
   echo
   echo "$n unassigned weight files, $(gb "$total") in all$( ((apply)) && echo "; removed $(gb "$removed"). Log: $LOG" )."
