@@ -171,7 +171,7 @@ describe("the pipeline's cached read of the Stack's choice", () => {
   test("before the move, Home's stored value rules; after it, the Stack's household pick and off state do, and a level nobody chose is the recommended one (Reduced stays off)", async () => {
     setHouseholdSettingValue("engines.image.tier.boost", { model: "old-pick", options: {} });
     expect(readSlot("image", "boost").model).toBe("old-pick");
-    view = { categories: [{ id: "pictures", tiers: [level("standard", "recommended", "atlas-fast"), level("boost", "household", "atlas-xl"), level("max", "off", null), level("reduced", "none", null)] }, { id: "chat", tiers: [level("reduced", "recommended", "nova-3b")] }] };
+    view = { categories: [{ id: "pictures", role: "image", tiers: [level("standard", "recommended", "atlas-fast"), level("boost", "household", "atlas-xl"), level("max", "off", null), level("reduced", "none", null)] }, { id: "chat", tiers: [level("reduced", "recommended", "nova-3b")] }] };
     await refreshStackChoiceSnapshot();
     expect(readSlot("image", "boost").model).toBe("atlas-xl");
     expect(readSlot("image", "max").model).toBe("off");
@@ -179,7 +179,7 @@ describe("the pipeline's cached read of the Stack's choice", () => {
     expect(readSlot("chat", "reduced").model).toBe("off");
   });
   test("an unreachable Stack puts Home's stored value back in charge", async () => {
-    view = { categories: [{ id: "pictures", tiers: [{ tier: "max", chosen: null, chosen_by: "off" }] }] };
+    view = { categories: [{ id: "pictures", role: "image", tiers: [{ tier: "max", chosen: null, chosen_by: "off" }] }] };
     await refreshStackChoiceSnapshot();
     expect(readSlot("image", "max").model).toBe("off");
     down = true;

@@ -6,31 +6,29 @@ import { forwardToStack, StackChoicesError } from "@/lib/stackChoicesForward";
 import { ensureChoicesMigrated, readMigrationRecord } from "@/lib/stackChoicesMigration";
 import { isStackConfigured } from "@/lib/stackEngine";
 
-/** Home's category names to the Stack's. Coding is left out: its Boost and Max are off until measured (CODE-TIER-02), a rule of Home's own. */
-const STACK_CATEGORY: Record<string, string> = { chat: "chat", image: "pictures", video: "video", music: "music", voice: "voice", coding: "coding" };
 type Level = "reduced" | "standard" | "boost" | "max";
 
 interface Row { tier: Level; chosen: string | null; chosen_by: "household" | "recommended" | "off" | "none" }
 let rows: Map<string, Row> | null = null;
 
 /**
- * The model a level uses as Home's slot reader names it (`off`, a model id or `recommended`), or null while the Stack's answer is not known. A level
+ * The model a level uses as Home's slot reader names it (`off`, a model id or `recommended`), or null while the Stack's answer is not known. The feature is
+ * found by the role it serves (each row of the Stack's answer names its role), so Home keeps no list of the Stack's feature names. A level
  * nobody chose is `recommended`, except Reduced, which stays off until a household turns it on (Home's own default for "let big jobs simplify chat").
  */
-export function stackSlotModel(category: string, tier: Level): string | null {
-  const stackCategory = STACK_CATEGORY[category];
-  if (!rows || !stackCategory) return null;
-  const row = rows.get(`${stackCategory}:${tier}`);
+export function stackSlotModel(role: string, tier: Level): string | null {
+  if (!rows) return null;
+  const row = rows.get(`${role}:${tier}`);
   if (!row) return null;
   if (row.chosen_by === "off") return "off";
   if (row.chosen_by === "household" && row.chosen) return row.chosen;
   return tier === "reduced" ? "off" : "recommended";
 }
 
-export function setStackChoiceSnapshot(view: { categories?: Array<{ id: string; tiers?: Row[] }> } | null): void {
+export function setStackChoiceSnapshot(view: { categories?: Array<{ id: string; role?: string | null; tiers?: Row[] }> } | null): void {
   if (!view?.categories) { rows = null; return; }
   const next = new Map<string, Row>();
-  for (const category of view.categories) for (const row of category.tiers ?? []) next.set(`${category.id}:${row.tier}`, row);
+  for (const category of view.categories) if (category.role) for (const row of category.tiers ?? []) next.set(`${category.role}:${row.tier}`, row);
   rows = next;
 }
 export function __resetChoiceSnapshotForTests(): void { rows = null; }

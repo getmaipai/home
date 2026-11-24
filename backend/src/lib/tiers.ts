@@ -39,7 +39,7 @@ export function readSlot(category: TierCategory, tier: Tier | "reduced"): SlotRe
   // The pinned spec still registers coding Boost and Max as `off` (its "until the benchmark justifies them" default), so a slot nobody stored reads as `recommended` here;
   // a slot an admin stored (including `off`) is read as stored below.
   // STACK-MODELS-HOME-01: the model a household chose lives in the Stack; Home reads its cached answer. Who may use the level and its options stay Home's.
-  const chosen = stackSlotModel(category, tier);
+  const chosen = stackSlotModel(ROLE_OF_CATEGORY[category], tier);
   const withStackModel = (record: SlotRecord): SlotRecord => (chosen === null ? record : { ...record, model: chosen });
   const codingDefault = category === "coding" && (tier === "boost" || tier === "max") && getHouseholdSettingSource(slotKey(category, tier)) === undefined;
   if (codingDefault) return withStackModel(fallback);
