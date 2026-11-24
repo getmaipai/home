@@ -5360,7 +5360,7 @@ msgid "setting.content.policy.chat.does"
 msgstr "Applies the content rules to chat replies for children and teens."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:630
+#: src/lib/settingCopy.generated.ts:633
 msgid "setting.engines.judge.choice.does"
 msgstr "Directs judge work to its selected package."
 
@@ -5375,7 +5375,7 @@ msgid "setting.search.source_mode.wikimedia.option.mix"
 msgstr "Checks the offline library first, then tries a live lookup only if nothing turns up."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:629
+#: src/lib/settingCopy.generated.ts:632
 msgid "setting.engines.judge.choice.help"
 msgstr "Choose the model for the Judge role. Auto follows the selected setup plan. Only an admin can change this."
 
@@ -5715,22 +5715,22 @@ msgid "setting.engines.coding.choice.help"
 msgstr "Choose the model for the Coding role. Auto follows the selected setup plan. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:649
-msgid "setting.engines.pictures.choice.help"
+#: src/lib/settingCopy.generated.ts:629
+msgid "setting.engines.image.choice.help"
 msgstr "Choose the model for the Image role. Auto follows the selected setup plan. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:632
+#: src/lib/settingCopy.generated.ts:635
 msgid "setting.engines.music.choice.help"
 msgstr "Choose the model for the Music role. Auto follows the selected setup plan. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:708
+#: src/lib/settingCopy.generated.ts:713
 msgid "setting.engines.video.choice.help"
 msgstr "Choose the model for the Video role. Auto follows the selected setup plan. Only an admin can change this."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:725
+#: src/lib/settingCopy.generated.ts:730
 msgid "setting.engines.vision.choice.help"
 msgstr "Choose the model for the Vision role. Auto follows the selected setup plan. Only an admin can change this."
 
@@ -8853,22 +8853,22 @@ msgid "setting.engines.coding.choice.does"
 msgstr "Directs coding work to its selected package."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:650
-msgid "setting.engines.pictures.choice.does"
+#: src/lib/settingCopy.generated.ts:630
+msgid "setting.engines.image.choice.does"
 msgstr "Directs image work to its selected package."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:633
+#: src/lib/settingCopy.generated.ts:636
 msgid "setting.engines.music.choice.does"
 msgstr "Directs music work to its selected package."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:709
+#: src/lib/settingCopy.generated.ts:714
 msgid "setting.engines.video.choice.does"
 msgstr "Directs video work to its selected package."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:726
+#: src/lib/settingCopy.generated.ts:731
 msgid "setting.engines.vision.choice.does"
 msgstr "Directs vision work to its selected package."
 
@@ -13197,8 +13197,8 @@ msgid "setting.topics.health.label"
 msgstr "Illness, death and health"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:648
-msgid "setting.engines.pictures.choice.label"
+#: src/lib/settingCopy.generated.ts:628
+msgid "setting.engines.image.choice.label"
 msgstr "Image model choice"
 
 #. js-lingui-explicit-id
@@ -13654,7 +13654,7 @@ msgid "jobs"
 msgstr "jobs"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:628
+#: src/lib/settingCopy.generated.ts:631
 msgid "setting.engines.judge.choice.label"
 msgstr "Judge model choice"
 
@@ -17041,22 +17041,22 @@ msgid "setting.media.budget.exempt_bedtime_audio.help"
 msgstr "Music and audiobooks do not use the daily media minutes when this is on."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:636
+#: src/lib/settingCopy.generated.ts:639
 msgid "setting.engines.music.tier.boost.label"
 msgstr "Music at Boost"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:639
+#: src/lib/settingCopy.generated.ts:642
 msgid "setting.engines.music.tier.max.label"
 msgstr "Music at Max"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:642
+#: src/lib/settingCopy.generated.ts:645
 msgid "setting.engines.music.tier.reduced.label"
 msgstr "Music at Reduced"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:645
+#: src/lib/settingCopy.generated.ts:648
 msgid "setting.engines.music.tier.standard.label"
 msgstr "Music at Standard"
 
@@ -17081,12 +17081,12 @@ msgid "setting.music.library_sort.label"
 msgstr "Music library order (advanced)"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:631
+#: src/lib/settingCopy.generated.ts:634
 msgid "setting.engines.music.choice.label"
 msgstr "Music model choice"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:634
+#: src/lib/settingCopy.generated.ts:637
 msgid "setting.engines.music.order.label"
 msgstr "Music order"
 
@@ -18659,12 +18659,12 @@ msgid "Nothing your family says is used to train anything."
 msgstr "Nothing your family says is used to train anything."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:706
+#: src/lib/settingCopy.generated.ts:711
 msgid "setting.engines.turn_signal.choice.does"
 msgstr "Directs turn signal work to its selected package."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:705
+#: src/lib/settingCopy.generated.ts:710
 msgid "setting.engines.turn_signal.choice.help"
 msgstr "Choose the model for the Turn Signal role. Auto follows the selected setup plan. Only an admin can change this."
 
@@ -18717,6 +18717,11 @@ msgstr "Nudges"
 #: src/apps/setup/PlanStep.tsx:202
 msgid "off"
 msgstr "off"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:708
+msgid "setting.engines.tts.choice.option_label.off"
+msgstr "Off"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
@@ -18774,13 +18779,8 @@ msgid "setting.engines.stt.choice.option_label.off"
 msgstr "Off"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:728
-msgid "setting.engines.vision.choice.option_label.off"
-msgstr "Off"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:733
-msgid "setting.engines.voice.choice.option_label.off"
+msgid "setting.engines.vision.choice.option_label.off"
 msgstr "Off"
 
 #. js-lingui-explicit-id
@@ -18919,12 +18919,12 @@ msgid "setting.engines.stt.choice.option.off"
 msgstr "Off: Home will not listen to speech."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:732
-msgid "setting.engines.voice.choice.option.off"
+#: src/lib/settingCopy.generated.ts:707
+msgid "setting.engines.tts.choice.option.off"
 msgstr "Off: Home will not speak replies aloud."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:727
+#: src/lib/settingCopy.generated.ts:732
 msgid "setting.engines.vision.choice.option.off"
 msgstr "Off: Home will not use photo understanding."
 
@@ -20394,22 +20394,22 @@ msgid "setting.engines.coding.tier.standard.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:638
+#: src/lib/settingCopy.generated.ts:641
 msgid "setting.engines.music.tier.boost.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:641
+#: src/lib/settingCopy.generated.ts:644
 msgid "setting.engines.music.tier.max.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:644
+#: src/lib/settingCopy.generated.ts:647
 msgid "setting.engines.music.tier.reduced.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:647
+#: src/lib/settingCopy.generated.ts:650
 msgid "setting.engines.music.tier.standard.does"
 msgstr "Picks the model and settings for this level."
 
@@ -20434,22 +20434,22 @@ msgid "setting.engines.pictures.tier.standard.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:714
+#: src/lib/settingCopy.generated.ts:719
 msgid "setting.engines.video.tier.boost.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:717
+#: src/lib/settingCopy.generated.ts:722
 msgid "setting.engines.video.tier.max.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:720
+#: src/lib/settingCopy.generated.ts:725
 msgid "setting.engines.video.tier.reduced.does"
 msgstr "Picks the model and settings for this level."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:723
+#: src/lib/settingCopy.generated.ts:728
 msgid "setting.engines.video.tier.standard.does"
 msgstr "Picks the model and settings for this level."
 
@@ -20511,21 +20511,21 @@ msgid "pictures"
 msgstr "pictures"
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:18
+msgid "setting.access.tier.boost.option_label.pictures"
+msgstr "Pictures"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:31
+msgid "setting.access.tier.max.option_label.pictures"
+msgstr "Pictures"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:9
 #: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/activityRows.tsx:32
 #: src/shell/pages/settings/MediaCardViews.tsx:60
 msgid "Pictures"
-msgstr "Pictures"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:18
-msgid "setting.access.tier.boost.option_label.image"
-msgstr "Pictures"
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:31
-msgid "setting.access.tier.max.option_label.image"
 msgstr "Pictures"
 
 #. js-lingui-explicit-id
@@ -20595,12 +20595,12 @@ msgstr "Pictures storage warning (%)"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:13
-msgid "setting.access.tier.boost.option.image"
+msgid "setting.access.tier.boost.option.pictures"
 msgstr "Pictures with extra power."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:26
-msgid "setting.access.tier.max.option.image"
+msgid "setting.access.tier.max.option.pictures"
 msgstr "Pictures with full power."
 
 #. js-lingui-explicit-id
@@ -25358,8 +25358,8 @@ msgid "Speakers"
 msgstr "Speakers"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:729
-msgid "setting.engines.voice.choice.label"
+#: src/lib/settingCopy.generated.ts:704
+msgid "setting.engines.tts.choice.label"
 msgstr "Speaking"
 
 #. js-lingui-explicit-id
@@ -25393,13 +25393,13 @@ msgid "setting.tts.voice_id.label"
 msgstr "Speaking voice"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:731
-msgid "setting.engines.voice.choice.does"
+#: src/lib/settingCopy.generated.ts:706
+msgid "setting.engines.tts.choice.does"
 msgstr "Speaks answers out loud."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:730
-msgid "setting.engines.voice.choice.help"
+#: src/lib/settingCopy.generated.ts:705
+msgid "setting.engines.tts.choice.help"
 msgstr "Speaks answers out loud. Auto follows the setup plan. Only an admin can change this."
 
 #. js-lingui-explicit-id
@@ -27741,7 +27741,7 @@ msgid "setting.engines.coding.tier.boost.help"
 msgstr "The model and options that fill the Boost level of coding. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:637
+#: src/lib/settingCopy.generated.ts:640
 msgid "setting.engines.music.tier.boost.help"
 msgstr "The model and options that fill the Boost level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27751,7 +27751,7 @@ msgid "setting.engines.pictures.tier.boost.help"
 msgstr "The model and options that fill the Boost level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:713
+#: src/lib/settingCopy.generated.ts:718
 msgid "setting.engines.video.tier.boost.help"
 msgstr "The model and options that fill the Boost level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27771,7 +27771,7 @@ msgid "setting.engines.coding.tier.max.help"
 msgstr "The model and options that fill the Max level of coding. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:640
+#: src/lib/settingCopy.generated.ts:643
 msgid "setting.engines.music.tier.max.help"
 msgstr "The model and options that fill the Max level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27781,7 +27781,7 @@ msgid "setting.engines.pictures.tier.max.help"
 msgstr "The model and options that fill the Max level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:716
+#: src/lib/settingCopy.generated.ts:721
 msgid "setting.engines.video.tier.max.help"
 msgstr "The model and options that fill the Max level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27801,7 +27801,7 @@ msgid "setting.engines.coding.tier.reduced.help"
 msgstr "The model and options that fill the Reduced level of coding. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:643
+#: src/lib/settingCopy.generated.ts:646
 msgid "setting.engines.music.tier.reduced.help"
 msgstr "The model and options that fill the Reduced level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27811,7 +27811,7 @@ msgid "setting.engines.pictures.tier.reduced.help"
 msgstr "The model and options that fill the Reduced level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:719
+#: src/lib/settingCopy.generated.ts:724
 msgid "setting.engines.video.tier.reduced.help"
 msgstr "The model and options that fill the Reduced level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27831,7 +27831,7 @@ msgid "setting.engines.coding.tier.standard.help"
 msgstr "The model and options that fill the Standard level of coding. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:646
+#: src/lib/settingCopy.generated.ts:649
 msgid "setting.engines.music.tier.standard.help"
 msgstr "The model and options that fill the Standard level of music. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27841,7 +27841,7 @@ msgid "setting.engines.pictures.tier.standard.help"
 msgstr "The model and options that fill the Standard level of pictures. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:722
+#: src/lib/settingCopy.generated.ts:727
 msgid "setting.engines.video.tier.standard.help"
 msgstr "The model and options that fill the Standard level of video. A JSON object '{'model, options'}'; model is a catalog id, recommended, or off. Normally set from the AI and models page."
 
@@ -27941,7 +27941,7 @@ msgid "the one you chose"
 msgstr "the one you chose"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:635
+#: src/lib/settingCopy.generated.ts:638
 msgid "setting.engines.music.order.help"
 msgstr "The order Home asks the Stack to try music models in. Empty follows the Stack's own order. Normally set from the AI and models page."
 
@@ -27951,7 +27951,7 @@ msgid "setting.engines.pictures.order.help"
 msgstr "The order Home asks the Stack to try pictures models in. Empty follows the Stack's own order. Normally set from the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:711
+#: src/lib/settingCopy.generated.ts:716
 msgid "setting.engines.video.order.help"
 msgstr "The order Home asks the Stack to try video models in. Empty follows the Stack's own order. Normally set from the AI and models page."
 
@@ -29512,7 +29512,7 @@ msgid "Turn routes"
 msgstr "Turn routes"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:704
+#: src/lib/settingCopy.generated.ts:709
 msgid "setting.engines.turn_signal.choice.label"
 msgstr "Turn Signal model choice"
 
@@ -30457,22 +30457,22 @@ msgid "Video"
 msgstr "Video"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:712
+#: src/lib/settingCopy.generated.ts:717
 msgid "setting.engines.video.tier.boost.label"
 msgstr "Video at Boost"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:715
+#: src/lib/settingCopy.generated.ts:720
 msgid "setting.engines.video.tier.max.label"
 msgstr "Video at Max"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:718
+#: src/lib/settingCopy.generated.ts:723
 msgid "setting.engines.video.tier.reduced.label"
 msgstr "Video at Reduced"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:721
+#: src/lib/settingCopy.generated.ts:726
 msgid "setting.engines.video.tier.standard.label"
 msgstr "Video at Standard"
 
@@ -30487,12 +30487,12 @@ msgid "setting.generation.video.enabled.label"
 msgstr "Video making"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:707
+#: src/lib/settingCopy.generated.ts:712
 msgid "setting.engines.video.choice.label"
 msgstr "Video model choice"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:710
+#: src/lib/settingCopy.generated.ts:715
 msgid "setting.engines.video.order.label"
 msgstr "Video order"
 
@@ -30589,7 +30589,7 @@ msgid "Violet"
 msgstr "Violet"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:724
+#: src/lib/settingCopy.generated.ts:729
 msgid "setting.engines.vision.choice.label"
 msgstr "Vision model choice"
 
