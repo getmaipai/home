@@ -10,6 +10,10 @@ export type DiskNeed = "required" | "recommended" | "optional";
 export interface DiskRow {
   id: string; label: string; note: string; kind: "home" | "model" | "engine"; need: DiskNeed; selectable: boolean;
   download_bytes: number; installed_bytes: number; peak_temp_bytes: number; model_ids: string[]; engines: string[]; installed: boolean; basis: "pins" | "measured" | "estimate";
+  /** The Stack feature row this row belongs to (null for Home itself and the shared helpers); absent in a copy older than the Stack that added it. */
+  feature?: string | null;
+  /** WAN-DEFAULT-01: the row installs a model made for minors only. */
+  minors_only?: boolean;
 }
 export interface DiskTotals { download_bytes: number; installed_bytes: number; peak_temp_bytes: number; needed_bytes: number; required_free_bytes: number }
 export interface DiskPlan {

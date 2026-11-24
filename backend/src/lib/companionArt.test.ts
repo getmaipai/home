@@ -16,7 +16,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { db } from "@/db";
 import { settingsValues } from "@/db/schema";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { writeChoiceSetting } from "@/lib/aiChoicesState";
+import { writeChoiceSetting } from "@/lib/choiceSettings";
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 

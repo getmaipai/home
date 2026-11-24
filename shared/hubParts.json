@@ -1,0 +1,15 @@
+{
+  "_note": "The setup wizard's units: ids, order, icons and copy keys only. A unit with a feature is a Stack feature row (its words, rows and levels come from the Stack); a unit with hub true is a part the hub holds itself (no Stack part), named by its plan row id. Copy keys name the card in spec/settings/areas.json (backend/src/lib/aiCopy.ts).",
+  "jobs": [
+    { "id": "chat", "feature": "chat", "icon": "message-circle", "copy": "chat" },
+    { "id": "pictures", "feature": "pictures", "icon": "palette", "copy": "pictures" },
+    { "id": "videos", "feature": "video", "icon": "film", "copy": "videos" },
+    { "id": "music", "feature": "music", "icon": "music", "copy": "music" },
+    { "id": "stems", "feature": "stems", "icon": "audio-waveform", "copy": "stems" },
+    { "id": "voice", "feature": "voice", "icon": "mic-vocal", "copy": "voice" },
+    { "id": "vision", "feature": "vision", "icon": "eye", "copy": "vision" },
+    { "id": "coding", "feature": "coding", "icon": "code", "copy": "coding" },
+    { "id": "faces", "hub": true, "rowId": "faces-finder", "icon": "users", "copy": "faces" },
+    { "id": "ingredients", "hub": true, "rowId": "ingredients-adapter", "icon": "clapperboard", "copy": "ingredients" }
+  ]
+}

@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { PlanStep } from "./PlanStep";
-import { buildAiCards } from "../../../../shared/aiChoices";
-import { cardsFor, fakeCopy } from "./planFixtures";
+import { jobsFor } from "./planFixtures";
 import type { PlanDiskView, PlanRead } from "@/lib/api";
 import table from "../../../../shared/diskPlan.json";
 import { selectionTotals, sizeGb, needGb, type DiskPlan } from "../../../../shared/diskPlanMath";
@@ -15,7 +14,7 @@ const plans = (table as unknown as { tiers: Record<string, DiskPlan> }).tiers;
 function read(tier: "p16" | "p64" | "p128", free: number | null, over: Partial<PlanDiskView> = {}, extra: Partial<PlanRead> = {}, planOverride?: DiskPlan): PlanRead {
   const plan = planOverride ?? plans[tier]!;
   const disk: PlanDiskView = { source: "shipped", plan, volumes: [{ freeBytes: free, needs: ["home", "data", "ai"] }], verdict: { state: "green", text: "", fix: "", requiredBytes: 0, freeBytes: free }, ...over };
-  return { wording: { level: plan.level, headline: `${plan.level} setup for this computer`, detail: "Fits.", gets: ["Chat with Home"], needsMemoryAnswer: false, sizeLine: "x", diskLine: null, disk }, choices: cardsFor(plan), ...extra };
+  return { wording: { level: plan.level, headline: `${plan.level} setup for this computer`, detail: "Fits.", gets: ["Chat with Home"], needsMemoryAnswer: false, sizeLine: "x", diskLine: null, disk }, jobs: jobsFor(plan), ...extra };
 }
 const jobs = (view: ReturnType<typeof render>) => view.getByRole("group", { name: "What gets installed" });
 const sw = (view: ReturnType<typeof render>, title: string) => view.getByRole("switch", { name: new RegExp(`^${title}: `) });
@@ -36,9 +35,9 @@ describe("the plan step's job cards", () => {
   });
   test("the face finder is listed ticked and sent as a row; the video-from-pictures adapter is listed, off, and says where to add it", async () => {
     const plan = plans.p128!;
-    const choices = buildAiCards({ copy: fakeCopy, plan, components: null, settings: { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false, householdHasMinors: false }, freeBytes: null, faces: { installed: false, bytes: 38_926_091 }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models." } });
+    const jobs = jobsFor(plan, { hub: { faces: { installed: false, bytes: 38_926_091, label: "Face finder", description: "Finds faces." }, ingredients: { installed: false, bytes: 1_308_787_472, blockedReason: "Add it after setup in Settings, AI and models: it needs a token.", label: "Adapter", description: "Makes video from pictures." } } });
     const start = mock(async () => ({}));
-    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { choices })} start={start} onInstalled={() => {}} />);
+    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { jobs })} start={start} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });
     expect(sw(view, "Job faces").getAttribute("aria-checked")).toBe("true");
     const adapter = sw(view, "Job ingredients") as HTMLButtonElement;
@@ -63,7 +62,7 @@ describe("the plan step's job cards", () => {
     await view.findByRole("group", { name: "What gets installed" });
     expect(within(jobs(view)).getByTestId("plan-job-videos")).toBeTruthy();
     // WAN-DEFAULT-01: an adult-only home's Videos job is the licensed LTX model alone, off until it is switched on; the card then shows that model's size.
-    const ltxBytes = cardsFor(plan).cards.find((card) => card.id === "videos")!.choices.find((choice) => choice.id === "videos.detailed")!.installedBytes;
+    const ltxBytes = jobsFor(plan).find((job) => job.job === "videos")!.installedBytes;
     expect(within(view.getByTestId("plan-job-videos")).queryByText(sizeGb(ltxBytes))).toBeNull();
     fireEvent.click(sw(view, "Videos"));
     expect(within(view.getByTestId("plan-job-videos")).getByText(sizeGb(ltxBytes))).toBeTruthy();
@@ -83,7 +82,6 @@ describe("the plan step's job cards", () => {
     expect(sw(view, "Job music").getAttribute("aria-checked")).toBe("false");
     // WAN-DEFAULT-01: an adult-only home has no minors-only clip model, and the licensed LTX model starts off.
     expect(sw(view, "Videos").getAttribute("aria-checked")).toBe("false");
-    expect(sw(view, "More picture styles").getAttribute("aria-checked")).toBe("false");
   });
 
   test("turning a job on raises the total and the space needed; turning it off lowers them again", async () => {
@@ -91,11 +89,11 @@ describe("the plan step's job cards", () => {
     const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB)} start={async () => ({})} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });
     const before = selectionTotals(plan, plan.default_selected);
-    fireEvent.click(sw(view, "More picture styles"));
-    const more = selectionTotals(plan, [...plan.default_selected, "pictures-zimage"]);
+    fireEvent.click(sw(view, "Job music"));
+    const more = selectionTotals(plan, [...plan.default_selected, ...jobsFor(plan).find((job) => job.job === "music")!.rowIds]);
     await waitFor(() => expect(view.getByText(sizeGb(more.installed_bytes))).toBeTruthy());
     expect(view.getByText(new RegExp(`Free space needed while it installs: about ${needGb(more.required_free_bytes + 2 * GIB)} GB`))).toBeTruthy();
-    fireEvent.click(sw(view, "More picture styles"));
+    fireEvent.click(sw(view, "Job music"));
     await waitFor(() => expect(view.getByText(sizeGb(before.installed_bytes))).toBeTruthy());
   });
 
@@ -116,7 +114,7 @@ describe("the plan step's job cards", () => {
     const call = start.mock.calls[0] as unknown[];
     expect(call[1]).not.toContain("coding");
     expect(call[1]).toContain("pictures-ernie");
-    expect(call[3]).toMatchObject({ "engines.pictures.tier.standard": "ernie" });
+    expect(call[3]).toBeUndefined();
   });
 
   test("a tight disk warns and still installs", async () => {
@@ -130,10 +128,8 @@ describe("the plan step's job cards", () => {
 
   test("a model already on this computer says Installed instead of a size", async () => {
     const plan: DiskPlan = { ...plans.p64!, rows: plans.p64!.rows.map((row) => row.id === "pictures-ernie" ? { ...row, installed: true } : row) };
-    const choices = cardsFor(plan);
-    const pictures = choices.cards.find((card) => card.id === "pictures")!;
-    pictures.choices = pictures.choices.map((choice) => choice.rowIds.includes("pictures-ernie") ? { ...choice, state: "installed" } : choice);
-    const view = render(<PlanStep readPlan={async () => read("p64", 800 * GIB, { source: "stack" }, { choices }, plan)} start={async () => ({})} onInstalled={() => {}} />);
+    const jobs = jobsFor(plan).map((job) => job.job === "pictures" ? { ...job, state: "installed" as const } : job);
+    const view = render(<PlanStep readPlan={async () => read("p64", 800 * GIB, { source: "stack" }, { jobs }, plan)} start={async () => ({})} onInstalled={() => {}} />);
     await view.findByRole("group", { name: "What gets installed" });
     expect(within(view.getByTestId("plan-job-pictures")).getByText("Installed")).toBeTruthy();
   });
@@ -160,27 +156,7 @@ describe("the plan step's job cards", () => {
     expect(call[1]).toContain("video-ltx25");
     expect(call[1]).not.toContain("video");
     expect(call[2]).toEqual([licence.id]);
-    expect(call[3]).toMatchObject({ "generation.video_tier": "boost" });
-  });
-
-  test("Sound effects is a separate licensed job in setup and its licence blocks install until accepted", async () => {
-    const soundLicence = { row_id: "sound-effects", component: "stable-audio-3-small-sfx", id: "stability-community-gemma-2026-11-13", name: "Stability AI Community Licence; Gemma Terms of Use", url: "https://example.com/sfx-licence", summary: ["Personal use only."], accepted_at: null };
-    const start = mock(async () => ({}));
-    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [soundLicence] })} start={start} onInstalled={() => {}} />);
-    await view.findByRole("group", { name: "What gets installed" });
-    const sounds = within(view.getByTestId("plan-job-sounds"));
-    expect(sounds.getByText("Sound effects")).toBeTruthy();
-    fireEvent.click(sw(view, "Sound effects"));
-    expect(sounds.getByText(/4\.2 GB/)).toBeTruthy();
-    expect(view.getByText(/Stability AI Community Licence/)).toBeTruthy();
-    expect((view.getByRole("button", { name: "Install and continue" }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(view.getByRole("checkbox", { name: /I have read it and I accept it/ }));
-    const install = view.getByRole("button", { name: "Install and continue" });
-    await waitFor(() => expect((install as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(install);
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-    expect((start.mock.calls[0] as unknown[])[1]).toContain("sound-effects");
-    expect((start.mock.calls[0] as unknown[])[2]).toEqual([soundLicence.id]);
+    expect(call[3]).toBeUndefined();
   });
 
   test("a covered licence is information: no accept is needed", async () => {

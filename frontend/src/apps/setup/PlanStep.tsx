@@ -5,16 +5,15 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
+import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { api, ApiError, type InstallStatusView, type PlanRead } from "@/lib/api";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import type { PlanLicence } from "../../../../shared/licensedRows";
 import { sizeGb } from "../../../../shared/diskPlanMath";
-import { JOB_ICONS } from "@/apps/settings/aiGlanceRows";
 import { liveVerdict, PlanDiskSummary } from "./PlanDiskSummary";
-import { defaultPicks, selectedRows, settingsFor, setupJobs, type Picks, type SetupJob } from "./planChoices";
+import { defaultPicks, selectedRows, type Picks, type SetupJob } from "./planChoices";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
 const ErrorIcon = getIcon("alert-triangle");
@@ -30,7 +29,7 @@ export interface PlanStepProps {
   onReady?: (ready: boolean) => void;
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
   readPlan?: (vramGb?: number) => Promise<PlanRead>;
-  start?: (vramGb?: number, components?: string[], acceptedLicences?: string[], settings?: Record<string, string | boolean>) => Promise<unknown>;
+  start?: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => Promise<unknown>;
   /** What the AI engine install is doing; the plan waits on it when this computer is installing the engine. */
   readInstall?: () => Promise<InstallStatusView>;
   /** Try the AI engine install again after it failed. */
@@ -51,7 +50,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [engine, setEngine] = useState<InstallStatusView | null>(null);
-  // One pick per job card (AIMODELS-SETUP-01): starts at the plan's defaults; the rows to install, the total and the disk check follow it.
+  // One on/off pick per unit (a Stack feature row at its recommended level): starts at the plan's defaults; the rows to install, the total and the disk check follow it.
   const [picks, setPicks] = useState<Picks>({});
   // MEM-SPACE-05: jobs no tier can ever run on this computer stay off and download nothing.
   const [cannotRun, setCannotRun] = useState<ReadonlySet<string>>(new Set());
@@ -63,7 +62,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   useEffect(() => {
     let active = true;
     setFailed(false);
-    readPlan(vram).then((result) => { if (active) { setRead(result); setLicences(result.licences ?? []); const plan = result.wording.disk?.plan; const no = new Set(result.cannot_run ?? []); setCannotRun(no); setCannotWhy(result.cannot_run_why ?? {}); const base = plan && result.choices ? defaultPicks(setupJobs(result.choices.cards, plan), plan) : {}; setPicks(Object.fromEntries(Object.entries(base).map(([job, pick]) => [job, no.has(job) ? { ...pick, on: false } : pick]))); } }).catch(() => { if (active) setFailed(true); });
+    readPlan(vram).then((result) => { if (active) { setRead(result); setLicences(result.licences ?? []); const no = new Set(result.cannot_run ?? []); setCannotRun(no); setCannotWhy(result.cannot_run_why ?? {}); const base = result.wording.disk?.plan && result.jobs ? defaultPicks(result.jobs) : {}; setPicks(Object.fromEntries(Object.entries(base).map(([job, on]) => [job, no.has(job) ? false : on]))); } }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
@@ -89,7 +88,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   // choosing anything: the engine was not answering, or the disk was short
   // and they have since freed space. Memory questions re-read on their own.
   const disk = wording?.disk ?? null;
-  const jobs = useMemo(() => (disk && read?.choices ? setupJobs(read.choices.cards, disk.plan) : []), [disk, read]);
+  const jobs = useMemo<SetupJob[]>(() => (disk && read?.jobs ? read.jobs : []), [disk, read]);
   const selected = useMemo<ReadonlySet<string>>(() => (disk ? (jobs.length > 0 ? selectedRows(jobs, disk.plan, picks) : new Set(disk.plan.default_selected)) : new Set()), [disk, jobs, picks]);
   // With a disk plan, the check follows the person's choice: turning off an extra can make a red check pass.
   const verdict = disk ? liveVerdict(disk, selected) : null;
@@ -111,7 +110,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   async function install() {
     setBusy(true); setError(null); setNotice(null);
     try {
-      const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id), settingsFor(jobs, picks)) : start(vram));
+      const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id)) : start(vram));
       const models = typeof result === "object" && result !== null && "models" in result && typeof result.models === "number" ? result.models : null;
       setNotice(models === 0 ? i18n._({ id: "Nothing to download: everything you ticked is already installed.", message: "Nothing to download: everything you ticked is already installed." }) : i18n._({ id: "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes.", message: "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes." }));
       onInstalled();
@@ -142,7 +141,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
         {disk ? <>
-          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label={i18n._({ id: "What gets installed", message: "What gets installed" })}>{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack", job.blocked ?? (cannotRun.has(job.job) && !job.required ? (cannotWhy[job.job] ?? i18n._({ id: "This computer can't run this, so nothing is downloaded for it.", message: "This computer can't run this, so nothing is downloaded for it." })) : null)))}</ItemGroup> : null}
+          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label={i18n._({ id: "What gets installed", message: "What gets installed" })}>{jobs.map((job) => jobItem(job, picks, (on) => setPicks((current) => ({ ...current, [job.job]: on })), disk.source === "stack", job.blocked ?? (cannotRun.has(job.job) && !job.required ? (cannotWhy[job.job] ?? i18n._({ id: "This computer can't run this, so nothing is downloaded for it.", message: "This computer can't run this, so nothing is downloaded for it." })) : null)))}</ItemGroup> : null}
           <PlanDiskSummary disk={disk} selected={selected} />
         </> : (
           <>
@@ -176,30 +175,21 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   );
 }
 
-/** One job, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
-function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choiceId: string }) => void, missingOnly: boolean, cannot: string | null) {
-  const Icon = getIcon(JOB_ICONS[job.job]);
-  const pick = picks[job.job];
-  const chosen = job.options.find((option) => option.id === pick?.choiceId) ?? job.options[0]!;
-  const on = pick?.on ?? false;
-  const size = (option: SetupJob["options"][number]) => (missingOnly && option.state === "installed" ? i18n._({ id: "Installed", message: "Installed" }) : sizeGb(option.installedBytes));
+/** One unit, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
+function jobItem(job: SetupJob, picks: Picks, onPick: (on: boolean) => void, missingOnly: boolean, cannot: string | null) {
+  const Icon = getIcon(job.icon);
+  const on = picks[job.job] ?? false;
+  const size = missingOnly && job.state === "installed" ? i18n._({ id: "Installed", message: "Installed" }) : sizeGb(job.installedBytes);
   return (
     <Item key={job.job} data-testid={`plan-job-${job.job}`}>
       <ItemMedia variant="icon"><Icon /></ItemMedia>
       <ItemContent>
         <ItemTitle>{job.title}</ItemTitle>
-        <ItemDescription clamp={false}>{cannot ? cannot : on ? `${chosen.label}. ${chosen.description}` : job.summary}</ItemDescription>
-        {job.options.length > 1 && on ? (
-          <RadioGroup value={chosen.id} onValueChange={(value) => onPick({ on: true, choiceId: value })} aria-label={i18n._({ id: "{title}: which one", message: "{title}: which one", values: { title: job.title } })}>
-            {job.options.map((option) => (
-              <Field key={option.id} orientation="horizontal"><RadioGroupItem value={option.id} id={`choice-${option.id}`} disabled={option.blockedReason !== null && option.state !== "installed"} /><FieldContent><FieldLabel htmlFor={`choice-${option.id}`}>{option.label}</FieldLabel><FieldDescription>{option.blockedReason ?? `${option.description} ${size(option)}.`}</FieldDescription></FieldContent></Field>
-            ))}
-          </RadioGroup>
-        ) : null}
+        <ItemDescription clamp={false}>{cannot ? cannot : on ? `${job.label}. ${job.description}` : job.summary}</ItemDescription>
       </ItemContent>
       <ItemActions>
-        {on ? <span className="text-base text-muted-foreground">{size(chosen)}</span> : null}
-        <Switch checked={on} disabled={job.required || cannot !== null} onCheckedChange={(next) => onPick({ on: next, choiceId: chosen.id })} aria-label={`${job.title}: ${on ? i18n._({ id: "on", message: "on" }) : i18n._({ id: "off", message: "off" })}`} />
+        {on ? <span className="text-base text-muted-foreground">{size}</span> : null}
+        <Switch checked={on} disabled={job.required || cannot !== null} onCheckedChange={onPick} aria-label={`${job.title}: ${on ? i18n._({ id: "on", message: "on" }) : i18n._({ id: "off", message: "off" })}`} />
       </ItemActions>
     </Item>
   );

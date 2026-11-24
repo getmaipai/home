@@ -88,7 +88,7 @@ export async function chooseStackModel(category: TierStackCategory, tier: "reduc
 }
 
 /** AUDIT-DUP-ROUTES-01: the one answer a component route gives for a Stack component error (404 and 409 as they are, anything else 503);
- * an error that is not a StackComponentError is a bug and rethrows. Was copied byte for byte in routes/components.ts and routes/aiChoices.ts. */
+ * an error that is not a StackComponentError is a bug and rethrows. Was copied byte for byte in routes/components.ts and the old AI cards route. */
 export function componentFailure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
   if (error instanceof StackComponentError) {
     const status = error.status === 404 ? 404 : error.status === 409 ? 409 : 503;

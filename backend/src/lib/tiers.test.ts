@@ -7,7 +7,7 @@ import { maxOffered, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE, tierAr
 import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
 import { offeredCodingTiers } from "@/lib/codingSessions";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
-import { writeChoiceSetting } from "@/lib/aiChoicesState";
+import { writeChoiceSetting } from "@/lib/choiceSettings";
 import type { AgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { resetDb } from "../../tests/reset-db";

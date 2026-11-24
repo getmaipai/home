@@ -6,7 +6,7 @@ import { mappedMediaSettings, migrateMediaSettings } from "@/lib/settingsMediaMi
 import { adultStylesAllowed, householdPictureQuality } from "@/lib/pictures/policy";
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { householdVideoQuality, videoAdapterAudiencesFor } from "@/lib/videos/policy";
-import { writeChoiceSetting } from "@/lib/aiChoicesState";
+import { writeChoiceSetting } from "@/lib/choiceSettings";
 import { resetDb } from "../../tests/reset-db";
 
 const OLD = ["generation.adult_adapters", "generation.video.adult_adapters", "generation.picture_quality", "generation.video_quality"] as const;

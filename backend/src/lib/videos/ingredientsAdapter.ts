@@ -1,6 +1,6 @@
 // The LTX 2.5 Ingredients adapter (a video LoRA of the Stack's library) that "make a video from pictures" (make_reference_video) needs. The Stack finds it by this exact
 // NAME and answers 409 ic_lora_missing from POST /v1/videos/ingredients without it. This module is the one place that pins the file and reads its state, so the install
-// wizard and Settings, AI and models (shared/aiChoices.ts, the "ingredients" card) list it with size, licence and readiness like every other model.
+// wizard and Settings, AI and models (shared/setupJobs.ts, the "ingredients" unit) list it with size, licence and readiness like every other model.
 //
 // Install goes through the Stack's existing LoRA install route (POST /stack/v1/video/loras/install: a Hugging Face file link, the person's Hugging Face token in that one
 // body, the name below, all-ages, base ltx-2.5). The file is gated: its Hugging Face page asks the person to accept the LTX-2.x Community License there, and the household's

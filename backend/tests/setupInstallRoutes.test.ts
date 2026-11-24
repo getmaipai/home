@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { resetInstallStatusCache } from "@/lib/installStatus";
-import { readAiSettings } from "@/lib/aiChoicesState";
 import { getMemoryAnswerGb, getSetupState } from "@/lib/setupState";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
 import { owner } from "./support/testAuth";
@@ -63,39 +62,24 @@ describe("setup install routes", () => {
     expect((await response.json() as { error: string }).error).toMatch(/^This computer needs about \d+ GB free for the minimal setup; it has 5\.0 GB\. Free up space, or choose a smaller plan\.$/);
   });
 
-  test("GET /api/setup/plan carries the job cards built from the disk plan, or none without one", async () => {
-    __setStackClientForTests(stack(async () => plan()));
-    const client = new TestClient();
-    const body = await (await client.get("/api/setup/plan")).json() as { wording: { disk?: unknown }; choices?: { cards: Array<{ id: string }> } | null };
-    if (body.wording.disk) expect(body.choices?.cards.map((card) => card.id)).toContain("chat");
-    else expect(body.choices ?? null).toBeNull();
-  });
-
-  test("GET /api/setup/plan lists the optional song and recorded voice choices from the shared cards", async () => {
+  test("GET /api/setup/plan carries one unit per Stack feature row built from the disk plan, or none without one", async () => {
     __setStackClientForTests(stack(async () => plan({ tier: "p64", memory_gb: 64 })));
     const client = new TestClient();
-    const body = await (await client.get("/api/setup/plan")).json() as { choices: { cards: Array<{ id: string; choices: Array<{ id: string; kind: string; recommended: boolean }> }> } };
-    const music = body.choices.cards.find((card) => card.id === "music")!;
-    const voice = body.choices.cards.find((card) => card.id === "voice")!;
-    expect(music.choices.find((choice) => choice.id === "music.voice")).toMatchObject({ kind: "switch", recommended: false });
-    expect(voice.choices.find((choice) => choice.id === "voice.realistic")).toMatchObject({ kind: "switch", recommended: false });
+    const body = await (await client.get("/api/setup/plan")).json() as { wording: { disk?: unknown }; jobs?: Array<{ job: string; rowIds: string[]; icon: string; required: boolean }> | null };
+    if (body.wording.disk) {
+      expect(body.jobs?.map((job) => job.job)).toContain("chat");
+      expect(body.jobs!.find((job) => job.job === "chat")).toMatchObject({ required: true });
+      expect(body.jobs!.every((job) => job.icon.length > 0 && job.rowIds.length > 0)).toBe(true);
+    } else expect(body.jobs ?? null).toBeNull();
   });
 
-  test("POST /api/setup/install saves the card choices it was sent, and refuses a key that is not one", async () => {
+  test("POST /api/setup/install no longer takes settings: the picture, video and music choices are Stack levels set after setup", async () => {
     __setStackClientForTests(stack(async () => plan()));
     const client = new TestClient();
-    const refused = await client.post("/api/setup/install", { settings: { "auth.secret": "x" } });
-    expect(refused.status).toBe(409);
-    expect((await refused.json() as { error: string }).error).toMatch(/auth\.secret is not a choice setup can save/);
+    const refused = await client.post("/api/setup/install", { settings: { "generation.music.enabled": false } });
+    expect(refused.status).toBe(400);
     expect(getSetupState().steps.find((s) => s.id === "plan")?.status).not.toBe("done");
-    const before = readAiSettings();
-    expect(before.musicEnabled).toBe(true);
-    expect(before.videoQuality).toBe("quick");
-    const saved = await client.post("/api/setup/install", { settings: { "generation.music.enabled": false, "generation.video_tier": "boost" } });
-    expect(saved.status).toBe(202);
-    const after = readAiSettings();
-    expect(after.musicEnabled).toBe(false);
-    expect(after.videoQuality).toBe("detailed");
+    expect((await client.post("/api/setup/install", {})).status).toBe(202);
   });
 
   test("POST /api/setup/install is closed once Home has an owner", async () => {

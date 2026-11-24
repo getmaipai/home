@@ -16,9 +16,8 @@ import { licenceCovered } from "@/lib/licenceAcceptance";
 import { isLicensedRow, LICENSED_ROWS, type PlanLicence } from "../../../shared/licensedRows";
 import type { StackInstallPlan } from "@/lib/stack/client";
 import { cannotRunJobs, cannotRunWhy, readCapabilities } from "@/lib/memoryRoom";
-import { setupCards } from "@/lib/aiChoicesState";
 import { ensureVisionAssets, faceFinderState } from "@/lib/visionAssets";
-import { FACES_ROW_ID } from "../../../shared/aiJobs";
+import { FACES_ROW_ID, jobRowIds, type SetupJobId } from "../../../shared/setupJobs";
 
 /** Where the plan's files land and how much room each place has: Home's program and data on this computer, the AI's files on the Stack's disk (read by the Stack, which may be another computer). */
 export function volumesFor(plan: StackInstallPlan): DiskVolume[] {
@@ -83,12 +82,11 @@ export async function withoutUnfitJobs(diskPlan: DiskPlan, selected: string[]): 
   const never = cannotRunJobs(view);
   if (never.length === 0) return { selected, leftOut: [] };
   const why = cannotRunWhy(view);
-  const cards = (await setupCards(diskPlan)).cards;
   const required = new Set(diskPlan.rows.filter((row) => row.need === "required").map((row) => row.id));
   const drop = new Set<string>();
   const leftOut: LeftOut[] = [];
   for (const job of never) {
-    const rows = (cards.find((card) => card.id === job)?.choices ?? []).flatMap((choice) => choice.rowIds).filter((id) => selected.includes(id) && !required.has(id));
+    const rows = jobRowIds(diskPlan, job as SetupJobId).filter((id) => selected.includes(id) && !required.has(id));
     if (rows.length === 0) continue;
     rows.forEach((id) => drop.add(id));
     leftOut.push({ job, reason: why[job] ?? "This computer can never run it, so Home does not download it." });
