@@ -464,8 +464,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/adultMarkRoute.ts` | adultMarkJobBody |
 | `backend/src/lib/adultMarks.ts` | SHARED_SCREEN_MARK_LINE, NEED_PASSCODE_LINE, NOT_FOUND_LINE, NOT_READY_LINE, TEMPORARY_LINE, NOT_MARKED_LINE |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
-| `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, writeChoiceSetting, setupCards |
-| `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
+| `backend/src/lib/aiCopy.ts` | aiCopy |
 | `backend/src/lib/alarmActions.ts` | ALARM_ACTION_NAMES, resolveAlarm, runAlarmAction |
 | `backend/src/lib/alarmCalls.ts` | alarmFoldFor, isAlarmActionCall, isListAction, LIST_CALL_PREFIX, LIST_WORDS_MAX, LIST_ITEMS_MAX |
 | `backend/src/lib/alarmChat.ts` | daysPhrase, clockText, whenText, jobLabel, handleAlarmChat |
@@ -542,6 +541,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/chatTransitions.ts` | DEFAULT_TRANSITION_SECONDS, RUNNING_LONG_FACTOR, RUNNING_LONG_LINE, __resetTransitionsForTests, recordTransition, estimateSeconds |
 | `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
+| `backend/src/lib/choiceSettings.ts` | writeChoiceSetting |
 | `backend/src/lib/clipVoiceEngine.ts` | CLIP_VOICE_ENGINES, liveClipEngine |
 | `backend/src/lib/clonedVoiceTranscript.ts` | __setClonedVoiceTranscriberForTests, normalizeVoiceTranscript, updateClonedVoiceTranscript, transcribeClonedVoiceOnce |
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, saveInspiredVoice, previewInspiredVoice, renameClonedVoice |
@@ -1241,6 +1241,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/settingsMinorSnapshot.ts` | EASE_SETTING_KEYS, ALARM_SETTING_KEYS, CHILD_VISIBLE_SETTING_KEYS, TEEN_VISIBLE_SETTING_KEYS, minorVisibleSettingKeys |
 | `backend/src/lib/settingsRegistry.ts` | PLACE_SETTINGS_KEYS, getRegistry, registerStoredHouseholdReader, isRetiredKey, getRegistryKey, __reloadRegistryForTests |
 | `backend/src/lib/setupChecklist.ts` | SETUP_CHECKLIST_ITEMS, checklistFromFacts, getSetupChecklist |
+| `backend/src/lib/setupJobsState.ts` | householdHasMinors, withFeatures, setupJobsFor |
 | `backend/src/lib/setupSearchAddress.ts` | SEARCH_ADDRESS_NOT_LOCAL, SEARCH_ADDRESS_NOT_AN_ADDRESS, parseSearchAddress |
 | `backend/src/lib/setupState.ts` | SETUP_STEP_IDS, PRE_OWNER_STEPS, setupCodingChoice, setSetupCodingChoice, codingClientLater, getMemoryAnswerGb |
 | `backend/src/lib/shares.ts` | createShare, deleteShare, pruneUnreachableShares, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor |
