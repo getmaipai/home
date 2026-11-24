@@ -64,7 +64,7 @@ classify() {
   tip="$(git -C "$path" rev-parse HEAD 2>/dev/null)" || { printf 'ODD\tgit cannot read it\n'; return; }
   porcelain="$(git -C "$path" status --porcelain=v1 --ignored 2>/dev/null)" || { printf 'ODD\tgit status failed\n'; return; }
   # ignored caches are disposable; anything else (tracked edits, untracked, other ignored files) means a person must look
-  porcelain="$(printf '%s\n' "$porcelain" | grep -Ev '^!! (.*/)?(node_modules|__pycache__|\.pytest_cache|\.ruff_cache|\.turbo|\.vite|dist|\.next|\.cache)/$|^!! (.*/)?\.DS_Store$|^$' || true)"
+  porcelain="$(printf '%s\n' "$porcelain" | grep -Ev '^!! (.*/)?(node_modules|__pycache__|\.pytest_cache|\.ruff_cache|\.turbo|\.vite|dist|\.next|\.cache|gate-stamps|ort)/$|^!! (.*/)?\.DS_Store$|^$' || true)"
   if [[ -n "$porcelain" ]]; then printf 'DIRTY\t%s changed, untracked or ignored paths\n' "$(printf '%s\n' "$porcelain" | wc -l | tr -d ' ')"; return; fi
   real="$(cd "$path" && pwd -P)"
   lsout="${LSOF_CWD:-}"

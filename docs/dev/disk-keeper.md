@@ -74,5 +74,7 @@ classification (merged, squash-merged, pushed, unpushed, dirty), `--apply` for w
 download guard. The tests set `MAIPAI_DISK_ORG` and `MAIPAI_DISK_HOME` so they never scan the real machine. Installed 2026-11-24 with Jesse's yes: copies
 of both scripts in `~/.claude/hooks/` (refresh them after a change here) and two entries in `~/.claude/settings.json` (backup `settings.json.bak-disk-keeper`).
 
+Home-only dry run on 2026-11-24: 134 worktrees, 21 safe, 96 dirty (mostly ignored `data/` and `data-scratch/` folders, kept on purpose), 5 unpushed, 12 odd. `gate-stamps` and `public/ort` ignored folders are now treated as disposable.
+
 Known limits: the full-machine worktree scan is slow (`git status --ignored` on 100k-file trees; minutes for hundreds of worktrees) and its numbers
 were not yet verified against wt-scan.tsv. Follow-ups: change `wt.sh reap` in `.github` to use the same cherry test (separate repo, full gate).
