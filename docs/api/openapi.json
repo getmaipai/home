@@ -29507,20 +29507,6 @@
                       "type": "string"
                     },
                     "description": "The disk plan rows to install (ids from the plan's disk.plan.rows). Required rows are always installed; omitted means the plan's defaults."
-                  },
-                  "settings": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "boolean"
-                        }
-                      ]
-                    },
-                    "description": "The household settings the chosen job cards carry (the picture, video and music choices). Written once the install can start; keys outside the card settings are refused."
                   }
                 },
                 "additionalProperties": false
@@ -29721,24 +29707,13 @@
                       },
                       "description": "The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."
                     },
-                    "choices": {
-                      "type": "object",
+                    "jobs": {
+                      "type": "array",
                       "nullable": true,
-                      "properties": {
-                        "cards": {
-                          "type": "array",
-                          "items": {
-                            "nullable": true
-                          }
-                        },
-                        "alwaysOn": {
-                          "nullable": true
-                        }
+                      "items": {
+                        "nullable": true
                       },
-                      "required": [
-                        "cards"
-                      ],
-                      "description": "The same job cards Settings shows (AI and models), built from this plan; null when there is no disk plan to build them from."
+                      "description": "The wizard's units, one per Stack feature row (plus the hub's own parts), built from this plan's rows; null when there is no disk plan to build them from."
                     },
                     "cannot_run": {
                       "type": "array",
