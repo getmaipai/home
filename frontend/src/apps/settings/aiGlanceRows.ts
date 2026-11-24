@@ -1,6 +1,7 @@
 // AIMODELS-GLANCE-2026-10-26: the pure side of the "AI and models, at a glance" page. The job rows, the staged changes (client
 // state until Apply) and the Memory and Storage projections are derived here from /api/ai/choices, so the page only draws them.
-import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
+import type { AiCard, AiChoice } from "../../../../shared/aiChoices";
+import type { AiJobId } from "../../../../shared/aiJobs";
 
 export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "sounds", "stems", "voice", "wakeword", "vision", "coding", "faces", "ingredients"];
 /** The icon name of each job, shared by Settings and the setup wizard. */

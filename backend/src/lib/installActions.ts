@@ -18,7 +18,7 @@ import type { StackInstallPlan } from "@/lib/stack/client";
 import { cannotRunJobs, cannotRunWhy, readCapabilities } from "@/lib/memoryRoom";
 import { setupCards } from "@/lib/aiChoicesState";
 import { ensureVisionAssets, faceFinderState } from "@/lib/visionAssets";
-import { FACES_ROW_ID } from "../../../shared/aiChoices";
+import { FACES_ROW_ID } from "../../../shared/aiJobs";
 
 /** Where the plan's files land and how much room each place has: Home's program and data on this computer, the AI's files on the Stack's disk (read by the Stack, which may be another computer). */
 export function volumesFor(plan: StackInstallPlan): DiskVolume[] {

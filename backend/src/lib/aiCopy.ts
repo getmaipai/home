@@ -3,7 +3,8 @@
 // choices and the music switch, from the key that holds the setting. Nothing is written here.
 import areasFile from "@maipai/spec/settings/areas.json";
 import keysFile from "@maipai/spec/settings/keys.json";
-import type { AiCopy, AiJobId } from "../../../shared/aiChoices";
+import type { AiCopy } from "../../../shared/aiChoices";
+import type { AiJobId } from "../../../shared/aiJobs";
 import { FACE_FINDER_NAME, faceFinderDescription } from "@/lib/visionAssets";
 import { INGREDIENTS_NAME, ingredientsDescription } from "@/lib/videos/ingredientsAdapter";
 

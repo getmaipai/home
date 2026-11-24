@@ -1,6 +1,7 @@
 // AIMODELS-SETUP-01: the setup wizard's plan step reads the same job cards as Settings (shared/aiChoices.ts) and turns one
 // pick per job into the disk plan rows to install. Pure: cards and plan in, rows and settings out.
-import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
+import type { AiCard, AiChoice } from "../../../../shared/aiChoices";
+import type { AiJobId } from "../../../../shared/aiJobs";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import { HUB_PART_JOBS, JOB_ORDER, optionsOf } from "@/apps/settings/aiGlanceRows";
 

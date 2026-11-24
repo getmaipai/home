@@ -5,9 +5,9 @@
 // Home's backend and the setup wizard share it, so it imports only
 // ./diskPlanMath and nothing from backend/ or frontend/.
 
+import { FACES_ROW_ID, INGREDIENTS_ROW_ID, type AiJobId } from "./aiJobs";
 import { rowHasModel, sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "sounds" | "stems" | "voice" | "wakeword" | "vision" | "coding" | "faces" | "ingredients";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[]; licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string|null; covered?: boolean } | null }
 export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean; householdHasMinors: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
@@ -82,9 +82,6 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "faces", rows: [] },
   { id: "ingredients", rows: [] },
 ];
-/** The plan-row ids that stand in for the hub's own parts: the wizard and the cards use them, no disk plan holds them. */
-export const FACES_ROW_ID = "faces-finder";
-export const INGREDIENTS_ROW_ID = "ingredients-adapter";
 
 // A model needs about this share of its size on disk in memory while it runs: a marked estimate, replaced by the Stack's measured footprint when there is one.
 const RAM_SHARE = 1.1;

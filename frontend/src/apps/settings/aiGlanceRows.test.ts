@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
+import type { AiCard, AiChoice } from "../../../../shared/aiChoices";
+import type { AiJobId } from "../../../../shared/aiJobs";
 import table from "../../../../shared/diskPlan.json";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import { buildAiCards } from "../../../../shared/aiChoices";
