@@ -242,19 +242,3 @@ export async function installCodingPiece(id: string): Promise<{ job: string | nu
     return { job: started.job, piece: piece.id };
   } catch (error) { return asPieceError(error); }
 }
-
-export async function removeCodingPiece(id: string): Promise<{ piece: CodingPieceId; removed: true }> {
-  if (codingEnabled() && ["engine", "model", "draft"].includes(id)) throw new CodingPieceError(409, "coding_on", CODING_ON_REFUSAL);
-  const piece = await pieceNamed(id);
-  if (!piece.can_remove) throw new CodingPieceError(409, "cannot_remove", piece.remove_block ?? "This piece cannot be removed right now.");
-  try {
-    if (piece.id === "engine") {
-      const tag = (await stack.engines()).find((engine) => engine.name === piece.name && engine.matchesThisMachine)?.currentTag;
-      if (!tag) throw new CodingPieceError(409, "cannot_remove", "That engine has no installed build to remove.");
-      await stack.removeEngineBuild(piece.name, tag);
-    } else await stack.uninstallComponent(piece.name);
-    resetInstallStatusCache();
-    knownMissing = null;
-    return { piece: piece.id, removed: true };
-  } catch (error) { return asPieceError(error); }
-}

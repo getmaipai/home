@@ -28,7 +28,6 @@ import { FeatureAccess } from "@/apps/settings/FeatureAccess";
 const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
 const messageOf = (error: unknown, fallback: string) => errorLine(error, fallback);
-const sizeText = (bytes: number | null) => bytes == null ? i18n._({ id: "Size not reported", message: "Size not reported" }) : bytes >= 1024 ** 3 ? i18n._({ id: "{size} GB", message: "{size} GB", values: { size: (bytes / 1024 ** 3).toFixed(1) } }) : i18n._({ id: "{size} MB", message: "{size} MB", values: { size: Math.ceil(bytes / 1024 ** 2) } });
 const dateText = (date: string | null) => date ? formatDate(date) : i18n._({ id: "Never", message: "Never" });
 const timeText = (date: string | null) => date ? formatDateTime(date) : i18n._({ id: "Never", message: "Never" });
 
@@ -58,8 +57,7 @@ export function homeModeSentence(data: CodingModeView | undefined): string | nul
 export function CodingAdminSettings({ viewer }: { viewer?: Pick<Roster, "id" | "role"> }) {
   const client = useQueryClient();
   const settings = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
-  const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
-  const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchIntervalInBackground: true, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
+  const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchIntervalInBackground: true, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") ? 2000 : false });
   const [testStartedAt, setTestStartedAt] = useState<number | null>(null);
   const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running || q.state.data?.state === "switching" || q.state.data?.state === "waiting" ? 2000 : false) });
   const selfTest = selfTestState(mode.data, testStartedAt);
@@ -71,10 +69,8 @@ export function CodingAdminSettings({ viewer }: { viewer?: Pick<Roster, "id" | "
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [modeActionBusy, setModeActionBusy] = useState<CodingModeReadinessItemId | null>(null);
   const [modeActionError, setModeActionError] = useState<string | null>(null);
-  const [removePiece, setRemovePiece] = useState<CodingPiece | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
   const paused = settings.data?.find((setting) => setting.key === "coding.paused")?.value === true;
-  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["coding-pieces"] }), client.invalidateQueries({ queryKey: ["people"] })]);
   const refreshModeChecklist = () => Promise.all([mode.refetch(), pieces.refetch(), settings.refetch()]).then(() => undefined);
   const runModeAction = async (id: CodingModeReadinessItemId) => {
     setModeActionBusy(id); setModeActionError(null);
@@ -88,20 +84,6 @@ export function CodingAdminSettings({ viewer }: { viewer?: Pick<Roster, "id" | "
       setModeActionError(messageOf(reason, id === "self_test" ? i18n._({ id: "Home could not run the coding test. Try again.", message: "Home could not run the coding test. Try again." }) : i18n._({ id: "Home could not update coding mode. Try again.", message: "Home could not update coding mode. Try again." })));
       await refreshModeChecklist().catch(() => undefined);
     } finally { setModeActionBusy(null); }
-  };
-  const install = async (piece: CodingPiece) => {
-    setPieceError(null);
-    setPending((value) => ({ ...value, [piece.id]: "install" }));
-    try { await api.installCodingPiece(piece.id); await refresh(); }
-    catch (error) { setPieceError(messageOf(error, i18n._({ id: "Could not start this install.", message: "Could not start this install." }))); }
-    finally { setPending((value) => { const next = { ...value }; delete next[piece.id]; return next; }); }
-  };
-  const remove = async (piece: CodingPiece) => {
-    setPieceError(null);
-    setPending((value) => ({ ...value, [piece.id]: "remove" }));
-    try { await api.removeCodingPiece(piece.id); await refresh(); }
-    catch (error) { setPieceError(messageOf(error, i18n._({ id: "Could not remove this piece.", message: "Could not remove this piece." }))); }
-    finally { setPending((value) => { const next = { ...value }; delete next[piece.id]; return next; }); }
   };
   return <div className="flex flex-col gap-4">
     <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled"]} titleOverrides={{ "household.coding": i18n._({ id: "Coding", message: "Coding" }) }} />
@@ -125,15 +107,6 @@ export function CodingAdminSettings({ viewer }: { viewer?: Pick<Roster, "id" | "
     <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding", "household.coding_people", "household.coding_limits"]} includeKeys={KEYS.filter((key) => key !== "coding.paused" && key !== "coding.enabled")} titleOverrides={{ "household.coding": i18n._({ id: "More Coding settings", message: "More Coding settings" }) }} />
     <Card><CardHeader><CardTitle>{i18n._({ id: "Stop all coding now", message: "Stop all coding now" })}</CardTitle><CardDescription>{i18n._({ id: "Pause coding requests until you resume. This does not delete keys.", message: "Pause coding requests until you resume. This does not delete keys." })}</CardDescription></CardHeader><CardContent><Button type="button" variant={paused ? "default" : "destructive"} onClick={() => setPauseOpen(true)}>{paused ? i18n._({ id: "Resume coding", message: "Resume coding" }) : i18n._({ id: "Stop all coding now", message: "Stop all coding now" })}</Button>{settings.isError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={i18n._({ id: "Could not load the pause setting.", message: "Could not load the pause setting." })} /> : null}</CardContent></Card>
     <FeatureAccess viewer={viewer} feature="code" />
-    <Card><CardHeader><CardTitle>{i18n._({ id: "What Coding needs", message: "What Coding needs" })}</CardTitle><CardDescription>{i18n._({ id: "Home downloads these parts to this computer. Home does not install a coding app.", message: "Home downloads these parts to this computer. Home does not install a coding app." })}</CardDescription></CardHeader><CardContent>
-      <AsyncState data={pieces.data} error={pieces.isError} isFetching={pieces.isFetching} onRetry={() => void pieces.refetch()} errorMessage={i18n._({ id: "Could not load Coding setup.", message: "Could not load Coding setup." })} loadingLabel={i18n._({ id: "Loading Coding setup", message: "Loading Coding setup" })}>
-        {(view) => view.pieces.length === 0 ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Coding needs these pieces.", message: "Coding needs these pieces." })}</p> : <ItemGroup variant="card" aria-label={i18n._({ id: "Coding pieces", message: "Coding pieces" })}>{view.pieces.map((piece) => <Item key={piece.id}>
-          <ItemContent><ItemTitle>{piece.label} <Badge variant={piece.state === "installed" ? "secondary" : piece.state === "failed" ? "destructive" : "outline"}>{piece.state === "installed" ? i18n._({ id: "Installed", message: "Installed" }) : piece.state === "notInstalled" ? i18n._({ id: "Not installed", message: "Not installed" }) : piece.state === "installing" ? i18n._({ id: "Installing", message: "Installing" }) : piece.state === "unsupported" ? i18n._({ id: "Not supported", message: "Not supported" }) : i18n._({ id: "Needs attention", message: "Needs attention" })}</Badge></ItemTitle><ItemDescription>{piece.summary} · {sizeText(piece.size_bytes)}{piece.state === "installing" ? i18n._({ id: " · {percent}%", message: " · {percent}%", values: { percent: piece.percent ?? 0 } }) : ""}</ItemDescription>{piece.state === "installing" ? pieceCard(piece) : null}{piece.failure ? <ItemDescription>{piece.failure}</ItemDescription> : null}{piece.remove_block && !piece.can_remove ? <ItemDescription>{piece.remove_block}</ItemDescription> : null}{piece.install_block && !piece.can_install ? <ItemDescription>{piece.install_block}</ItemDescription> : null}</ItemContent>
-          <ItemActions><Button type="button" onClick={() => void install(piece)} disabled={!piece.can_install || piece.state === "installing" || pending[piece.id] === "install"}>{pending[piece.id] === "install" || piece.state === "installing" ? i18n._({ id: "Installing", message: "Installing" }) : i18n._({ id: "Install", message: "Install" })}</Button><Button type="button" variant="outline" disabled={!piece.can_remove || pending[piece.id] === "remove"} onClick={() => setRemovePiece(piece)}>{pending[piece.id] === "remove" ? i18n._({ id: "Removing", message: "Removing" }) : i18n._({ id: "Remove", message: "Remove" })}</Button></ItemActions>
-        </Item>)}</ItemGroup>}
-      </AsyncState>
-      <AlertDialog open={removePiece !== null} onOpenChange={(open) => { if (!open) setRemovePiece(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{i18n._({ id: "Remove {label}?", message: "Remove {label}?", values: { label: removePiece?.label } })}</AlertDialogTitle><AlertDialogDescription>{i18n._({ id: "This removes the piece from this computer. You can install it again later.", message: "This removes the piece from this computer. You can install it again later." })}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{i18n._({ id: "Keep it", message: "Keep it" })}</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removePiece; setRemovePiece(null); if (pending) void remove(pending); }}>{i18n._({ id: "Remove", message: "Remove" })}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    </CardContent></Card>
     {pieceError ? <StatusCard kind="problem" title={i18n._({ id: "That did not work", message: "That did not work" })} line={pieceError} /> : null}
     {pieces.data?.message ? <p className="text-sm text-muted-foreground">{pieces.data.stack === "unreachable" ? i18n._({ id: "Coding is waiting for its helper to start. The Status page shows what is happening.", message: "Coding is waiting for its helper to start. The Status page shows what is happening." }) : pieces.data.message}</p> : null}
     <p className="text-sm text-muted-foreground">{i18n._({ id: "Chat always comes first. Coding waits or slows down, never chat. See what is running on the", message: "Chat always comes first. Coding waits or slows down, never chat. See what is running on the" })} <Link to="/status" className="text-primary underline">{i18n._({ id: "Status page", message: "Status page" })}</Link>.</p>

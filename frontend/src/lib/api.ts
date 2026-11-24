@@ -1441,7 +1441,6 @@ export const api = {
   setupCoding: () => request<SetupCodingView>("/api/setup/coding"),
   chooseSetupCoding: (choice: "set_up" | "later") => request<SetupCodingView>("/api/setup/coding", { method: "POST", body: JSON.stringify({ choice }) }),
   installCodingPiece: (id: CodingPiece["id"]) => request<{ job: string | null; piece: CodingPiece["id"] }>(`/api/coding/pieces/${id}/install`, { method: "POST" }),
-  removeCodingPiece: (id: CodingPiece["id"]) => request<{ piece: CodingPiece["id"]; removed: true }>(`/api/coding/pieces/${id}`, { method: "DELETE" }),
   apiKeys: () => request<{ keys: PersonalApiKey[] }>("/api/settings/api-keys"),
   createApiKey: (input: { name: string; scopes: Array<"turn" | "code" | "settings" | "diagnose" | "engine">; expires_in_days: 7 | 30 | 90 | 365 }) =>
     request<{ key: PersonalApiKey; secret: string }>("/api/settings/api-keys", { method: "POST", body: JSON.stringify(input) }),

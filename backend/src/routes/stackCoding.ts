@@ -6,7 +6,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { codeReady } from "@/lib/codeReady";
-import { CodingPieceError, installCodingPiece, listCodingPieces, removeCodingPiece } from "@/lib/stackCodingPieces";
+import { CodingPieceError, installCodingPiece, listCodingPieces } from "@/lib/stackCodingPieces";
 
 export const stackCodingRoutes = apiRouter();
 
@@ -45,16 +45,6 @@ const installRoute = createRoute({
 });
 stackCodingRoutes.openapi(installRoute, async (c) => {
   try { return c.json(await installCodingPiece(c.req.valid("param").id), 202); }
-  catch (error) { return failure(c, error) as never; }
-});
-
-const removeRoute = createRoute({
-  method: "delete", path: "/pieces/{id}", tags: ["Coding"], summary: "Remove one coding piece and free its space", middleware: [requireRole("owner", "admin")] as const,
-  request: { params },
-  responses: { 200: { content: { "application/json": { schema: z.object({ piece: PieceId, removed: z.literal(true) }) } }, description: "Removed." }, ...refusals },
-});
-stackCodingRoutes.openapi(removeRoute, async (c) => {
-  try { return c.json(await removeCodingPiece(c.req.valid("param").id), 200); }
   catch (error) { return failure(c, error) as never; }
 });
 

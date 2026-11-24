@@ -78,7 +78,6 @@ describe("the list", () => {
       expect((await list(client)).pieces.map(piece => piece.id)).toEqual(["engine","model","draft"]);
     }
     expect((await client.request("/api/coding/pieces/heavy_model/install", {method:"POST"})).status).toBe(400);
-    expect((await client.request("/api/coding/pieces/heavy_draft", {method:"DELETE"})).status).toBe(400);
   });
   test("on a computer that cannot run Splash the engine is the shared llama-server and has no draft", async () => {
     const { client } = await owner();
@@ -135,7 +134,6 @@ describe("the list", () => {
     invalidateSessionCacheForPerson(actor.id);
     expect((await client.get("/api/coding/pieces")).status).toBe(403);
     expect((await client.request("/api/coding/pieces/model/install", { method: "POST" })).status).toBe(403);
-    expect((await client.request("/api/coding/pieces/model", { method: "DELETE" })).status).toBe(403);
     expect(calls).toEqual([]);
   });
   test("a signed-out caller is refused", async () => {
@@ -174,43 +172,6 @@ describe("install", () => {
     const { client } = await owner();
     const res = await client.request("/api/coding/pieces/laptop/install", { method: "POST" });
     expect([400, 404]).toContain(res.status);
-  });
-});
-
-describe("remove", () => {
-  test("with Coding off each piece is removed through the Stack: the engine build by its current tag, the model by its component", async () => {
-    const { client } = await owner();
-    expect((await client.request("/api/coding/pieces/engine", { method: "DELETE" })).status).toBe(200);
-    const model = await client.request("/api/coding/pieces/model", { method: "DELETE" });
-    expect(model.status).toBe(200);
-    expect(await model.json()).toEqual({ piece: "model", removed: true });
-    expect(calls).toEqual(["remove-engine:splash:1.3.2", `remove-component:${MODEL}`]);
-  });
-  test("with Coding on every removal is refused with the plain sentence and the Stack is not called", async () => {
-    const { client } = await owner();
-    setHouseholdSettingValue("coding.enabled", true);
-    for (const id of ["engine", "model", "draft"]) {
-      const res = await client.request(`/api/coding/pieces/${id}`, { method: "DELETE" });
-      expect(res.status).toBe(409);
-      expect(await res.json()).toMatchObject({ error: CODING_ON_REFUSAL, code: "coding_on" });
-    }
-    expect(CODING_ON_REFUSAL).toContain("Turn Coding off");
-    expect(calls).toEqual([]);
-    const listed = await list(client);
-    expect(listed.pieces.every((p) => !p.can_remove)).toBe(true);
-    expect(listed.pieces[1]!.remove_block).toBe(CODING_ON_REFUSAL);
-  });
-  test("the shared llama-server and the draft cannot be removed on their own; the Stack's refusal for a running engine is passed on", async () => {
-    const { client } = await owner();
-    expect(await (await client.request("/api/coding/pieces/draft", { method: "DELETE" })).json()).toMatchObject({ error: "It is removed with the coding model." });
-    world.refuse = "This engine build is serving a role right now. Stop the role first, then remove the build.";
-    const res = await client.request("/api/coding/pieces/engine", { method: "DELETE" });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ error: "This engine build is serving a role right now. Stop the role first, then remove the build." });
-    world.engines = [engine({ matchesThisMachine: false }), engine({ id: "llama-1", name: "llama-server", installed: true, currentTag: "b1" })];
-    world.roles = [codingRole({ engine: "llama-server" })];
-    const shared = await client.request("/api/coding/pieces/engine", { method: "DELETE" });
-    expect(await shared.json()).toMatchObject({ error: "Chat uses this engine as well, so it stays." });
   });
 });
 
