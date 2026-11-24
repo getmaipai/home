@@ -115,7 +115,7 @@ describe("forwarding", () => {
 describe("the one-time move of Home's old values", () => {
   test("sends the stored slots, orders, switches and nothing else, once, and records the result", async () => {
     const { client } = await admin();
-    setHouseholdSettingValue("engines.image.tier.standard", { model: "atlas-fast", options: {} });
+    setHouseholdSettingValue("engines.pictures.tier.standard", { model: "atlas-fast", options: {} });
     setHouseholdSettingValue("engines.video.tier.boost", { model: "off", options: {} });
     setHouseholdSettingValue("engines.pictures.order", ["atlas-xl", "atlas-fast"]);
     setHouseholdSettingValue("chat.paused", true);
@@ -132,16 +132,16 @@ describe("the one-time move of Home's old values", () => {
     await client.get("/api/ai/stack/choices");
     await ensureChoicesMigrated();
     expect(calls.filter((call) => call.path.endsWith("/migrate"))).toHaveLength(1);
-    expect(getHouseholdSettingValue("engines.image.tier.standard")).toMatchObject({ model: "atlas-fast" });
+    expect(getHouseholdSettingValue("engines.pictures.tier.standard")).toMatchObject({ model: "atlas-fast" });
   });
 
   test("a value the Stack refuses stays in Home and shows as a notice until the admin dismisses it", async () => {
     const { client } = await admin();
-    setHouseholdSettingValue("engines.image.tier.max", { model: "gone-model", options: {} });
+    setHouseholdSettingValue("engines.pictures.tier.max", { model: "gone-model", options: {} });
     migrateAnswer = { ...migrateAnswer, accepted: 0, refused: [{ kind: "slot", key: "image.max", status: "refused", reason: "gone-model is not a picture model the Stack knows." }] };
     const view1 = await (await client.get("/api/ai/stack/migration")).json() as { done: boolean; refused: Array<{ key: string; reason: string }>; dismissed: boolean };
     expect(view1).toMatchObject({ done: true, dismissed: false, refused: [{ key: "image.max", reason: expect.stringContaining("gone-model") }] });
-    expect(getHouseholdSettingValue("engines.image.tier.max")).toMatchObject({ model: "gone-model" });
+    expect(getHouseholdSettingValue("engines.pictures.tier.max")).toMatchObject({ model: "gone-model" });
     expect(((await (await client.post("/api/ai/stack/migration/dismiss", {})).json()) as { dismissed: boolean }).dismissed).toBe(true);
   });
 
@@ -169,22 +169,22 @@ describe("the one-time move of Home's old values", () => {
 describe("the pipeline's cached read of the Stack's choice", () => {
   const level = (tier: string, chosen_by: string, chosen: string | null) => ({ tier, chosen, chosen_by });
   test("before the move, Home's stored value rules; after it, the Stack's household pick and off state do, and a level nobody chose is the recommended one (Reduced stays off)", async () => {
-    setHouseholdSettingValue("engines.image.tier.boost", { model: "old-pick", options: {} });
-    expect(readSlot("image", "boost").model).toBe("old-pick");
+    setHouseholdSettingValue("engines.pictures.tier.boost", { model: "old-pick", options: {} });
+    expect(readSlot("pictures", "boost").model).toBe("old-pick");
     view = { categories: [{ id: "pictures", role: "image", tiers: [level("standard", "recommended", "atlas-fast"), level("boost", "household", "atlas-xl"), level("max", "off", null), level("reduced", "none", null)] }, { id: "chat", tiers: [level("reduced", "recommended", "nova-3b")] }] };
     await refreshStackChoiceSnapshot();
-    expect(readSlot("image", "boost").model).toBe("atlas-xl");
-    expect(readSlot("image", "max").model).toBe("off");
-    expect(readSlot("image", "standard").model).toBe("recommended");
+    expect(readSlot("pictures", "boost").model).toBe("atlas-xl");
+    expect(readSlot("pictures", "max").model).toBe("off");
+    expect(readSlot("pictures", "standard").model).toBe("recommended");
     expect(readSlot("chat", "reduced").model).toBe("off");
   });
   test("an unreachable Stack puts Home's stored value back in charge", async () => {
     view = { categories: [{ id: "pictures", role: "image", tiers: [{ tier: "max", chosen: null, chosen_by: "off" }] }] };
     await refreshStackChoiceSnapshot();
-    expect(readSlot("image", "max").model).toBe("off");
+    expect(readSlot("pictures", "max").model).toBe("off");
     down = true;
     await refreshStackChoiceSnapshot();
-    expect(readSlot("image", "max").model).toBe("recommended");
+    expect(readSlot("pictures", "max").model).toBe("recommended");
   });
 });
 

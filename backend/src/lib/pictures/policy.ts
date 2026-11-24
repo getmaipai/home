@@ -104,10 +104,10 @@ export function householdQuickModel(): "ernie" | "klein" {
   return "ernie";
 }
 
-/** The picture Boost slot is on (`engines.image.tier.boost`; the AI card writes it directly): the Detailed pictures switch on the AI and models page. On unless turned off. */
+/** The picture Boost slot is on (`engines.pictures.tier.boost`; the AI card writes it directly): the Detailed pictures switch on the AI and models page. On unless turned off. */
 export function householdDetailedEnabled(): boolean {
   try {
-    return !slotIsOff("image", "boost");
+    return !slotIsOff("pictures", "boost");
   } catch {
     return true;
   }

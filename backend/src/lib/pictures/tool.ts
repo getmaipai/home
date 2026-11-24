@@ -331,8 +331,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   // KIDS-CREATE-01: a child gets a daily limit, the cartoon look forced, Quick only, one or two pictures, and no friction text.
   if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
-  const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "image", arg: args.tier, band: audience.band });
-  const regularChoice: QualityChoice = kid ? { quality: "quick", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "image", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "image", householdPictureQuality(), audience.band), style: adapter });
+  const tierAsked = tierArgument({ person: state.actor as PersonRow, category: "pictures", arg: args.tier, band: audience.band });
+  const regularChoice: QualityChoice = kid ? { quality: "quick", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? allowedQuality(state.actor as PersonRow, "pictures", args.quality, audience.band) : tierAsked.quality, household: allowedQuality(state.actor as PersonRow, "pictures", householdPictureQuality(), audience.band), style: adapter });
   if (regularChoice.removed) return refused(callId, args, { kind: "plan", why: "style_plan", line: REMOVED_MODEL_LINE });
   // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
   const sentAudience = lane === "adult" && adultStylesAllowed() && strictAudience === "adult-only" ? "adult" : "all-ages";
@@ -368,7 +368,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       temporary: extra || input.scene?.detached ? false : temporary,
       kind: "generate",
       prompt: subjectPrompt,
-      tier: jobTier("image", tierAsked.tier, tierAsked.tier && ["boost", "max"].includes(tierAsked.tier) && !kid ? "detailed" : choice.quality),
+      tier: jobTier("pictures", tierAsked.tier, tierAsked.tier && ["boost", "max"].includes(tierAsked.tier) && !kid ? "detailed" : choice.quality),
       body: {
         prompt: kid ? forceCartoon(subjectPrompt) : subjectPrompt,
         size,

@@ -5357,7 +5357,7 @@ msgid "setting.content.policy.chat.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:645
+#: src/lib/settingCopy.generated.ts:630
 msgid "setting.engines.judge.choice.does"
 msgstr ""
 
@@ -5372,7 +5372,7 @@ msgid "setting.search.source_mode.wikimedia.option.mix"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:644
+#: src/lib/settingCopy.generated.ts:629
 msgid "setting.engines.judge.choice.help"
 msgstr ""
 
@@ -5712,22 +5712,22 @@ msgid "setting.engines.coding.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:629
-msgid "setting.engines.image.choice.help"
+#: src/lib/settingCopy.generated.ts:649
+msgid "setting.engines.pictures.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:647
+#: src/lib/settingCopy.generated.ts:632
 msgid "setting.engines.music.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:725
+#: src/lib/settingCopy.generated.ts:708
 msgid "setting.engines.video.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:742
+#: src/lib/settingCopy.generated.ts:725
 msgid "setting.engines.vision.choice.help"
 msgstr ""
 
@@ -8850,22 +8850,22 @@ msgid "setting.engines.coding.choice.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:630
-msgid "setting.engines.image.choice.does"
+#: src/lib/settingCopy.generated.ts:650
+msgid "setting.engines.pictures.choice.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:648
+#: src/lib/settingCopy.generated.ts:633
 msgid "setting.engines.music.choice.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:726
+#: src/lib/settingCopy.generated.ts:709
 msgid "setting.engines.video.choice.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:743
+#: src/lib/settingCopy.generated.ts:726
 msgid "setting.engines.vision.choice.does"
 msgstr ""
 
@@ -13194,8 +13194,8 @@ msgid "setting.topics.health.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:628
-msgid "setting.engines.image.choice.label"
+#: src/lib/settingCopy.generated.ts:648
+msgid "setting.engines.pictures.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13651,7 +13651,7 @@ msgid "jobs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:643
+#: src/lib/settingCopy.generated.ts:628
 msgid "setting.engines.judge.choice.label"
 msgstr ""
 
@@ -17028,22 +17028,22 @@ msgid "setting.media.budget.exempt_bedtime_audio.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:651
+#: src/lib/settingCopy.generated.ts:636
 msgid "setting.engines.music.tier.boost.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:654
+#: src/lib/settingCopy.generated.ts:639
 msgid "setting.engines.music.tier.max.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:657
+#: src/lib/settingCopy.generated.ts:642
 msgid "setting.engines.music.tier.reduced.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:660
+#: src/lib/settingCopy.generated.ts:645
 msgid "setting.engines.music.tier.standard.label"
 msgstr ""
 
@@ -17068,12 +17068,12 @@ msgid "setting.music.library_sort.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:646
+#: src/lib/settingCopy.generated.ts:631
 msgid "setting.engines.music.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:649
+#: src/lib/settingCopy.generated.ts:634
 msgid "setting.engines.music.order.label"
 msgstr ""
 
@@ -18646,12 +18646,12 @@ msgid "Nothing your family says is used to train anything."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:723
+#: src/lib/settingCopy.generated.ts:706
 msgid "setting.engines.turn_signal.choice.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:722
+#: src/lib/settingCopy.generated.ts:705
 msgid "setting.engines.turn_signal.choice.help"
 msgstr ""
 
@@ -18761,13 +18761,13 @@ msgid "setting.engines.stt.choice.option_label.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:708
-msgid "setting.engines.tts.choice.option_label.off"
+#: src/lib/settingCopy.generated.ts:728
+msgid "setting.engines.vision.choice.option_label.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:745
-msgid "setting.engines.vision.choice.option_label.off"
+#: src/lib/settingCopy.generated.ts:733
+msgid "setting.engines.voice.choice.option_label.off"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -18906,12 +18906,12 @@ msgid "setting.engines.stt.choice.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:707
-msgid "setting.engines.tts.choice.option.off"
+#: src/lib/settingCopy.generated.ts:732
+msgid "setting.engines.voice.choice.option.off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:744
+#: src/lib/settingCopy.generated.ts:727
 msgid "setting.engines.vision.choice.option.off"
 msgstr ""
 
@@ -20381,83 +20381,83 @@ msgid "setting.engines.coding.tier.standard.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:633
-msgid "setting.engines.image.tier.boost.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:636
-msgid "setting.engines.image.tier.max.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:639
-msgid "setting.engines.image.tier.reduced.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:642
-msgid "setting.engines.image.tier.standard.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:653
+#: src/lib/settingCopy.generated.ts:638
 msgid "setting.engines.music.tier.boost.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:656
+#: src/lib/settingCopy.generated.ts:641
 msgid "setting.engines.music.tier.max.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:659
+#: src/lib/settingCopy.generated.ts:644
 msgid "setting.engines.music.tier.reduced.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:662
+#: src/lib/settingCopy.generated.ts:647
 msgid "setting.engines.music.tier.standard.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:711
-msgid "setting.engines.tts.tier.boost.does"
+#: src/lib/settingCopy.generated.ts:655
+msgid "setting.engines.pictures.tier.boost.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:658
+msgid "setting.engines.pictures.tier.max.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:661
+msgid "setting.engines.pictures.tier.reduced.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:664
+msgid "setting.engines.pictures.tier.standard.does"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:714
-msgid "setting.engines.tts.tier.max.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:717
-msgid "setting.engines.tts.tier.reduced.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:720
-msgid "setting.engines.tts.tier.standard.does"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:731
 msgid "setting.engines.video.tier.boost.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:734
+#: src/lib/settingCopy.generated.ts:717
 msgid "setting.engines.video.tier.max.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:737
+#: src/lib/settingCopy.generated.ts:720
 msgid "setting.engines.video.tier.reduced.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:740
+#: src/lib/settingCopy.generated.ts:723
 msgid "setting.engines.video.tier.standard.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:736
+msgid "setting.engines.voice.tier.boost.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:739
+msgid "setting.engines.voice.tier.max.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:742
+msgid "setting.engines.voice.tier.reduced.does"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:745
+msgid "setting.engines.voice.tier.standard.does"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20541,23 +20541,23 @@ msgid "Pictures are made in chat; songs are made on"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:631
-msgid "setting.engines.image.tier.boost.label"
+#: src/lib/settingCopy.generated.ts:653
+msgid "setting.engines.pictures.tier.boost.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:634
-msgid "setting.engines.image.tier.max.label"
+#: src/lib/settingCopy.generated.ts:656
+msgid "setting.engines.pictures.tier.max.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:637
-msgid "setting.engines.image.tier.reduced.label"
+#: src/lib/settingCopy.generated.ts:659
+msgid "setting.engines.pictures.tier.reduced.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:640
-msgid "setting.engines.image.tier.standard.label"
+#: src/lib/settingCopy.generated.ts:662
+msgid "setting.engines.pictures.tier.standard.label"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -20566,7 +20566,7 @@ msgid "setting.news.images.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:663
+#: src/lib/settingCopy.generated.ts:651
 msgid "setting.engines.pictures.order.label"
 msgstr ""
 
@@ -25345,8 +25345,8 @@ msgid "Speakers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:704
-msgid "setting.engines.tts.choice.label"
+#: src/lib/settingCopy.generated.ts:729
+msgid "setting.engines.voice.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25380,13 +25380,13 @@ msgid "setting.tts.voice_id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:706
-msgid "setting.engines.tts.choice.does"
+#: src/lib/settingCopy.generated.ts:731
+msgid "setting.engines.voice.choice.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:705
-msgid "setting.engines.tts.choice.help"
+#: src/lib/settingCopy.generated.ts:730
+msgid "setting.engines.voice.choice.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27728,23 +27728,23 @@ msgid "setting.engines.coding.tier.boost.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:652
+#: src/lib/settingCopy.generated.ts:637
 msgid "setting.engines.music.tier.boost.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:632
-msgid "setting.engines.image.tier.boost.help"
+#: src/lib/settingCopy.generated.ts:654
+msgid "setting.engines.pictures.tier.boost.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:730
+#: src/lib/settingCopy.generated.ts:713
 msgid "setting.engines.video.tier.boost.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:710
-msgid "setting.engines.tts.tier.boost.help"
+#: src/lib/settingCopy.generated.ts:735
+msgid "setting.engines.voice.tier.boost.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27758,23 +27758,23 @@ msgid "setting.engines.coding.tier.max.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:655
+#: src/lib/settingCopy.generated.ts:640
 msgid "setting.engines.music.tier.max.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:635
-msgid "setting.engines.image.tier.max.help"
+#: src/lib/settingCopy.generated.ts:657
+msgid "setting.engines.pictures.tier.max.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:733
+#: src/lib/settingCopy.generated.ts:716
 msgid "setting.engines.video.tier.max.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:713
-msgid "setting.engines.tts.tier.max.help"
+#: src/lib/settingCopy.generated.ts:738
+msgid "setting.engines.voice.tier.max.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27788,23 +27788,23 @@ msgid "setting.engines.coding.tier.reduced.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:658
+#: src/lib/settingCopy.generated.ts:643
 msgid "setting.engines.music.tier.reduced.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:638
-msgid "setting.engines.image.tier.reduced.help"
+#: src/lib/settingCopy.generated.ts:660
+msgid "setting.engines.pictures.tier.reduced.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:736
+#: src/lib/settingCopy.generated.ts:719
 msgid "setting.engines.video.tier.reduced.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:716
-msgid "setting.engines.tts.tier.reduced.help"
+#: src/lib/settingCopy.generated.ts:741
+msgid "setting.engines.voice.tier.reduced.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27818,23 +27818,23 @@ msgid "setting.engines.coding.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:661
+#: src/lib/settingCopy.generated.ts:646
 msgid "setting.engines.music.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:641
-msgid "setting.engines.image.tier.standard.help"
+#: src/lib/settingCopy.generated.ts:663
+msgid "setting.engines.pictures.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:739
+#: src/lib/settingCopy.generated.ts:722
 msgid "setting.engines.video.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:719
-msgid "setting.engines.tts.tier.standard.help"
+#: src/lib/settingCopy.generated.ts:744
+msgid "setting.engines.voice.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27928,17 +27928,17 @@ msgid "the one you chose"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:650
+#: src/lib/settingCopy.generated.ts:635
 msgid "setting.engines.music.order.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:664
+#: src/lib/settingCopy.generated.ts:652
 msgid "setting.engines.pictures.order.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:728
+#: src/lib/settingCopy.generated.ts:711
 msgid "setting.engines.video.order.help"
 msgstr ""
 
@@ -29499,7 +29499,7 @@ msgid "Turn routes"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:721
+#: src/lib/settingCopy.generated.ts:704
 msgid "setting.engines.turn_signal.choice.label"
 msgstr ""
 
@@ -30444,22 +30444,22 @@ msgid "Video"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:729
+#: src/lib/settingCopy.generated.ts:712
 msgid "setting.engines.video.tier.boost.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:732
+#: src/lib/settingCopy.generated.ts:715
 msgid "setting.engines.video.tier.max.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:735
+#: src/lib/settingCopy.generated.ts:718
 msgid "setting.engines.video.tier.reduced.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:738
+#: src/lib/settingCopy.generated.ts:721
 msgid "setting.engines.video.tier.standard.label"
 msgstr ""
 
@@ -30474,12 +30474,12 @@ msgid "setting.generation.video.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:724
+#: src/lib/settingCopy.generated.ts:707
 msgid "setting.engines.video.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:727
+#: src/lib/settingCopy.generated.ts:710
 msgid "setting.engines.video.order.label"
 msgstr ""
 
@@ -30576,7 +30576,7 @@ msgid "Violet"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:741
+#: src/lib/settingCopy.generated.ts:724
 msgid "setting.engines.vision.choice.label"
 msgstr ""
 
@@ -30654,23 +30654,23 @@ msgid "area.Voice and robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:709
-msgid "setting.engines.tts.tier.boost.label"
+#: src/lib/settingCopy.generated.ts:734
+msgid "setting.engines.voice.tier.boost.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:712
-msgid "setting.engines.tts.tier.max.label"
+#: src/lib/settingCopy.generated.ts:737
+msgid "setting.engines.voice.tier.max.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:715
-msgid "setting.engines.tts.tier.reduced.label"
+#: src/lib/settingCopy.generated.ts:740
+msgid "setting.engines.voice.tier.reduced.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:718
-msgid "setting.engines.tts.tier.standard.label"
+#: src/lib/settingCopy.generated.ts:743
+msgid "setting.engines.voice.tier.standard.label"
 msgstr ""
 
 #. js-lingui-explicit-id

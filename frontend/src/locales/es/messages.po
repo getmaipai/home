@@ -6077,7 +6077,7 @@ msgid "setting.content.policy.chat.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:645
+#: src/lib/settingCopy.generated.ts:630
 #, needs-review
 msgid "setting.engines.judge.choice.does"
 msgstr "Dirige el trabajo de juez a su paquete seleccionado."
@@ -6095,7 +6095,7 @@ msgid "setting.search.source_mode.wikimedia.option.mix"
 msgstr "Revisa primero la biblioteca offline y luego intenta una búsqueda en vivo solo si no encuentra nada."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:644
+#: src/lib/settingCopy.generated.ts:629
 #, needs-review
 msgid "setting.engines.judge.choice.help"
 msgstr "Elige el modelo para el rol de Judge. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
@@ -6482,25 +6482,24 @@ msgid "setting.engines.coding.choice.help"
 msgstr "Elige el modelo para el rol de Coding. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:629
-#, needs-review
-msgid "setting.engines.image.choice.help"
+#: src/lib/settingCopy.generated.ts:649
+msgid "setting.engines.pictures.choice.help"
 msgstr "Elige el modelo para el rol de Image. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:647
+#: src/lib/settingCopy.generated.ts:632
 #, needs-review
 msgid "setting.engines.music.choice.help"
 msgstr "Elige el modelo para el rol de Music. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:725
+#: src/lib/settingCopy.generated.ts:708
 #, needs-review
 msgid "setting.engines.video.choice.help"
 msgstr "Elige el modelo para el rol de Video. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:742
+#: src/lib/settingCopy.generated.ts:725
 #, needs-review
 msgid "setting.engines.vision.choice.help"
 msgstr "Elige el modelo para el rol de Vision. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
@@ -10034,25 +10033,24 @@ msgid "setting.engines.coding.choice.does"
 msgstr "Dirige el trabajo de codificación a su paquete seleccionado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:630
-#, needs-review
-msgid "setting.engines.image.choice.does"
+#: src/lib/settingCopy.generated.ts:650
+msgid "setting.engines.pictures.choice.does"
 msgstr "Dirige el trabajo de imágenes a su paquete seleccionado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:648
+#: src/lib/settingCopy.generated.ts:633
 #, needs-review
 msgid "setting.engines.music.choice.does"
 msgstr "Dirige el trabajo de música a su paquete seleccionado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:726
+#: src/lib/settingCopy.generated.ts:709
 #, needs-review
 msgid "setting.engines.video.choice.does"
 msgstr "Dirige el trabajo de video a su paquete seleccionado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:743
+#: src/lib/settingCopy.generated.ts:726
 #, needs-review
 msgid "setting.engines.vision.choice.does"
 msgstr "Dirige el trabajo de visión a su paquete seleccionado."
@@ -14967,9 +14965,8 @@ msgid "setting.topics.health.label"
 msgstr "Enfermedad, muerte y salud"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:628
-#, needs-review
-msgid "setting.engines.image.choice.label"
+#: src/lib/settingCopy.generated.ts:648
+msgid "setting.engines.pictures.choice.label"
 msgstr "Elección de modelo de imagen"
 
 #. js-lingui-explicit-id
@@ -15492,7 +15489,7 @@ msgid "jobs"
 msgstr "tareas"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:643
+#: src/lib/settingCopy.generated.ts:628
 #, needs-review
 msgid "setting.engines.judge.choice.label"
 msgstr "Elección de modelo juez"
@@ -19325,25 +19322,25 @@ msgid "setting.media.budget.exempt_bedtime_audio.help"
 msgstr "La música y los audiolibros no usan los minutos de medios diarios cuando esto está activado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:651
+#: src/lib/settingCopy.generated.ts:636
 #, needs-review
 msgid "setting.engines.music.tier.boost.label"
 msgstr "Música en Boost"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:654
+#: src/lib/settingCopy.generated.ts:639
 #, needs-review
 msgid "setting.engines.music.tier.max.label"
 msgstr "Música en Max"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:657
+#: src/lib/settingCopy.generated.ts:642
 #, needs-review
 msgid "setting.engines.music.tier.reduced.label"
 msgstr "Música en Reduced"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:660
+#: src/lib/settingCopy.generated.ts:645
 #, needs-review
 msgid "setting.engines.music.tier.standard.label"
 msgstr "Música en Standard"
@@ -19370,13 +19367,13 @@ msgid "setting.music.library_sort.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:646
+#: src/lib/settingCopy.generated.ts:631
 #, needs-review
 msgid "setting.engines.music.choice.label"
 msgstr "Elección de modelo de música"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:649
+#: src/lib/settingCopy.generated.ts:634
 msgid "setting.engines.music.order.label"
 msgstr ""
 
@@ -21148,13 +21145,13 @@ msgid "Nothing your family says is used to train anything."
 msgstr "Nada de lo que dice tu familia se usa para entrenar algo."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:723
+#: src/lib/settingCopy.generated.ts:706
 #, needs-review
 msgid "setting.engines.turn_signal.choice.does"
 msgstr "Dirige el trabajo de señal de giro a su paquete seleccionado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:722
+#: src/lib/settingCopy.generated.ts:705
 #, needs-review
 msgid "setting.engines.turn_signal.choice.help"
 msgstr "Elige el modelo para el rol de Turn Signal. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
@@ -21279,15 +21276,14 @@ msgid "setting.engines.stt.choice.option_label.off"
 msgstr "Desactivado"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:708
+#: src/lib/settingCopy.generated.ts:728
 #, needs-review
-msgid "setting.engines.tts.choice.option_label.off"
+msgid "setting.engines.vision.choice.option_label.off"
 msgstr "Desactivado"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:745
-#, needs-review
-msgid "setting.engines.vision.choice.option_label.off"
+#: src/lib/settingCopy.generated.ts:733
+msgid "setting.engines.voice.choice.option_label.off"
 msgstr "Desactivado"
 
 #. js-lingui-explicit-id
@@ -21439,13 +21435,12 @@ msgid "setting.engines.stt.choice.option.off"
 msgstr "Desactivado: Home no escuchará el habla."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:707
-#, needs-review
-msgid "setting.engines.tts.choice.option.off"
+#: src/lib/settingCopy.generated.ts:732
+msgid "setting.engines.voice.choice.option.off"
 msgstr "Desactivado: Home no leerá las respuestas en voz alta."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:744
+#: src/lib/settingCopy.generated.ts:727
 #, needs-review
 msgid "setting.engines.vision.choice.option.off"
 msgstr "Desactivado: Home no usará la comprensión de fotos."
@@ -23104,99 +23099,91 @@ msgid "setting.engines.coding.tier.standard.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:633
-#, needs-review
-msgid "setting.engines.image.tier.boost.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:636
-#, needs-review
-msgid "setting.engines.image.tier.max.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:639
-#, needs-review
-msgid "setting.engines.image.tier.reduced.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:642
-#, needs-review
-msgid "setting.engines.image.tier.standard.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:653
+#: src/lib/settingCopy.generated.ts:638
 #, needs-review
 msgid "setting.engines.music.tier.boost.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:656
+#: src/lib/settingCopy.generated.ts:641
 #, needs-review
 msgid "setting.engines.music.tier.max.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:659
+#: src/lib/settingCopy.generated.ts:644
 #, needs-review
 msgid "setting.engines.music.tier.reduced.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:662
+#: src/lib/settingCopy.generated.ts:647
 #, needs-review
 msgid "setting.engines.music.tier.standard.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:711
-#, needs-review
-msgid "setting.engines.tts.tier.boost.does"
+#: src/lib/settingCopy.generated.ts:655
+msgid "setting.engines.pictures.tier.boost.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:658
+msgid "setting.engines.pictures.tier.max.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:661
+msgid "setting.engines.pictures.tier.reduced.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:664
+msgid "setting.engines.pictures.tier.standard.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:714
 #, needs-review
-msgid "setting.engines.tts.tier.max.does"
+msgid "setting.engines.video.tier.boost.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:717
 #, needs-review
-msgid "setting.engines.tts.tier.reduced.does"
+msgid "setting.engines.video.tier.max.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:720
 #, needs-review
-msgid "setting.engines.tts.tier.standard.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:731
-#, needs-review
-msgid "setting.engines.video.tier.boost.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:734
-#, needs-review
-msgid "setting.engines.video.tier.max.does"
-msgstr "Elige el modelo y la configuración para este nivel."
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:737
-#, needs-review
 msgid "setting.engines.video.tier.reduced.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:740
+#: src/lib/settingCopy.generated.ts:723
 #, needs-review
 msgid "setting.engines.video.tier.standard.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:736
+msgid "setting.engines.voice.tier.boost.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:739
+msgid "setting.engines.voice.tier.max.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:742
+msgid "setting.engines.voice.tier.reduced.does"
+msgstr "Elige el modelo y la configuración para este nivel."
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:745
+msgid "setting.engines.voice.tier.standard.does"
 msgstr "Elige el modelo y la configuración para este nivel."
 
 #. js-lingui-explicit-id
@@ -23290,27 +23277,23 @@ msgid "Pictures are made in chat; songs are made on"
 msgstr "Las imágenes se hacen en el chat; las canciones se hacen en"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:631
-#, needs-review
-msgid "setting.engines.image.tier.boost.label"
+#: src/lib/settingCopy.generated.ts:653
+msgid "setting.engines.pictures.tier.boost.label"
 msgstr "Imágenes en Boost"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:634
-#, needs-review
-msgid "setting.engines.image.tier.max.label"
+#: src/lib/settingCopy.generated.ts:656
+msgid "setting.engines.pictures.tier.max.label"
 msgstr "Imágenes en Max"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:637
-#, needs-review
-msgid "setting.engines.image.tier.reduced.label"
+#: src/lib/settingCopy.generated.ts:659
+msgid "setting.engines.pictures.tier.reduced.label"
 msgstr "Imágenes en Reduced"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:640
-#, needs-review
-msgid "setting.engines.image.tier.standard.label"
+#: src/lib/settingCopy.generated.ts:662
+msgid "setting.engines.pictures.tier.standard.label"
 msgstr "Imágenes en Standard"
 
 #. js-lingui-explicit-id
@@ -23320,7 +23303,7 @@ msgid "setting.news.images.label"
 msgstr "Imágenes en Noticias"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:663
+#: src/lib/settingCopy.generated.ts:651
 msgid "setting.engines.pictures.order.label"
 msgstr ""
 
@@ -28710,9 +28693,8 @@ msgid "Speakers"
 msgstr "Oradores"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:704
-#, needs-review
-msgid "setting.engines.tts.choice.label"
+#: src/lib/settingCopy.generated.ts:729
+msgid "setting.engines.voice.choice.label"
 msgstr "Elección del modelo Tts"
 
 #. js-lingui-explicit-id
@@ -28747,15 +28729,13 @@ msgid "setting.tts.voice_id.label"
 msgstr "Voz hablada"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:706
-#, needs-review
-msgid "setting.engines.tts.choice.does"
+#: src/lib/settingCopy.generated.ts:731
+msgid "setting.engines.voice.choice.does"
 msgstr "Dirige el trabajo de tts a su paquete seleccionado."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:705
-#, needs-review
-msgid "setting.engines.tts.choice.help"
+#: src/lib/settingCopy.generated.ts:730
+msgid "setting.engines.voice.choice.help"
 msgstr "Elige el modelo para el rol de Tts. Auto sigue el plan de configuración seleccionado. Solo un administrador puede cambiar esto."
 
 #. js-lingui-explicit-id
@@ -31381,27 +31361,25 @@ msgid "setting.engines.coding.tier.boost.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:652
+#: src/lib/settingCopy.generated.ts:637
 #, needs-review
 msgid "setting.engines.music.tier.boost.help"
 msgstr "El modelo y las opciones que completan el nivel Boost de la música. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:632
-#, needs-review
-msgid "setting.engines.image.tier.boost.help"
+#: src/lib/settingCopy.generated.ts:654
+msgid "setting.engines.pictures.tier.boost.help"
 msgstr "El modelo y las opciones que completan el nivel Boost de las imágenes. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:730
+#: src/lib/settingCopy.generated.ts:713
 #, needs-review
 msgid "setting.engines.video.tier.boost.help"
 msgstr "El modelo y las opciones que completan el nivel Boost del video. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:710
-#, needs-review
-msgid "setting.engines.tts.tier.boost.help"
+#: src/lib/settingCopy.generated.ts:735
+msgid "setting.engines.voice.tier.boost.help"
 msgstr "El modelo y las opciones que completan el nivel Boost de la voz. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
@@ -31416,27 +31394,25 @@ msgid "setting.engines.coding.tier.max.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:655
+#: src/lib/settingCopy.generated.ts:640
 #, needs-review
 msgid "setting.engines.music.tier.max.help"
 msgstr "El modelo y las opciones que completan el nivel Max de la música. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:635
-#, needs-review
-msgid "setting.engines.image.tier.max.help"
+#: src/lib/settingCopy.generated.ts:657
+msgid "setting.engines.pictures.tier.max.help"
 msgstr "El modelo y las opciones que completan el nivel Max de las imágenes. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:733
+#: src/lib/settingCopy.generated.ts:716
 #, needs-review
 msgid "setting.engines.video.tier.max.help"
 msgstr "El modelo y las opciones que completan el nivel Max del video. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:713
-#, needs-review
-msgid "setting.engines.tts.tier.max.help"
+#: src/lib/settingCopy.generated.ts:738
+msgid "setting.engines.voice.tier.max.help"
 msgstr "El modelo y las opciones que completan el nivel Max de la voz. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
@@ -31451,27 +31427,25 @@ msgid "setting.engines.coding.tier.reduced.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:658
+#: src/lib/settingCopy.generated.ts:643
 #, needs-review
 msgid "setting.engines.music.tier.reduced.help"
 msgstr "El modelo y las opciones que completan el nivel Reduced de la música. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:638
-#, needs-review
-msgid "setting.engines.image.tier.reduced.help"
+#: src/lib/settingCopy.generated.ts:660
+msgid "setting.engines.pictures.tier.reduced.help"
 msgstr "El modelo y las opciones que completan el nivel Reduced de las imágenes. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:736
+#: src/lib/settingCopy.generated.ts:719
 #, needs-review
 msgid "setting.engines.video.tier.reduced.help"
 msgstr "El modelo y las opciones que completan el nivel Reduced del video. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:716
-#, needs-review
-msgid "setting.engines.tts.tier.reduced.help"
+#: src/lib/settingCopy.generated.ts:741
+msgid "setting.engines.voice.tier.reduced.help"
 msgstr "El modelo y las opciones que completan el nivel Reduced de la voz. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
@@ -31486,27 +31460,25 @@ msgid "setting.engines.coding.tier.standard.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:661
+#: src/lib/settingCopy.generated.ts:646
 #, needs-review
 msgid "setting.engines.music.tier.standard.help"
 msgstr "El modelo y las opciones que completan el nivel Standard de la música. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:641
-#, needs-review
-msgid "setting.engines.image.tier.standard.help"
+#: src/lib/settingCopy.generated.ts:663
+msgid "setting.engines.pictures.tier.standard.help"
 msgstr "El modelo y las opciones que completan el nivel Standard de las imágenes. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:739
+#: src/lib/settingCopy.generated.ts:722
 #, needs-review
 msgid "setting.engines.video.tier.standard.help"
 msgstr "El modelo y las opciones que completan el nivel Standard del video. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:719
-#, needs-review
-msgid "setting.engines.tts.tier.standard.help"
+#: src/lib/settingCopy.generated.ts:744
+msgid "setting.engines.voice.tier.standard.help"
 msgstr "El modelo y las opciones que completan el nivel Standard de la voz. Un objeto JSON '{'model, options'}'; model es un id de catálogo, recommended o off. Normalmente se configura desde la página de IA y modelos."
 
 #. js-lingui-explicit-id
@@ -31607,17 +31579,17 @@ msgid "the one you chose"
 msgstr "la que elegiste"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:650
+#: src/lib/settingCopy.generated.ts:635
 msgid "setting.engines.music.order.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:664
+#: src/lib/settingCopy.generated.ts:652
 msgid "setting.engines.pictures.order.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:728
+#: src/lib/settingCopy.generated.ts:711
 msgid "setting.engines.video.order.help"
 msgstr ""
 
@@ -33382,7 +33354,7 @@ msgid "Turn routes"
 msgstr "Activar rutas"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:721
+#: src/lib/settingCopy.generated.ts:704
 #, needs-review
 msgid "setting.engines.turn_signal.choice.label"
 msgstr "Elección del modelo Turn Signal"
@@ -34454,25 +34426,25 @@ msgid "Video"
 msgstr "Vídeo"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:729
+#: src/lib/settingCopy.generated.ts:712
 #, needs-review
 msgid "setting.engines.video.tier.boost.label"
 msgstr "Vídeo en Boost"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:732
+#: src/lib/settingCopy.generated.ts:715
 #, needs-review
 msgid "setting.engines.video.tier.max.label"
 msgstr "Vídeo en Max"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:735
+#: src/lib/settingCopy.generated.ts:718
 #, needs-review
 msgid "setting.engines.video.tier.reduced.label"
 msgstr "Vídeo en Reduced"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:738
+#: src/lib/settingCopy.generated.ts:721
 #, needs-review
 msgid "setting.engines.video.tier.standard.label"
 msgstr "Vídeo en Standard"
@@ -34489,13 +34461,13 @@ msgid "setting.generation.video.enabled.label"
 msgstr "Creación de vídeos"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:724
+#: src/lib/settingCopy.generated.ts:707
 #, needs-review
 msgid "setting.engines.video.choice.label"
 msgstr "Elección de modelo de vídeo"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:727
+#: src/lib/settingCopy.generated.ts:710
 msgid "setting.engines.video.order.label"
 msgstr ""
 
@@ -34605,7 +34577,7 @@ msgid "Violet"
 msgstr "Violeta"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:741
+#: src/lib/settingCopy.generated.ts:724
 #, needs-review
 msgid "setting.engines.vision.choice.label"
 msgstr "Elección de modelo de visión"
@@ -34688,27 +34660,23 @@ msgid "area.Voice and robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:709
-#, needs-review
-msgid "setting.engines.tts.tier.boost.label"
+#: src/lib/settingCopy.generated.ts:734
+msgid "setting.engines.voice.tier.boost.label"
 msgstr "Voz en Boost"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:712
-#, needs-review
-msgid "setting.engines.tts.tier.max.label"
+#: src/lib/settingCopy.generated.ts:737
+msgid "setting.engines.voice.tier.max.label"
 msgstr "Voz en Max"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:715
-#, needs-review
-msgid "setting.engines.tts.tier.reduced.label"
+#: src/lib/settingCopy.generated.ts:740
+msgid "setting.engines.voice.tier.reduced.label"
 msgstr "Voz en Reduced"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:718
-#, needs-review
-msgid "setting.engines.tts.tier.standard.label"
+#: src/lib/settingCopy.generated.ts:743
+msgid "setting.engines.voice.tier.standard.label"
 msgstr "Voz en Standard"
 
 #. js-lingui-explicit-id

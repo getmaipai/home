@@ -39,13 +39,13 @@ export function AiLevelAccess({ client }: { client: StackClient }) {
     // CODE-FIX-03: the Stack may not list Coding as a tiered category; Home still keeps who may use its Boost and Max, so Coding shows from its own slot levels.
     if (!category && feature.id === "coding" && choices.data) return [{ ...feature, label: i18n._({ id: "Coding", message: "Coding" }), levels: (SLOT_LEVELS_READ.coding ?? ["standard"]).map((tier) => ({ tier: tier as SlotTier, off: false })) }];
     if (!category) return [];
-    const levels = category.tiered ? category.tiers.map((row) => ({ tier: row.tier as SlotTier, off: row.chosen_by === "off" })) : (SLOT_LEVELS_READ[feature.category] ?? ["standard"]).map((tier) => ({ tier: tier as SlotTier, off: false }));
+    const levels = category.tiered ? category.tiers.map((row) => ({ tier: row.tier as SlotTier, off: row.chosen_by === "off" })) : (SLOT_LEVELS_READ[feature.id] ?? ["standard"]).map((tier) => ({ tier: tier as SlotTier, off: false }));
     return [{ ...feature, label: category.label, levels }];
   });
   if (features.length === 0) return null;
   const open = features.find((feature) => feature.id === openId) ?? null;
-  const begin = (id: string) => { const feature = features.find((item) => item.id === id)!; setDrafts(Object.fromEntries(TIERS.filter((tier) => feature.levels.some((level) => level.tier === tier)).map((tier) => [tier, draftOf(storedOf(feature.role, tier), tier)])) as SlotDrafts); setOpenId(id); };
-  const defs = open ? optionDefs(open.category) : [];
+  const begin = (id: string) => { const feature = features.find((item) => item.id === id)!; setDrafts(Object.fromEntries(TIERS.filter((tier) => feature.levels.some((level) => level.tier === tier)).map((tier) => [tier, draftOf(storedOf(feature.id, tier), tier)])) as SlotDrafts); setOpenId(id); };
+  const defs = open ? optionDefs(open.id) : [];
   const gateKeys = open ? GATE_KEYS[open.id] ?? [] : [];
   return <>
     <ItemGroup variant="card" aria-label={i18n._({ id: "Who can use each level", message: "Who can use each level" })} data-testid="ai-level-access">
@@ -65,7 +65,7 @@ export function AiLevelAccess({ client }: { client: StackClient }) {
         </div>
         <div className="flex justify-end gap-2 p-4">
           <Button type="button" variant="outline" onClick={() => setOpenId(null)}>{i18n._({ id: "Cancel", message: "Cancel" })}</Button>
-          <Button type="button" disabled={save.isPending} onClick={() => save.mutate({ role: open.role, changed: (Object.entries(drafts) as Array<[SlotTier, SlotDraft]>).filter(([tier, draft]) => !sameDraft(draftOf(storedOf(open.role, tier), tier), draft)) })}>{i18n._({ id: "Save", message: "Save" })}</Button>
+          <Button type="button" disabled={save.isPending} onClick={() => save.mutate({ role: open.id, changed: (Object.entries(drafts) as Array<[SlotTier, SlotDraft]>).filter(([tier, draft]) => !sameDraft(draftOf(storedOf(open.id, tier), tier), draft)) })}>{i18n._({ id: "Save", message: "Save" })}</Button>
         </div>
       </SheetContent> : null}
     </Sheet>

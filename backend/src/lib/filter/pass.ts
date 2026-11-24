@@ -58,7 +58,7 @@ function scalar(key: string, personId: string, band: AgeBand): unknown {
 }
 /** Rules 0 and 8: no override or grant gives a child Max, or a teen Max beyond pictures. */
 function maxAllowed(band: AgeBand, work: string): boolean {
-  return band === "adult" || (band === "teen" && work === "image");
+  return band === "adult" || (band === "teen" && work === "pictures");
 }
 function listOf(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string" && (ACCESS_WORKS as readonly string[]).includes(entry)) : [];

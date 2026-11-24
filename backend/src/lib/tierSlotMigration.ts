@@ -18,8 +18,8 @@ export const MODEL_OF_CHOICE: Record<string, string> = { ernie: "recommended", k
 
 /** Copy one old key's stored value into its slot. */
 export function copyLegacyIntoSlot(key: string, value: unknown): void {
-  if (key === QUICK_MODEL_KEY && typeof value === "string" && MODEL_OF_CHOICE[value]) writeSlotModel("image", "standard", MODEL_OF_CHOICE[value]!);
-  if (key === DETAILED_ENABLED_KEY && typeof value === "boolean") writeSlotModel("image", "boost", value ? "recommended" : "off");
+  if (key === QUICK_MODEL_KEY && typeof value === "string" && MODEL_OF_CHOICE[value]) writeSlotModel("pictures", "standard", MODEL_OF_CHOICE[value]!);
+  if (key === DETAILED_ENABLED_KEY && typeof value === "boolean") writeSlotModel("pictures", "boost", value ? "recommended" : "off");
 }
 
 /** One time, at boot: copy the values a person set into the slots. Returns what it did. */
@@ -29,7 +29,7 @@ export function migrateTierSlots(): "already_ran" | "migrated" {
   if (marker) return "already_ran";
   for (const key of [QUICK_MODEL_KEY, DETAILED_ENABLED_KEY]) {
     const slotTier = key === QUICK_MODEL_KEY ? "standard" : "boost";
-    if (getHouseholdSettingSource(key) !== undefined && getHouseholdSettingSource(slotKey("image", slotTier)) === undefined) copyLegacyIntoSlot(key, getHouseholdSettingValue(key));
+    if (getHouseholdSettingSource(key) !== undefined && getHouseholdSettingSource(slotKey("pictures", slotTier)) === undefined) copyLegacyIntoSlot(key, getHouseholdSettingValue(key));
   }
   db.insert(settingsValues).values({ scope: "system", key: MARKER_KEY, value: "true", hlc: nextHlc(), source: "migration", setBy: null, updatedAt: new Date().toISOString() }).run();
   return "migrated";

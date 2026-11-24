@@ -81,7 +81,7 @@ describe("companion art model resolution", () => {
     if (!result.ok) throw new Error(result.error);
     const id = result.value.id, image = new Uint8Array(await sharp({ create: { width: 16, height: 16, channels: 4, background: "red" } }).png().toBuffer());
     const v = addVersion(id, image, { source: "upload", label: "Source", width: 16, height: 16, from: null });
-    setHouseholdSettingValue("generation.picture_tier", "standard"); writeChoiceSetting("engines.image.tier.standard", "ernie");
+    setHouseholdSettingValue("generation.picture_tier", "standard"); writeChoiceSetting("engines.pictures.tier.standard", "ernie");
     const imageStatus = readyStatusForTests({ models: [{ id: "flux2-klein-4b", installed: true, available: true }, { id: "ernie-image-turbo", installed: true, available: true }] as never });
     __setPictureStatusForTests(imageStatus); __setCompanionArtStatusReadersForTests({ picture: async () => imageStatus, video: async () => readyVideoStatusForTests() }); __setPictureStatusForTests(imageStatus);
     const calls: Array<{ kind: string; model?: string }> = [];

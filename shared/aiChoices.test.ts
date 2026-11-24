@@ -136,8 +136,8 @@ test("pictures: Quick offers ERNIE and Klein as radios, and Klein alone when ERN
   const klein = picturesA.choices.find((choice) => choice.id === "pictures.klein")!;
   expect(ernie.rowIds[0]).toBe("pictures-ernie");
   expect(klein.rowIds[0]).toBe("pictures");
-  expect(ernie.setting).toEqual({ key: "engines.image.tier.standard", value: "ernie" });
-  expect(klein.setting).toEqual({ key: "engines.image.tier.standard", value: "klein" });
+  expect(ernie.setting).toEqual({ key: "engines.pictures.tier.standard", value: "ernie" });
+  expect(klein.setting).toEqual({ key: "engines.pictures.tier.standard", value: "klein" });
   expect(ernie.current).toBe(true);
   expect(klein.current).toBe(false);
   expect(picturesA.choices.some((choice) => choice.id === "pictures.edit")).toBe(true);
@@ -160,7 +160,7 @@ test("Detailed pictures is its own switch row, on only when enabled and installe
   const on = card(SETTINGS, null).choices[0]!;
   expect(on.id).toBe("picturesdetailed.zimage");
   expect(on.kind).toBe("switch");
-  expect(on.setting).toEqual({ key: "engines.image.tier.boost", value: true });
+  expect(on.setting).toEqual({ key: "engines.pictures.tier.boost", value: true });
   const installed = TIERS.p128.rows.find((candidate) => candidate.id === "pictures-zimage")!.model_ids.map((id) => component({ id, state: "installed" }));
   expect(card(SETTINGS, installed).choices[0]!.current).toBe(true);
   expect(card({ ...SETTINGS, pictureDetailedEnabled: false }, installed).choices[0]!.current).toBe(false);

@@ -116,7 +116,7 @@ describe("the plan step's job cards", () => {
     const call = start.mock.calls[0] as unknown[];
     expect(call[1]).not.toContain("coding");
     expect(call[1]).toContain("pictures-ernie");
-    expect(call[3]).toMatchObject({ "engines.image.tier.standard": "ernie" });
+    expect(call[3]).toMatchObject({ "engines.pictures.tier.standard": "ernie" });
   });
 
   test("a tight disk warns and still installs", async () => {

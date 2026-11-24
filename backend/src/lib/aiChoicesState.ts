@@ -33,19 +33,19 @@ export function readAiSettings(): AiChoicesInput["settings"] {
 
 /** The settings keys a setup choice may write, one per job that has a setting (the same keys the cards carry). */
 export const SETUP_CHOICE_KEYS: ReadonlySet<string> = new Set([
-  slotKey("image", "standard"), slotKey("image", "boost"), VIDEO_TIER_KEY, "generation.music.enabled",
+  slotKey("pictures", "standard"), slotKey("pictures", "boost"), VIDEO_TIER_KEY, "generation.music.enabled",
 ]);
 
 /** Write one card or setup setting. The Standard picture slot takes a choice name (`ernie` or `klein`) and the Boost slot takes the switch (true or false); both keep the slot's options. Turning Boost on keeps a model an admin already chose and only replaces `off`. Anything else for a slot is refused; every other key is an ordinary household write. */
 export function writeChoiceSetting(key: string, value: unknown): { ok: true } | { ok: false; status: 400 | 403; error: string } {
-  if (key === slotKey("image", "standard")) {
+  if (key === slotKey("pictures", "standard")) {
     const model = typeof value === "string" ? MODEL_OF_CHOICE[value] : undefined;
-    return model ? writeSlotModel("image", "standard", model) : { ok: false, status: 400, error: "That is not a picture model Home can use for Standard. Choose one of the listed models." };
+    return model ? writeSlotModel("pictures", "standard", model) : { ok: false, status: 400, error: "That is not a picture model Home can use for Standard. Choose one of the listed models." };
   }
-  if (key === slotKey("image", "boost")) {
+  if (key === slotKey("pictures", "boost")) {
     if (typeof value !== "boolean") return { ok: false, status: 400, error: "Boost pictures are switched on or off here. Use the models list to choose another model." };
-    if (value) return slotIsOff("image", "boost") ? writeSlotModel("image", "boost", "recommended") : { ok: true };
-    return writeSlotModel("image", "boost", "off");
+    if (value) return slotIsOff("pictures", "boost") ? writeSlotModel("pictures", "boost", "recommended") : { ok: true };
+    return writeSlotModel("pictures", "boost", "off");
   }
   const written = setHouseholdSettingValue(key, value);
   return written.ok ? { ok: true } : { ok: false, status: written.status, error: written.error };

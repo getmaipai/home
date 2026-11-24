@@ -132,7 +132,7 @@ function tierGrantRefusal(catalogActionId: string, action: string, personId: str
   if (catalogActionId !== "tier.max" && catalogActionId !== "tier.max:<category>") return null;
   const role = db.select({ role: people.role }).from(people).where(eq(people.id, personId)).get()?.role;
   if (role === "child") return "grant_child_max";
-  if (role === "teen" && action !== "tier.max:image") return "grant_teen_max_pictures";
+  if (role === "teen" && action !== "tier.max:pictures") return "grant_teen_max_pictures";
   return null;
 }
 

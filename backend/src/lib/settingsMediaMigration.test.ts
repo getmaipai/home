@@ -108,21 +108,21 @@ describe("writeChoiceSetting on the picture slots", () => {
   beforeEach(() => resetDb());
 
   test("turning Boost on keeps a model an admin chose and only replaces off", () => {
-    setHouseholdSettingValue("engines.image.tier.boost", { model: "z-image-turbo", options: {} });
-    expect(writeChoiceSetting("engines.image.tier.boost", true)).toEqual({ ok: true });
-    expect(getHouseholdSettingValue("engines.image.tier.boost")).toMatchObject({ model: "z-image-turbo" });
-    expect(writeChoiceSetting("engines.image.tier.boost", false)).toEqual({ ok: true });
-    expect(getHouseholdSettingValue("engines.image.tier.boost")).toMatchObject({ model: "off" });
-    expect(writeChoiceSetting("engines.image.tier.boost", true)).toEqual({ ok: true });
-    expect(getHouseholdSettingValue("engines.image.tier.boost")).toMatchObject({ model: "recommended" });
+    setHouseholdSettingValue("engines.pictures.tier.boost", { model: "z-image-turbo", options: {} });
+    expect(writeChoiceSetting("engines.pictures.tier.boost", true)).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.pictures.tier.boost")).toMatchObject({ model: "z-image-turbo" });
+    expect(writeChoiceSetting("engines.pictures.tier.boost", false)).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.pictures.tier.boost")).toMatchObject({ model: "off" });
+    expect(writeChoiceSetting("engines.pictures.tier.boost", true)).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.pictures.tier.boost")).toMatchObject({ model: "recommended" });
   });
 
   test("a slot takes only the choices the card offers", () => {
-    expect(writeChoiceSetting("engines.image.tier.standard", "off")).toMatchObject({ ok: false, status: 400 });
-    expect(writeChoiceSetting("engines.image.tier.standard", "no-such-model")).toMatchObject({ ok: false, status: 400 });
-    expect(writeChoiceSetting("engines.image.tier.boost", "klein")).toMatchObject({ ok: false, status: 400 });
-    expect(writeChoiceSetting("engines.image.tier.standard", "klein")).toEqual({ ok: true });
-    expect(getHouseholdSettingValue("engines.image.tier.standard")).toMatchObject({ model: "flux2-klein-4b" });
+    expect(writeChoiceSetting("engines.pictures.tier.standard", "off")).toMatchObject({ ok: false, status: 400 });
+    expect(writeChoiceSetting("engines.pictures.tier.standard", "no-such-model")).toMatchObject({ ok: false, status: 400 });
+    expect(writeChoiceSetting("engines.pictures.tier.boost", "klein")).toMatchObject({ ok: false, status: 400 });
+    expect(writeChoiceSetting("engines.pictures.tier.standard", "klein")).toEqual({ ok: true });
+    expect(getHouseholdSettingValue("engines.pictures.tier.standard")).toMatchObject({ model: "flux2-klein-4b" });
   });
 
   test("a video level and the music switch are ordinary writes", () => {

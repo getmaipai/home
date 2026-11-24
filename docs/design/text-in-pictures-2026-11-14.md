@@ -4,7 +4,7 @@ Status: design note, 2026-11-14. Owner rule (Jesse, 2026-11-13, direct message):
 
 ## What is wrong today
 
-- The picture lane picks a model by quality tier (`lib/pictures/quality.ts`: Quick is Klein 4B or ERNIE-Image-Turbo by the household's `engines.image.tier.standard` choice, Detailed is Z-Image-Turbo). Nothing looks at whether the picture must show words. The 2026-10-25 bakeoff (`image-model-bakeoff-2026-10-25.md`) found ERNIE-Image-Turbo the best of ours at readable text; Klein, the usual Standard model, is not. A cover or poster made on Klein has misspelled words.
+- The picture lane picks a model by quality tier (`lib/pictures/quality.ts`: Quick is Klein 4B or ERNIE-Image-Turbo by the household's `engines.pictures.tier.standard` choice, Detailed is Z-Image-Turbo). Nothing looks at whether the picture must show words. The 2026-10-25 bakeoff (`image-model-bakeoff-2026-10-25.md`) found ERNIE-Image-Turbo the best of ours at readable text; Klein, the usual Standard model, is not. A cover or poster made on Klein has misspelled words.
 - A picture that should show no words can still grow gibberish letters on signs, shirts, packaging and posters, because nothing tells the model not to.
 - Nothing checks the words that did come out.
 

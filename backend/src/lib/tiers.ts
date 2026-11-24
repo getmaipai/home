@@ -39,7 +39,7 @@ export function readSlot(category: TierCategory, tier: Tier | "reduced"): SlotRe
   // The pinned spec still registers coding Boost and Max as `off` (its "until the benchmark justifies them" default), so a slot nobody stored reads as `recommended` here;
   // a slot an admin stored (including `off`) is read as stored below.
   // STACK-MODELS-HOME-01: the model a household chose lives in the Stack; Home reads its cached answer. Who may use the level and its options stay Home's.
-  const chosen = stackSlotModel(ROLE_OF_CATEGORY[category], tier);
+  const chosen = stackSlotModel(category, tier);
   const withStackModel = (record: SlotRecord): SlotRecord => (chosen === null ? record : { ...record, model: chosen });
   const codingDefault = category === "coding" && (tier === "boost" || tier === "max") && getHouseholdSettingSource(slotKey(category, tier)) === undefined;
   if (codingDefault) return withStackModel(fallback);
@@ -97,7 +97,7 @@ export function clampTier(input: { person: Pick<PersonRow, "id" | "role">; band:
   // E6: a level whose slot part is not on a minor's list is not offered to a minor. Home has no list (E1: it writes no minors mark, E2: it compares no part id),
   // so a minor's chat, music, voice and video run at Standard. Pictures keep today's teen picture lane; the child lane is Standard (kids lane, Quick only).
   const lane = laneOf({ actor: input.person as PersonRow, band });
-  if (lane !== "adult" && !(category === "image" && lane === "teen")) lower("standard", "no_minor_part");
+  if (lane !== "adult" && !(category === "pictures" && lane === "teen")) lower("standard", "no_minor_part");
   if (input.person.role === "guest") lower("standard", "not_for_this_person");
   if (tier === "max" && !deps.holdsMax(category)) lower("boost", "no_max_access");
   if (tier === "boost" && deps.holdsBoost && !deps.holdsBoost(category)) lower("standard", "no_boost_access");
@@ -179,7 +179,7 @@ const imageModelInstalled = (id: string): boolean => Boolean(peekPictureEngineSt
 export function maxModel(category: TierCategory): string | null {
   const slot = readSlot(category, "max");
   if (slot.model === "off") return null;
-  if (slot.model === "recommended") return category === "image" && imageModelInstalled(RECOMMENDED_MAX_IMAGE_MODEL) ? RECOMMENDED_MAX_IMAGE_MODEL : null;
+  if (slot.model === "recommended") return category === "pictures" && imageModelInstalled(RECOMMENDED_MAX_IMAGE_MODEL) ? RECOMMENDED_MAX_IMAGE_MODEL : null;
   return slot.model === readSlot(category, "boost").model ? null : slot.model;
 }
 /** Max exists for a category only when its Max slot resolves to a model (`maxModel`); the recommended Max is empty until the evaluations fill it, except pictures with Qwen-Image installed. */

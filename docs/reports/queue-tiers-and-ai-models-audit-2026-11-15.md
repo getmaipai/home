@@ -167,7 +167,7 @@ that model.
 - **Three ways to change a model, two ways to save.** Row switch, gear model picker and the per-level dialog all
   write model settings; rows and the picker stage until Apply, the level dialog saves at once (`AiGlance.tsx:95-103`).
 - **The same key drawn twice.** "Detailed pictures" row and the Pictures Boost level both write
-  `engines.image.tier.boost`; turning the row off wipes the slot's model (`aiTierSlots.ts:53-55`).
+  `engines.pictures.tier.boost`; turning the row off wipes the slot's model (`aiTierSlots.ts:53-55`).
 - **Dialogs three deep.** Gear, then "Levels and models", then "Edit" opens the model picker. For voice the middle
   dialog has one row, a dead hop.
 - **Levels are invisible until you dig.** Nothing on the page says "Videos Max has no model". The grid in section 2 is

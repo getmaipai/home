@@ -310,7 +310,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const hasKlein = has("pictures");
         const ernieChosen = hasErnie && settings.pictureQuickModel === "ernie";
         // The Standard picture slot (docs/design/settings-media-2026-11-02.md section 8): the card writes the slot, the backend turns the choice name into a model id.
-        const quickKey = "engines.image.tier.standard";
+        const quickKey = "engines.pictures.tier.standard";
         if (hasErnie) specs.push({ id: "pictures.ernie", job: "pictures", kind: "radio", row: rows.get("pictures-ernie")!, current: ernieChosen, recommended: true, setting: { key: quickKey, value: "ernie" } });
         if (hasKlein) specs.push({ id: "pictures.klein", job: "pictures", kind: "radio", row: rows.get("pictures")!, current: !ernieChosen, recommended: !hasErnie, setting: { key: quickKey, value: "klein" } });
         if (hasKlein && hasErnie) specs.push({ id: "pictures.edit", job: "pictures", kind: "fixed", row: rows.get("pictures")!, current: true, recommended: false, setting: null });
@@ -319,7 +319,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         break;
       }
       case "picturesdetailed": {
-        if (has("pictures-zimage")) specs.push({ id: "picturesdetailed.zimage", job: "picturesdetailed", kind: "switch", row: rows.get("pictures-zimage")!, current: settings.pictureDetailedEnabled && rowIsInstalled(rows.get("pictures-zimage")!, components), recommended: need("pictures-zimage") === "recommended", setting: { key: "engines.image.tier.boost", value: true } });
+        if (has("pictures-zimage")) specs.push({ id: "picturesdetailed.zimage", job: "picturesdetailed", kind: "switch", row: rows.get("pictures-zimage")!, current: settings.pictureDetailedEnabled && rowIsInstalled(rows.get("pictures-zimage")!, components), recommended: need("pictures-zimage") === "recommended", setting: { key: "engines.pictures.tier.boost", value: true } });
         break;
       }
       case "wakeword": {

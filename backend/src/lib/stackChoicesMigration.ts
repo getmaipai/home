@@ -11,7 +11,8 @@ import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/setti
 import { forwardToStack, StackChoicesError } from "@/lib/stackChoicesForward";
 
 const MARKER_KEY = "__migration.stack_choices_01";
-const ROLES = ["chat", "coding", "image", "video", "music", "tts"] as const;
+/** The Stack role and the feature id the old per-role slot keys were saved under (`engines.<feature>.tier.<tier>`, renamed by lib/tierKeyMigration.ts). */
+const ROLES = [["chat", "chat"], ["coding", "coding"], ["image", "pictures"], ["video", "video"], ["music", "music"], ["tts", "voice"]] as const;
 const TIERS = ["reduced", "standard", "boost", "max"] as const;
 /** The categories whose order Home stored (`engines.<category>.order`). */
 const ORDERED = ["pictures", "video", "music"] as const;
@@ -63,8 +64,8 @@ function addedModelValues(): { values: Array<Record<string, unknown>>; unmappabl
 /** Everything Home stored under the old keys, as the Stack's migrate body. Only values a person set are sent (a default is not a choice). */
 export function collectHomeValues(dryRun = false): { body: MigrateBody; unmappable: MigrationNotice[] } {
   const slots: SlotValue[] = [];
-  for (const role of ROLES) for (const tier of TIERS) {
-    const value = stored(`engines.${role}.tier.${tier}`) as { model?: unknown } | undefined;
+  for (const [role, feature] of ROLES) for (const tier of TIERS) {
+    const value = stored(`engines.${feature}.tier.${tier}`) as { model?: unknown } | undefined;
     if (value && typeof value.model === "string" && value.model) slots.push({ role, tier, model: value.model });
   }
   const orders = ORDERED.flatMap((category) => { const raw = stored(`engines.${category}.order`); return Array.isArray(raw) && raw.length ? [{ category, order: raw.filter((id): id is string => typeof id === "string") }] : []; });

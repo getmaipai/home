@@ -124,13 +124,13 @@ describe("the page", () => {
   });
 
   test("saving who may use a level writes Home's slot setting and keeps its stored model", async () => {
-    stored["engines.image.tier.boost"] = { model: "old-pick", options: {} };
+    stored["engines.pictures.tier.boost"] = { model: "old-pick", options: {} };
     const view = open();
     fireEvent.click(await view.findByRole("button", { name: "Who can use each Pictures level" }));
     const boost = await view.findByTestId("ai-access-boost");
     fireEvent.click(within(boost).getByRole("radio", { name: "Admins and assigned people" }));
     fireEvent.click(view.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(stored["engines.image.tier.boost"]).toEqual({ model: "old-pick", options: {}, who: "admins" }));
+    await waitFor(() => expect(stored["engines.pictures.tier.boost"]).toEqual({ model: "old-pick", options: {}, who: "admins" }));
   });
 
   test("a value the Stack refused when Home moved its choices shows as a plain notice until it is read", async () => {

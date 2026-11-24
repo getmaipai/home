@@ -13,12 +13,12 @@ let rows: Map<string, Row> | null = null;
 
 /**
  * The model a level uses as Home's slot reader names it (`off`, a model id or `recommended`), or null while the Stack's answer is not known. The feature is
- * found by the role it serves (each row of the Stack's answer names its role), so Home keeps no list of the Stack's feature names. A level
+ * found by the Stack's feature id, which is also the category and the middle of the slot key, so Home keeps no list of the Stack's feature names. A level
  * nobody chose is `recommended`, except Reduced, which stays off until a household turns it on (Home's own default for "let big jobs simplify chat").
  */
-export function stackSlotModel(role: string, tier: Level): string | null {
+export function stackSlotModel(feature: string, tier: Level): string | null {
   if (!rows) return null;
-  const row = rows.get(`${role}:${tier}`);
+  const row = rows.get(`${feature}:${tier}`);
   if (!row) return null;
   if (row.chosen_by === "off") return "off";
   if (row.chosen_by === "household" && row.chosen) return row.chosen;
@@ -28,7 +28,7 @@ export function stackSlotModel(role: string, tier: Level): string | null {
 export function setStackChoiceSnapshot(view: { categories?: Array<{ id: string; role?: string | null; tiers?: Row[] }> } | null): void {
   if (!view?.categories) { rows = null; return; }
   const next = new Map<string, Row>();
-  for (const category of view.categories) if (category.role) for (const row of category.tiers ?? []) next.set(`${category.role}:${row.tier}`, row);
+  for (const category of view.categories) for (const row of category.tiers ?? []) next.set(`${category.id}:${row.tier}`, row);
   rows = next;
 }
 export function __resetChoiceSnapshotForTests(): void { rows = null; }

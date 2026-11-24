@@ -34,7 +34,7 @@ function person(id: string, role: string, controls?: string): PersonRow {
   db.insert(peopleTable).values({ id, displayName: id, role, avatarSeed: id, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:0:testfix", ...(controls ? { controls } : {}) } as never).run();
   return db.select().from(peopleTable).where(eq(peopleTable.id, id)).get()! as PersonRow;
 }
-const CATEGORIES: TierCategory[] = ["chat", "image", "video", "music", "voice"];
+const CATEGORIES: TierCategory[] = ["chat", "pictures", "video", "music", "voice"];
 let owner: PersonRow, admin: PersonRow, adult: PersonRow, teen: PersonRow, child: PersonRow;
 const tierOf = (who: PersonRow, category: TierCategory, requested: Tier, band?: "child" | "teen" | "adult") => authorizeTier({ person: who, category, requested, ...(band ? { band } : {}) });
 const tiers = (who: PersonRow, requested: Tier) => Object.fromEntries(CATEGORIES.map((category) => [category, tierOf(who, category, requested).tier]));
@@ -57,10 +57,10 @@ describe("the tier per role with no overrides (items 1 and 6)", () => {
 
   test("a teen holds Boost for every work, yet chat, music, voice and video run at Standard (no_minor_part), and pictures at Boost", () => {
     for (const category of CATEGORIES) expect(passFor(teen.id).access.has(`tier.boost:${category}`)).toBe(true);
-    expect(tiers(teen, "boost")).toEqual({ chat: "standard", image: "boost", video: "standard", music: "standard", voice: "standard" });
-    expect(tiers(teen, "max")).toEqual({ chat: "standard", image: "boost", video: "standard", music: "standard", voice: "standard" });
+    expect(tiers(teen, "boost")).toEqual({ chat: "standard", pictures: "boost", video: "standard", music: "standard", voice: "standard" });
+    expect(tiers(teen, "max")).toEqual({ chat: "standard", pictures: "boost", video: "standard", music: "standard", voice: "standard" });
     for (const category of ["chat", "video", "music", "voice"] as const) expect(tierOf(teen, category, "boost").note).toBe("no_minor_part");
-    expect(tierOf(teen, "image", "max").note).toBe("no_max_access");
+    expect(tierOf(teen, "pictures", "max").note).toBe("no_max_access");
   });
 
   test("an adult: Boost everywhere, Max only with the grant or an admin's override; an owner and an admin hold Max", () => {
@@ -72,7 +72,7 @@ describe("the tier per role with no overrides (items 1 and 6)", () => {
 
   test("a household with no overrides sees the tier every job saw before (the old role ceiling, per role and work)", () => {
     const before = (role: string, category: TierCategory, requested: Tier): Tier => {
-      const ceiling: Tier = role === "child" ? "standard" : role === "teen" ? (category === "image" ? "max" : "standard") : "max";
+      const ceiling: Tier = role === "child" ? "standard" : role === "teen" ? (category === "pictures" ? "max" : "standard") : "max";
       const lowered = LADDER.indexOf(requested) > LADDER.indexOf(ceiling) ? ceiling : requested;
       const needsMax = lowered === "max" && !(role === "owner" || role === "admin");
       return needsMax ? "boost" : lowered;
@@ -84,20 +84,20 @@ describe("the tier per role with no overrides (items 1 and 6)", () => {
 
 describe("overrides and grants (items 1, 2 and 6)", () => {
   test("an admin's access.tier.boost override for a child is accepted and shows in the pass, but nothing leaves Standard (no_minor_part; pictures stay on the child lane)", () => {
-    ok(setValue(admin, `person:${child.id}`, "access.tier.boost", ["chat", "image", "video", "music", "voice"]));
+    ok(setValue(admin, `person:${child.id}`, "access.tier.boost", ["chat", "pictures", "video", "music", "voice"]));
     for (const category of CATEGORIES) expect(passFor(child.id).access.has(`tier.boost:${category}`)).toBe(true);
     expect(Object.values(tiers(child, "boost"))).toEqual(Array(5).fill("standard"));
-    expect(tierOf(child, "image", "boost").note).toBe("no_minor_part");
-    expect(maxOffered(child, "image")).toBe(false);
+    expect(tierOf(child, "pictures", "boost").note).toBe("no_minor_part");
+    expect(maxOffered(child, "pictures")).toBe(false);
   });
 
   test("a child's Max stays refused in the pass whatever an admin sets or a stored grant says", () => {
-    ok(setValue(admin, `person:${child.id}`, "access.tier.max", ["image", "chat"]));
-    insertGrant(child, "tier.max:image");
+    ok(setValue(admin, `person:${child.id}`, "access.tier.max", ["pictures", "chat"]));
+    insertGrant(child, "tier.max:pictures");
     insertGrant(child, "tier.max");
     invalidatePass();
     expect([...passFor(child.id).access].filter((item) => item.startsWith("tier.max"))).toEqual([]);
-    expect(createGrant({ id: owner.id, role: "owner" }, { person: child.id, action: "tier.max:image", effect: "allow" }).ok).toBe(false);
+    expect(createGrant({ id: owner.id, role: "owner" }, { person: child.id, action: "tier.max:pictures", effect: "allow" }).ok).toBe(false);
     expect(Object.values(tiers(child, "max"))).toEqual(Array(5).fill("standard"));
   });
 
@@ -106,36 +106,36 @@ describe("overrides and grants (items 1, 2 and 6)", () => {
     expect(tierOf(adult, "video", "max").tier).toBe("max");
     expect(tierOf(adult, "chat", "max").tier).toBe("boost");
     expect(holdsMax(adult, "video")).toBe(true);
-    expect(holdsMax(adult, "image")).toBe(false);
+    expect(holdsMax(adult, "pictures")).toBe(false);
   });
 
   test("a teen's Max is pictures only: through the grant or through an admin's override, never chat or video", () => {
-    ok(createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:image", effect: "allow" }));
-    expect(tierOf(teen, "image", "max").tier).toBe("max");
+    ok(createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:pictures", effect: "allow" }));
+    expect(tierOf(teen, "pictures", "max").tier).toBe("max");
     expect(tierOf(teen, "chat", "max").tier).toBe("standard");
-    ok(setValue(admin, `person:${teen.id}`, "access.tier.max", ["image", "video"]));
+    ok(setValue(admin, `person:${teen.id}`, "access.tier.max", ["pictures", "video"]));
     expect(passFor(teen.id).access.has("tier.max:video")).toBe(false);
     expect(tierOf(teen, "video", "max").tier).toBe("standard");
     // the override alone, with no grant
     const other = person("person-teentwo", "teen");
-    ok(setValue(admin, `person:${other.id}`, "access.tier.max", ["image"]));
-    expect(tierOf(other, "image", "max").tier).toBe("max");
+    ok(setValue(admin, `person:${other.id}`, "access.tier.max", ["pictures"]));
+    expect(tierOf(other, "pictures", "max").tier).toBe("max");
   });
 
   test("grant-sourced tier items follow the band gate of the override loop (item 2)", () => {
     insertGrant(teen, "tier.max:video");
     insertGrant(teen, "tier.max");
-    insertGrant(teen, "tier.max:image");
+    insertGrant(teen, "tier.max:pictures");
     insertGrant(adult, "tier.max");
     const adultTwo = person("person-adulttwo", "adult");
-    insertGrant(adultTwo, "tier.max:image");
+    insertGrant(adultTwo, "tier.max:pictures");
     invalidatePass();
     const teenItems = [...passFor(teen.id).access].filter((item) => item.startsWith("tier.max")).sort();
-    expect(teenItems).toEqual(["tier.max:image"]); // not :video, and the bare grant is never a teen's
+    expect(teenItems).toEqual(["tier.max:pictures"]); // not :video, and the bare grant is never a teen's
     expect(passFor(adult.id).access.has("tier.max:*")).toBe(true); // the bare grant is Max in every kind of work for an adult
     expect(passFor(adult.id).access.has("tier.max")).toBe(false);
     expect(tiers(adult, "max")).toEqual(Object.fromEntries(CATEGORIES.map((category) => [category, "max"])));
-    expect(tierOf(adultTwo, "image", "max").tier).toBe("max");
+    expect(tierOf(adultTwo, "pictures", "max").tier).toBe("max");
     expect(tierOf(adultTwo, "video", "max").tier).toBe("boost");
   });
 
@@ -143,13 +143,13 @@ describe("overrides and grants (items 1, 2 and 6)", () => {
     const teenGuest = person("person-guestteen", "guest", "teen");
     const adultGuest = person("person-guestadlt", "guest", "adult");
     insertGrant(adultGuest, "tier.max");
-    insertGrant(adultGuest, "tier.max:image");
-    ok(setValue(admin, `person:${adultGuest.id}`, "access.tier.max", ["image", "video"]));
+    insertGrant(adultGuest, "tier.max:pictures");
+    ok(setValue(admin, `person:${adultGuest.id}`, "access.tier.max", ["pictures", "video"]));
     invalidatePass();
     for (const who of [teenGuest, adultGuest]) {
       expect(Object.values(tiers(who, "boost"))).toEqual(Array(5).fill("standard"));
       expect(Object.values(tiers(who, "max"))).toEqual(Array(5).fill("standard"));
-      expect(holdsMax(who, "image")).toBe(false);
+      expect(holdsMax(who, "pictures")).toBe(false);
     }
   });
 });
@@ -173,7 +173,7 @@ describe("an unconfirmed speaker gets the pass of the surface (item 1, record 5a
   test("the admin line is for the adult lane only (item 13): an adult on a child-band robot and a teen are lowered without it", () => {
     expect(tierArgument({ person: adult, category: "video", arg: "max" }).line).toBe(MAX_NEEDS_ADMIN_LINE);
     expect(tierArgument({ person: adult, category: "video", arg: "max", band: "child" })).toEqual({ quality: "quick", tier: "standard", line: null });
-    expect(tierArgument({ person: teen, category: "image", arg: "max" }).line).toBeNull();
+    expect(tierArgument({ person: teen, category: "pictures", arg: "max" }).line).toBeNull();
     expect(tierArgument({ person: teen, category: "chat", arg: "max" })).toEqual({ quality: "quick", tier: "standard", line: null });
     expect(tierArgument({ person: adult, category: "video", arg: "max", band: "teen" }).line).toBeNull();
   });
@@ -192,7 +192,7 @@ describe("a minor's part (items 1(3), 6, 7): no Boost or Max on a part Home cann
     invalidatePass();
     expect(laneOf({ actor: adult, band: "adult" })).toBe("teen");
     for (const category of ["chat", "video", "music", "voice"] as const) expect(tierOf(adult, category, "boost")).toEqual({ tier: "standard", note: "no_minor_part" });
-    expect(tierOf(adult, "image", "boost").tier).toBe("boost"); // pictures keep today's teen picture lane
+    expect(tierOf(adult, "pictures", "boost").tier).toBe("boost"); // pictures keep today's teen picture lane
   });
 
   test("no part id or model family is compared in tiers.ts, and Home writes no minors mark (E1, E2)", () => {

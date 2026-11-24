@@ -19,15 +19,15 @@ const run = (role: string, band: AgeBand, category: TierCategory, requested: "st
 
 describe("clampTier", () => {
   test("a child is always Standard, even holding every grant", () => {
-    for (const category of ["chat", "image", "video", "music", "voice"] as const) expect(run("child", "child", category, "max").tier).toBe("standard");
+    for (const category of ["chat", "pictures", "video", "music", "voice"] as const) expect(run("child", "child", category, "max").tier).toBe("standard");
   });
   test("a teen's chat and video clamp to Standard whatever the grant says (RULES.md rule 8)", () => {
     expect(run("teen", "teen", "chat", "max")).toEqual({ tier: "standard", note: "no_minor_part" });
     expect(run("teen", "teen", "video", "boost").tier).toBe("standard");
   });
   test("a teen reaches Max pictures only with the picture grant", () => {
-    expect(run("teen", "teen", "image", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "no_max_access" });
-    expect(run("teen", "teen", "image", "max", { who: () => "everyone" }).tier).toBe("max");
+    expect(run("teen", "teen", "pictures", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "no_max_access" });
+    expect(run("teen", "teen", "pictures", "max", { who: () => "everyone" }).tier).toBe("max");
   });
   test("an adult without the grant gets Boost with a note", () => {
     expect(run("adult", "adult", "chat", "max", { holdsMax: () => false })).toEqual({ tier: "boost", note: "no_max_access" });
@@ -38,11 +38,11 @@ describe("clampTier", () => {
   });
   test("Who can use it: admins only keeps Boost from an adult, an admin still has it", () => {
     const adminsOnly = { who: () => "admins" as const };
-    expect(run("adult", "adult", "image", "boost", adminsOnly)).toEqual({ tier: "standard", note: "not_for_this_person" });
-    expect(run("admin", "adult", "image", "boost", adminsOnly).tier).toBe("boost");
+    expect(run("adult", "adult", "pictures", "boost", adminsOnly)).toEqual({ tier: "standard", note: "not_for_this_person" });
+    expect(run("admin", "adult", "pictures", "boost", adminsOnly).tier).toBe("boost");
   });
   test("a guest is Standard", () => {
-    expect(run("guest", "adult", "image", "boost").tier).toBe("standard");
+    expect(run("guest", "adult", "pictures", "boost").tier).toBe("standard");
   });
 });
 
@@ -70,21 +70,21 @@ describe("authorizeTier against real grants and slots", () => {
     const child = addPerson("person-child001", "child");
     const teen = addPerson("person-teen0001", "teen");
     expect(createGrant({ id: owner.id, role: "owner" }, { person: child.id, action: "tier.max", effect: "allow" }).ok).toBe(false);
-    expect(createGrant({ id: owner.id, role: "owner" }, { person: child.id, action: "tier.max:image", effect: "allow" }).ok).toBe(false);
+    expect(createGrant({ id: owner.id, role: "owner" }, { person: child.id, action: "tier.max:pictures", effect: "allow" }).ok).toBe(false);
     expect(createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max", effect: "allow" }).ok).toBe(false);
     expect(createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:chat", effect: "allow" }).ok).toBe(false);
-    expect(authorizeTier({ person: child, category: "image", requested: "max" }).tier).toBe("standard");
+    expect(authorizeTier({ person: child, category: "pictures", requested: "max" }).tier).toBe("standard");
     expect(authorizeTier({ person: teen, category: "chat", requested: "max" }).tier).toBe("standard");
-    expect(authorizeTier({ person: teen, category: "image", requested: "max" }).tier).toBe("boost");
-    expect(createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:image", effect: "allow" }).ok).toBe(true);
-    expect(authorizeTier({ person: teen, category: "image", requested: "max" }).tier).toBe("max");
+    expect(authorizeTier({ person: teen, category: "pictures", requested: "max" }).tier).toBe("boost");
+    expect(createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:pictures", effect: "allow" }).ok).toBe(true);
+    expect(authorizeTier({ person: teen, category: "pictures", requested: "max" }).tier).toBe("max");
   });
 
   test("a switched-off Boost slot turns Detailed into Quick", () => {
     const adult = addPerson("person-adult001", "adult");
-    expect(allowedQuality(adult, "image", "detailed")).toBe("detailed");
-    expect(setHouseholdSettingValue(slotKey("image", "boost"), { model: "off", options: {} }).ok).toBe(true);
-    expect(allowedQuality(adult, "image", "detailed")).toBe("quick");
+    expect(allowedQuality(adult, "pictures", "detailed")).toBe("detailed");
+    expect(setHouseholdSettingValue(slotKey("pictures", "boost"), { model: "off", options: {} }).ok).toBe(true);
+    expect(allowedQuality(adult, "pictures", "detailed")).toBe("quick");
   });
 
   test("a minor never receives a thinking option from a slot", () => {
@@ -110,33 +110,33 @@ describe("Quick and Detailed migrate into the slots", () => {
     }
     expect(householdQuickModel()).toBe("ernie");
     expect(migrateTierSlots()).toBe("migrated");
-    expect(readSlot("image", "standard").model).toBe("flux2-klein-4b");
-    expect(readSlot("image", "boost").model).toBe("off");
+    expect(readSlot("pictures", "standard").model).toBe("flux2-klein-4b");
+    expect(readSlot("pictures", "boost").model).toBe("off");
     expect(migrateTierSlots()).toBe("already_ran");
   });
 
   test("the AI card writes the slots directly, and a write to an old key no longer touches them (VIDEO-SETTINGS-04)", () => {
-    expect(writeChoiceSetting("engines.image.tier.standard", "klein")).toEqual({ ok: true });
-    expect(writeChoiceSetting("engines.image.tier.boost", false)).toEqual({ ok: true });
-    expect(readSlot("image", "standard").model).toBe("flux2-klein-4b");
-    expect(readSlot("image", "boost").model).toBe("off");
+    expect(writeChoiceSetting("engines.pictures.tier.standard", "klein")).toEqual({ ok: true });
+    expect(writeChoiceSetting("engines.pictures.tier.boost", false)).toEqual({ ok: true });
+    expect(readSlot("pictures", "standard").model).toBe("flux2-klein-4b");
+    expect(readSlot("pictures", "boost").model).toBe("off");
     expect(householdQuickModel()).toBe("klein");
     expect(householdDetailedEnabled()).toBe(false);
-    expect(writeChoiceSetting("engines.image.tier.boost", true)).toEqual({ ok: true });
+    expect(writeChoiceSetting("engines.pictures.tier.boost", true)).toEqual({ ok: true });
     expect(householdDetailedEnabled()).toBe(true);
-    expect(getHouseholdSettingValue(slotKey("image", "boost"))).toMatchObject({ model: "recommended" });
+    expect(getHouseholdSettingValue(slotKey("pictures", "boost"))).toMatchObject({ model: "recommended" });
     // The old keys are still storable and readable, and no longer move a slot.
     setHouseholdSettingValue("generation.picture_quick_model", "ernie");
     setHouseholdSettingValue("generation.picture_detailed.enabled", false);
-    expect(readSlot("image", "standard").model).toBe("flux2-klein-4b");
+    expect(readSlot("pictures", "standard").model).toBe("flux2-klein-4b");
     expect(householdDetailedEnabled()).toBe(true);
     expect(getHouseholdSettingValue("generation.picture_quick_model")).toBe("ernie");
   });
 
   test("a slot write keeps the slot's options", () => {
-    setHouseholdSettingValue(slotKey("image", "standard"), { model: "ernie-image-turbo", options: { steps: 12 } });
-    writeChoiceSetting("engines.image.tier.standard", "klein");
-    expect(getHouseholdSettingValue(slotKey("image", "standard"))).toMatchObject({ model: "flux2-klein-4b", options: { steps: 12 } });
+    setHouseholdSettingValue(slotKey("pictures", "standard"), { model: "ernie-image-turbo", options: { steps: 12 } });
+    writeChoiceSetting("engines.pictures.tier.standard", "klein");
+    expect(getHouseholdSettingValue(slotKey("pictures", "standard"))).toMatchObject({ model: "flux2-klein-4b", options: { steps: 12 } });
   });
 });
 
@@ -145,9 +145,9 @@ describe("tierArgument (the typed tier of a generating tool)", () => {
 
   test("standard is Quick, boost is Detailed, and no value changes nothing", () => {
     const adult = addPerson("person-adult001", "adult");
-    expect(tierArgument({ person: adult, category: "image", arg: "standard" })).toMatchObject({ quality: "quick", line: null });
-    expect(tierArgument({ person: adult, category: "image", arg: "boost" })).toMatchObject({ quality: "detailed", line: null });
-    expect(tierArgument({ person: adult, category: "image", arg: "loud" })).toEqual({ quality: undefined, tier: undefined, line: null });
+    expect(tierArgument({ person: adult, category: "pictures", arg: "standard" })).toMatchObject({ quality: "quick", line: null });
+    expect(tierArgument({ person: adult, category: "pictures", arg: "boost" })).toMatchObject({ quality: "detailed", line: null });
+    expect(tierArgument({ person: adult, category: "pictures", arg: "loud" })).toEqual({ quality: undefined, tier: undefined, line: null });
   });
 
   test("Max without the grant says an admin must do it; with it, says Max is not here yet and makes Boost", () => {
@@ -162,7 +162,7 @@ describe("tierArgument (the typed tier of a generating tool)", () => {
     const teen = addPerson("person-teen0001", "teen");
     const child = addPerson("person-child001", "child");
     expect(tierArgument({ person: teen, category: "chat", arg: "max" })).toEqual({ quality: "quick", tier: "standard", line: null });
-    expect(tierArgument({ person: child, category: "image", arg: "boost" })).toMatchObject({ quality: "quick", line: null });
+    expect(tierArgument({ person: child, category: "pictures", arg: "boost" })).toMatchObject({ quality: "quick", line: null });
   });
 });
 
@@ -185,11 +185,11 @@ describe("Max on a card (TIER-HOME-03)", () => {
     const owner = addPerson("person-owner001", "owner");
     const teen = addPerson("person-teen0001", "teen");
     const child = addPerson("person-child001", "child");
-    setHouseholdSettingValue(slotKey("image", "max"), { model: "big-picture", options: {} });
-    expect(maxOffered(teen, "image")).toBe(false);
-    createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:image", effect: "allow" });
-    expect(maxOffered(teen, "image")).toBe(true);
-    expect(maxOffered(child, "image")).toBe(false);
+    setHouseholdSettingValue(slotKey("pictures", "max"), { model: "big-picture", options: {} });
+    expect(maxOffered(teen, "pictures")).toBe(false);
+    createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:pictures", effect: "allow" });
+    expect(maxOffered(teen, "pictures")).toBe(true);
+    expect(maxOffered(child, "pictures")).toBe(false);
   });
 });
 

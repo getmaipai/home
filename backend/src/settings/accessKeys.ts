@@ -7,7 +7,7 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 export const CONTENT_KINDS = ["chat", "web", "news", "library", "made"] as const;
 export type ContentKindId = (typeof CONTENT_KINDS)[number];
 export const CEILING_LEVELS = ["G", "PG", "PG-13", "R", "X"] as const;
-export const ACCESS_WORKS = ["chat", "image", "video", "music", "voice", "coding"] as const;
+export const ACCESS_WORKS = ["chat", "pictures", "video", "music", "voice", "coding"] as const;
 
 export const CONTENT_CEILING_KEY = "content.ceiling";
 export const CONTENT_UNRATED_KEY = "content.unrated";
@@ -31,8 +31,8 @@ const LEVEL_LINES: Record<string, string> = {
   R: "Strong language and themes.",
   X: "Everything, with nothing held back.",
 };
-const WORK_LABEL: Record<string, string> = { chat: "Chat", image: "Pictures", video: "Videos", music: "Music", voice: "Voice" };
-const workLines = (power: string): Record<string, string> => ({ chat: `Chat replies with ${power}.`, image: `Pictures with ${power}.`, video: `Videos with ${power}.`, music: `Music with ${power}.`, voice: `Voices with ${power}.` });
+const WORK_LABEL: Record<string, string> = { chat: "Chat", pictures: "Pictures", video: "Videos", music: "Music", voice: "Voice" };
+const workLines = (power: string): Record<string, string> => ({ chat: `Chat replies with ${power}.`, pictures: `Pictures with ${power}.`, video: `Videos with ${power}.`, music: `Music with ${power}.`, voice: `Voices with ${power}.` });
 
 function select(key: string, options: readonly string[], dflt: string, label: string, help: string, does: string, optionLines: Record<string, string>, layers: Array<"band" | "household" | "person">, bandDefault?: Record<string, string>): SettingsKey {
   return SettingsKey.parse({

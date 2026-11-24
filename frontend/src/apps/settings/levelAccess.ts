@@ -10,19 +10,13 @@ export interface SlotDraft { model: string; options: Record<string, boolean | nu
 export type SlotDrafts = Partial<Record<SlotTier, SlotDraft>>;
 export interface OptionDef { id: string; type: "boolean" | "integer" | "number"; min?: number; max?: number; default: boolean | number; label: string; minors: boolean }
 
-/** The Stack's feature id to Home's slot role and the spec's category: only these have levels Home keeps access for. */
-export const ACCESS_FEATURES: ReadonlyArray<{ id: "chat" | "pictures" | "video" | "music" | "voice" | "coding"; role: string; category: string }> = [
-  { id: "chat", role: "chat", category: "chat" },
-  { id: "pictures", role: "image", category: "image" },
-  { id: "video", role: "video", category: "video" },
-  { id: "music", role: "music", category: "music" },
-  { id: "voice", role: "tts", category: "voice" },
-  { id: "coding", role: "coding", category: "coding" },
-];
+/** The Stack features (`GET /choices` ids) Home keeps level access for. The id is also the spec category and the middle of the slot key (`engines.<id>.tier.<tier>`). */
+export const ACCESS_FEATURES: ReadonlyArray<{ id: "chat" | "pictures" | "video" | "music" | "voice" | "coding" }> =
+  (["chat", "pictures", "video", "music", "voice", "coding"] as const).map((id) => ({ id }));
 /** The household switches that gate who a made-content level is for (the old "Adult gate" block of the details sheet). */
 export const GATE_KEYS: Record<string, string[]> = { pictures: ["generation.adults", "generation.kids"], video: ["generation.video.adult_adapters"], music: ["generation.music.enabled"] };
 
-export const slotKey = (role: string, tier: SlotTier) => `engines.${role}.tier.${tier}`;
+export const slotKey = (feature: string, tier: SlotTier) => `engines.${feature}.tier.${tier}`;
 /** The options a slot of this category may carry that something reads (`SLOT_OPTIONS_READ`): the sheet offers no switch that does nothing. */
 export const optionDefs = (category: string): OptionDef[] => ((vocab.categories.find((c) => c.id === category)?.options ?? []) as OptionDef[]).filter((def) => (SLOT_OPTIONS_READ[category] ?? []).includes(def.id));
 const whoDefault = (tier: SlotTier): SlotWho => (vocab.who_default as Record<string, SlotWho>)[tier] ?? "everyone";

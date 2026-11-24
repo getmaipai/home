@@ -17,7 +17,7 @@ const model = (id: string) => ({ id, family: id.split("-")[0]!, installed: true,
 const KLEIN = model(TEST_PICTURE_PART);
 const ZIMAGE = model(TEST_PICTURE_PART);
 const QWEN = model(RECOMMENDED_MAX_IMAGE_MODEL);
-const slot = (tier: Tier, value: string) => setHouseholdSettingValue(slotKey("image", tier), { model: value, options: {} });
+const slot = (tier: Tier, value: string) => setHouseholdSettingValue(slotKey("pictures", tier), { model: value, options: {} });
 
 beforeEach(() => {
   resetDb();
@@ -63,8 +63,8 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
 
   test("(c) Max with Qwen-Image installed sends the Max model and tier max", async () => {
     __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ZIMAGE, QWEN] }));
-    expect(maxAvailable("image")).toBe(true);
-    expect(jobTier("image", "max", "detailed")).toBe("max");
+    expect(maxAvailable("pictures")).toBe(true);
+    expect(jobTier("pictures", "max", "detailed")).toBe("max");
     const { sent, job } = await send("max");
     expect(sent.model).toBe(RECOMMENDED_MAX_IMAGE_MODEL);
     expect(sent.tier).toBe("max");
@@ -79,8 +79,8 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
   });
 
   test("(d) Max without Qwen-Image runs at Boost with the Boost slot's part and keeps the line", async () => {
-    expect(maxAvailable("image")).toBe(false);
-    expect(jobTier("image", "max", "detailed")).toBe("boost");
+    expect(maxAvailable("pictures")).toBe(false);
+    expect(jobTier("pictures", "max", "detailed")).toBe("boost");
     const { sent, job } = await send("max");
     expect(sent.model).toBeUndefined();
     expect(sent.tier).toBe("boost");
@@ -93,7 +93,7 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
     __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ZIMAGE, QWEN] }));
     slot("boost", TEST_PICTURE_PART);
     slot("max", RECOMMENDED_MAX_IMAGE_MODEL);
-    expect(authorizeTier({ person: people.child, category: "image", requested: "max" }).tier).toBe("standard");
+    expect(authorizeTier({ person: people.child, category: "pictures", requested: "max" }).tier).toBe("standard");
     const { sent, job } = await send("max", { audience: "all-ages" }, people.child);
     expect(sent.tier).toBeUndefined();
     expect(sent.model).toBeUndefined();
@@ -111,7 +111,7 @@ describe("TIER-PIC-01 a picture runs its level slot", () => {
     expect(chooseQuality({ requested: "quick" }).quality).toBe("quick");
     // One part serves both levels: Detailed asked for is the same part at the Boost level, not a second maker.
     expect(chooseQuality({ requested: "detailed" })).toMatchObject({ quality: "quick" });
-    expect(jobTier("image", "boost", "quick")).toBe("standard");
-    expect(jobTier("image", "boost", "detailed")).toBe("boost");
+    expect(jobTier("pictures", "boost", "quick")).toBe("standard");
+    expect(jobTier("pictures", "boost", "detailed")).toBe("boost");
   });
 });
