@@ -6,6 +6,7 @@ import { aiCopy } from "@/lib/aiCopy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { FACE_FINDER_NAME, faceFinderDescription, faceFinderState } from "@/lib/visionAssets";
 import { INGREDIENTS_AFTER_SETUP_LINE, INGREDIENTS_BYTES, INGREDIENTS_NAME, ingredientsDescription, ingredientsState } from "@/lib/videos/ingredientsAdapter";
+import { shippedDiskPlan } from "@/lib/diskPlan";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
 import { buildSetupJobs, type SetupJob } from "../../../shared/setupJobs";
 
@@ -14,8 +15,17 @@ export function householdHasMinors(): boolean {
   return db.select().from(people).all().some((person) => { const lane = laneOfPerson(person); return lane === "child" || lane === "teen"; });
 }
 
-export async function setupJobsFor(plan: DiskPlan): Promise<SetupJob[]> {
+/** A Stack older than the pinned one sends rows without `feature`: the shipped copy of the same tier names it, row by row. */
+export function withFeatures(plan: DiskPlan): DiskPlan {
+  if (plan.rows.some((row) => row.feature !== undefined)) return plan;
+  const shipped = shippedDiskPlan(plan.tier);
+  const byId = new Map((shipped?.rows ?? []).map((row) => [row.id, row] as const));
+  return { ...plan, rows: plan.rows.map((row) => { const known = byId.get(row.id); return known ? { ...row, feature: known.feature ?? null, minors_only: known.minors_only === true } : row; }) };
+}
+
+export async function setupJobsFor(rawPlan: DiskPlan): Promise<SetupJob[]> {
   // The face finder files install with the wizard's Install; the adapter needs a Hugging Face token and an accepted licence, so the wizard lists it and says where to add it.
+  const plan = withFeatures(rawPlan);
   const faces = faceFinderState();
   const adapter = await ingredientsState();
   return buildSetupJobs({

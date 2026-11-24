@@ -16,14 +16,9 @@ export function defaultPicks(jobs: readonly SetupJob[]): Picks {
 /** The disk plan rows the picks install: every required row, the plan's defaults for rows no unit asks about, and the rows of each unit that is on. */
 export function selectedRows(jobs: readonly SetupJob[], plan: DiskPlan, picks: Picks): Set<string> {
   const isModel = (id: string) => plan.rows.find((row) => row.id === id)?.kind !== "engine";
-  const asked = new Set(jobs.flatMap((job) => plan.rows.filter((row) => row.feature && row.feature === featureOf(plan, job)).map((row) => row.id)));
+  const asked = new Set(jobs.flatMap((job) => job.askedRowIds));
   const rows = new Set<string>(plan.rows.filter((row) => row.kind !== "engine" && row.need === "required").map((row) => row.id));
   for (const id of plan.default_selected) if (!asked.has(id)) rows.add(id);
   for (const job of jobs) if (picks[job.job] === true) for (const id of job.rowIds) if (isModel(id)) rows.add(id);
   return rows;
-}
-
-/** The feature row a unit's rows belong to, read from the rows themselves (the first row names it; hub parts have none). */
-function featureOf(plan: DiskPlan, job: SetupJob): string | null {
-  return job.hubPart ? null : plan.rows.find((row) => row.id === job.rowIds[0])?.feature ?? null;
 }

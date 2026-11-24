@@ -17,6 +17,7 @@ import { isLicensedRow, LICENSED_ROWS, type PlanLicence } from "../../../shared/
 import type { StackInstallPlan } from "@/lib/stack/client";
 import { cannotRunJobs, cannotRunWhy, readCapabilities } from "@/lib/memoryRoom";
 import { ensureVisionAssets, faceFinderState } from "@/lib/visionAssets";
+import { withFeatures } from "@/lib/setupJobsState";
 import { FACES_ROW_ID, jobRowIds, type SetupJobId } from "../../../shared/setupJobs";
 
 /** Where the plan's files land and how much room each place has: Home's program and data on this computer, the AI's files on the Stack's disk (read by the Stack, which may be another computer). */
@@ -86,7 +87,7 @@ export async function withoutUnfitJobs(diskPlan: DiskPlan, selected: string[]): 
   const drop = new Set<string>();
   const leftOut: LeftOut[] = [];
   for (const job of never) {
-    const rows = jobRowIds(diskPlan, job as SetupJobId).filter((id) => selected.includes(id) && !required.has(id));
+    const rows = jobRowIds(withFeatures(diskPlan), job as SetupJobId).filter((id) => selected.includes(id) && !required.has(id));
     if (rows.length === 0) continue;
     rows.forEach((id) => drop.add(id));
     leftOut.push({ job, reason: why[job] ?? "This computer can never run it, so Home does not download it." });

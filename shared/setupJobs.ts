@@ -24,6 +24,8 @@ export interface SetupJob {
   job: SetupJobId; title: string; summary: string; icon: string;
   /** What turning it on installs: the plan rows of its recommended level (the first optional model row when the plan recommends none). */
   rowIds: string[];
+  /** Every plan row of the unit at any level: the wizard asks about these through the unit, so the plan's defaults for them are not added again. */
+  askedRowIds: string[];
   /** The model the unit installs, for the line under its name. */
   label: string; description: string;
   installedBytes: number;
@@ -62,7 +64,7 @@ export function buildSetupJobs(input: SetupJobsInput): SetupJob[] {
       if (!part) continue;
       const state = part.installed ? "installed" : part.installing ? "installing" : part.failure ? "failed" : "notInstalled";
       // A hub part is no plan row: the face finder starts on (it is small and the wizard installs it); the adapter needs a token and a licence first.
-      out.push({ job: def.id, title: words.title, summary: words.summary, icon: def.icon, rowIds: [def.rowId!], label: part.label, description: part.description, installedBytes: part.bytes, state, required: false, defaultOn: !part.blockedReason && (def.id === "faces" || part.installed), hubPart: true, blocked: part.installed ? null : part.blockedReason ?? null, failure: part.failure ?? null });
+      out.push({ job: def.id, title: words.title, summary: words.summary, icon: def.icon, rowIds: [def.rowId!], askedRowIds: [def.rowId!], label: part.label, description: part.description, installedBytes: part.bytes, state, required: false, defaultOn: !part.blockedReason && (def.id === "faces" || part.installed), hubPart: true, blocked: part.installed ? null : part.blockedReason ?? null, failure: part.failure ?? null });
       continue;
     }
     const all = plan.rows.filter((row) => isModel(row) && row.feature === def.feature && (row.selectable || row.need === "required"));
@@ -72,7 +74,7 @@ export function buildSetupJobs(input: SetupJobsInput): SetupJob[] {
     const rows = defaults.length > 0 ? defaults : [base[0]!];
     const lead = rows.find((row) => row.need !== "required") ?? rows[0]!;
     const installed = rows.every((row) => row.installed);
-    out.push({ job: def.id, title: words.title, summary: words.summary, icon: def.icon, rowIds: rows.map((row) => row.id), label: lead.label, description: lead.note, installedBytes: rows.reduce((total, row) => total + row.installed_bytes, 0), state: installed ? "installed" : "notInstalled", required: base.some((row) => row.need === "required"), defaultOn: defaults.length > 0, hubPart: false, blocked: null, failure: null });
+    out.push({ job: def.id, title: words.title, summary: words.summary, icon: def.icon, rowIds: rows.map((row) => row.id), askedRowIds: all.map((row) => row.id), label: lead.label, description: lead.note, installedBytes: rows.reduce((total, row) => total + row.installed_bytes, 0), state: installed ? "installed" : "notInstalled", required: base.some((row) => row.need === "required"), defaultOn: defaults.length > 0, hubPart: false, blocked: null, failure: null });
   }
   return out;
 }
