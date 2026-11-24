@@ -21214,11 +21214,6 @@ msgid "off"
 msgstr "desactivado"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:708
-msgid "setting.engines.tts.choice.option_label.off"
-msgstr "Desactivado"
-
-#. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/CloseAppsSettings.tsx:96
 #: src/apps/settings/CloseAppsSettings.tsx:97
@@ -21278,6 +21273,11 @@ msgstr "Desactivado"
 #: src/lib/settingCopy.generated.ts:703
 #, needs-review
 msgid "setting.engines.stt.choice.option_label.off"
+msgstr "Desactivado"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:708
+msgid "setting.engines.tts.choice.option_label.off"
 msgstr "Desactivado"
 
 #. js-lingui-explicit-id
@@ -23229,6 +23229,15 @@ msgid "pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/performanceModel.ts:9
+#: src/apps/settings/styles/StyleBrowser.tsx:148
+#: src/shell/activityRows.tsx:32
+#: src/shell/pages/settings/MediaCardViews.tsx:60
+#, needs-review
+msgid "Pictures"
+msgstr "Imágenes"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:18
 msgid "setting.access.tier.boost.option_label.pictures"
 msgstr ""
@@ -23237,15 +23246,6 @@ msgstr ""
 #: src/lib/settingCopy.generated.ts:31
 msgid "setting.access.tier.max.option_label.pictures"
 msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/performanceModel.ts:9
-#: src/apps/settings/styles/StyleBrowser.tsx:148
-#: src/shell/activityRows.tsx:32
-#: src/shell/pages/settings/MediaCardViews.tsx:60
-#, needs-review
-msgid "Pictures"
-msgstr "Imágenes"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1961

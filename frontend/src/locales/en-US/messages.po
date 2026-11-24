@@ -18719,11 +18719,6 @@ msgid "off"
 msgstr "off"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:708
-msgid "setting.engines.tts.choice.option_label.off"
-msgstr "Off"
-
-#. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/CloseAppsSettings.tsx:96
 #: src/apps/settings/CloseAppsSettings.tsx:97
@@ -18776,6 +18771,11 @@ msgstr "Off"
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:703
 msgid "setting.engines.stt.choice.option_label.off"
+msgstr "Off"
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:708
+msgid "setting.engines.tts.choice.option_label.off"
 msgstr "Off"
 
 #. js-lingui-explicit-id
@@ -20511,6 +20511,14 @@ msgid "pictures"
 msgstr "pictures"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/performanceModel.ts:9
+#: src/apps/settings/styles/StyleBrowser.tsx:148
+#: src/shell/activityRows.tsx:32
+#: src/shell/pages/settings/MediaCardViews.tsx:60
+msgid "Pictures"
+msgstr "Pictures"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:18
 msgid "setting.access.tier.boost.option_label.pictures"
 msgstr "Pictures"
@@ -20518,14 +20526,6 @@ msgstr "Pictures"
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:31
 msgid "setting.access.tier.max.option_label.pictures"
-msgstr "Pictures"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/performanceModel.ts:9
-#: src/apps/settings/styles/StyleBrowser.tsx:148
-#: src/shell/activityRows.tsx:32
-#: src/shell/pages/settings/MediaCardViews.tsx:60
-msgid "Pictures"
 msgstr "Pictures"
 
 #. js-lingui-explicit-id
