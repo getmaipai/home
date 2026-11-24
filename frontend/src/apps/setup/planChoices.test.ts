@@ -57,4 +57,12 @@ describe("setup units", () => {
     expect(jobs.find((job) => job.job === "ingredients")!.blocked).toBe("Add it after setup.");
     expect(selectedRows(jobs, plan, picks).has("faces-finder")).toBe(true);
   });
+
+  test("a plan without the music row has no Music unit (its helper rows never stand in for it)", () => {
+    for (const tier of ["p16", "p32"]) {
+      const plan = plans[tier]!;
+      const hasMusic = plan.rows.some((row) => row.id === "music");
+      expect(jobsFor(plan).some((job) => job.job === "music")).toBe(hasMusic);
+    }
+  });
 });

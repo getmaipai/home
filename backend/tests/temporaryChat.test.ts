@@ -234,7 +234,7 @@ describe("temporary conversations never carry the person's selected companion", 
     if (!plain.ok) throw new Error("Could not create a temporary chat");
     expect(plain.value.mode).toBe("temporary");
     expect(plain.value.companion_id).toBeNull();
-    const withId = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true, companionId: "incognito" });
+    const withId = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true, companionId: "incognito" } as { temporary: boolean });
     if (!withId.ok) throw new Error("Could not create a temporary chat");
     expect(withId.value.companion_id).toBeNull();
   });

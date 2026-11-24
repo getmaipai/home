@@ -11,7 +11,7 @@ export type SetupJobId = "chat" | "pictures" | "videos" | "music" | "stems" | "v
 export const FACES_ROW_ID = "faces-finder";
 export const INGREDIENTS_ROW_ID = "ingredients-adapter";
 
-interface JobDef { id: SetupJobId; feature?: string; hub?: boolean; rowId?: string; icon: string; copy: string }
+interface JobDef { id: SetupJobId; feature?: string; lead?: string[]; hub?: boolean; rowId?: string; icon: string; copy: string }
 const JOBS = hubParts.jobs as unknown as JobDef[];
 
 export interface SetupCopy { card(copyKey: string): { title: string; summary: string } }
@@ -71,10 +71,13 @@ export function buildSetupJobs(input: SetupJobsInput): SetupJob[] {
     const base = all.filter((row) => householdHasMinors || row.minors_only !== true);
     if (base.length === 0) continue;
     const defaults = base.filter((row) => row.need === "required" || chosen.has(row.id) || (householdHasMinors && row.minors_only === true));
-    const rows = defaults.length > 0 ? defaults : [base[0]!];
-    const lead = rows.find((row) => row.need !== "required") ?? rows[0]!;
+    // With no recommended row the unit is its lead row (never another row of the feature: music is not its transcription helper); a plan with no lead row has no such unit.
+    const lead = defaults.length > 0 ? null : base.find((row) => def.lead?.includes(row.id)) ?? null;
+    if (defaults.length === 0 && !lead) continue;
+    const rows = lead ? [lead] : defaults;
+    const shown = rows.find((row) => row.need !== "required") ?? rows[0]!;
     const installed = rows.every((row) => row.installed);
-    out.push({ job: def.id, title: words.title, summary: words.summary, icon: def.icon, rowIds: rows.map((row) => row.id), askedRowIds: all.map((row) => row.id), label: lead.label, description: lead.note, installedBytes: rows.reduce((total, row) => total + row.installed_bytes, 0), state: installed ? "installed" : "notInstalled", required: base.some((row) => row.need === "required"), defaultOn: defaults.length > 0, hubPart: false, blocked: null, failure: null });
+    out.push({ job: def.id, title: words.title, summary: words.summary, icon: def.icon, rowIds: rows.map((row) => row.id), askedRowIds: all.map((row) => row.id), label: shown.label, description: shown.note, installedBytes: rows.reduce((total, row) => total + row.installed_bytes, 0), state: installed ? "installed" : "notInstalled", required: base.some((row) => row.need === "required"), defaultOn: defaults.length > 0, hubPart: false, blocked: null, failure: null });
   }
   return out;
 }
