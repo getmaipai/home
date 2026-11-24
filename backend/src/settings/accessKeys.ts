@@ -31,8 +31,8 @@ const LEVEL_LINES: Record<string, string> = {
   R: "Strong language and themes.",
   X: "Everything, with nothing held back.",
 };
-const WORK_LABEL: Record<string, string> = { chat: "Chat", pictures: "Pictures", video: "Videos", music: "Music", voice: "Voice" };
-const workLines = (power: string): Record<string, string> => ({ chat: `Chat replies with ${power}.`, pictures: `Pictures with ${power}.`, video: `Videos with ${power}.`, music: `Music with ${power}.`, voice: `Voices with ${power}.` });
+const WORK_LABEL: Record<string, string> = { chat: "Chat", pictures: "Pictures", video: "Videos", music: "Music", voice: "Voice", coding: "Coding" };
+const workLines = (power: string): Record<string, string> => ({ chat: `Chat replies with ${power}.`, pictures: `Pictures with ${power}.`, video: `Videos with ${power}.`, music: `Music with ${power}.`, voice: `Voices with ${power}.`, coding: `Coding with ${power}.` });
 
 function select(key: string, options: readonly string[], dflt: string, label: string, help: string, does: string, optionLines: Record<string, string>, layers: Array<"band" | "household" | "person">, bandDefault?: Record<string, string>): SettingsKey {
   return SettingsKey.parse({
