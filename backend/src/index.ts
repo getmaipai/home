@@ -80,6 +80,7 @@ import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceMode
 import { migrateRobotsSwitch } from "@/lib/robotsSwitchMigration";
 import { backfillSoundOnlyClips } from "@/lib/videos/soundStampBackfill";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
+import { migrateTierKeysToFeatureIds } from "@/lib/tierKeyMigration";
 import { startStackChoiceSync } from "@/lib/stackChoiceSnapshot";
 import { migrateMediaSettings } from "@/lib/settingsMediaMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
@@ -297,6 +298,7 @@ migrateWikipediaFallbackToSourceMode();
 migrateRobotsSwitch();
 // CLIP-AUDIENCE-LOCK-01: once, lower the clips the sound-only stamp raised (owner ruling 2026-11-20). Best effort: a failure leaves them adult-only, never more open.
 try { backfillSoundOnlyClips(); } catch (error) { console.error(`[clip-audience-lock] the one-time fix did not run (${error instanceof Error ? error.name : "error"})`); }
+migrateTierKeysToFeatureIds();
 migrateTierSlots();
 migrateMediaSettings();
 // STACK-MODELS-HOME-01: Home's old model values move to the Stack once (retried until it answers); the pipeline reads the Stack's answer from a cache.
