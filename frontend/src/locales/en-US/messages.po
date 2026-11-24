@@ -14,11 +14,6 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:131
-msgid " · {percent}%"
-msgstr " · {percent}%"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
 msgid " · {size} free"
 msgstr " · {size} free"
@@ -1253,16 +1248,6 @@ msgid "{size} drive"
 msgstr "{size} drive"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:31
-msgid "{size} GB"
-msgstr "{size} GB"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:31
-msgid "{size} MB"
-msgstr "{size} MB"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/StoragePage.tsx:164
 msgid "{size} used, no cap set"
 msgstr "{size} used, no cap set"
@@ -1370,18 +1355,18 @@ msgid "{tokens} tokens"
 msgstr "{tokens} tokens"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:191
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:164
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "{tool} · same key"
 msgstr "{tool} · same key"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "{tool} setup line"
 msgstr "{tool} setup line"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:191
+#: src/apps/settings/CodingSettings.tsx:164
 msgid "{tool} setup line, key masked"
 msgstr "{tool} setup line, key masked"
 
@@ -1509,7 +1494,7 @@ msgid "1 week"
 msgstr "1 week"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "1 year"
 msgstr "1 year"
 
@@ -1570,7 +1555,7 @@ msgstr "30"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:95
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "30 days"
 msgstr "30 days"
 
@@ -1606,7 +1591,7 @@ msgstr "60 seconds"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:95
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "7 days"
 msgstr "7 days"
 
@@ -1617,7 +1602,7 @@ msgstr "8 beats"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:95
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "90 days"
 msgstr "90 days"
 
@@ -1807,7 +1792,7 @@ msgid "A key is saved. Home keeps it private and never shows it again."
 msgstr "A key is saved. Home keeps it private and never shows it again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:184
+#: src/apps/settings/CodingSettings.tsx:157
 msgid "A key lets a coding tool on your computer use Home's model. If an admin turns Coding off, your key stops working."
 msgstr "A key lets a coding tool on your computer use Home's model. If an admin turns Coding off, your key stops working."
 
@@ -2056,7 +2041,7 @@ msgid "setting.acoustid.client.label"
 msgstr "AcoustID key (for naming songs online)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/components/DataTableRowActions.tsx:28
 msgid "Actions"
@@ -3277,7 +3262,7 @@ msgid "setting.generation.household_likeness.help"
 msgstr "Anyone in the home may make things with or of any household member. Turn it off to stop that."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "Anyone with this key can use Coding as you. If an admin turns Coding off, this key stops working."
 msgstr "Anyone with this key can use Coding as you. If an admin turns Coding off, this key stops working."
 
@@ -3781,7 +3766,7 @@ msgid "Avoid, and say this instead"
 msgstr "Avoid, and say this instead"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Away"
 msgstr "Away"
 
@@ -4611,9 +4596,9 @@ msgstr "Can use it now"
 #: src/apps/settings/AiLevelAccess.tsx:67
 #: src/apps/settings/AssistantKeysSettings.tsx:98
 #: src/apps/settings/AutoLocksSection.tsx:83
-#: src/apps/settings/CodingSettings.tsx:140
-#: src/apps/settings/CodingSettings.tsx:193
-#: src/apps/settings/CodingSettings.tsx:195
+#: src/apps/settings/CodingSettings.tsx:113
+#: src/apps/settings/CodingSettings.tsx:166
+#: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/PersonMore.tsx:87
 #: src/apps/settings/ReferenceLibrarySettings.tsx:241
 #: src/apps/settings/RobotPasswordSection.tsx:110
@@ -5015,7 +5000,7 @@ msgid "setting.resources.preset.option.chat_first"
 msgstr "Chat always answers, and big jobs wait for a quiet moment."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:139
+#: src/apps/settings/CodingSettings.tsx:112
 msgid "Chat always comes first. Coding waits or slows down, never chat. See what is running on the"
 msgstr "Chat always comes first. Coding waits or slows down, never chat. See what is running on the"
 
@@ -6256,13 +6241,13 @@ msgstr "Coding"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:40
-#: src/apps/settings/CodingSettings.tsx:107
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:89
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Coding"
 msgstr "Coding"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:151
+#: src/apps/settings/CodingSettings.tsx:124
 msgid "Coding app"
 msgstr "Coding app"
 
@@ -6302,7 +6287,7 @@ msgid "setting.coding.engine.label"
 msgstr "Coding engine"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:146
+#: src/apps/settings/CodingSettings.tsx:119
 msgid "Coding engine"
 msgstr "Coding engine"
 
@@ -6317,12 +6302,12 @@ msgid "Coding is not turned on for you. Ask a household admin to turn Coding on 
 msgstr "Coding is not turned on for you. Ask a household admin to turn Coding on for you in Settings, then open Code again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:145
+#: src/apps/settings/CodingSettings.tsx:118
 msgid "Coding is on"
 msgstr "Coding is on"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:138
+#: src/apps/settings/CodingSettings.tsx:111
 msgid "Coding is waiting for its helper to start. The Status page shows what is happening."
 msgstr "Coding is waiting for its helper to start. The Status page shows what is happening."
 
@@ -6342,12 +6327,12 @@ msgid "api.error.coding_mode_is_max"
 msgstr "Coding mode is now Max chat. Pick Max in a chat, or connect a coding app, and Home loads the big model for you."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:54
+#: src/apps/settings/CodingSettings.tsx:53
 msgid "Coding mode is on. One large model answers chat, search and coding. Pictures, videos and songs wait until you switch back to Normal."
 msgstr "Coding mode is on. One large model answers chat, search and coding. Pictures, videos and songs wait until you switch back to Normal."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:51
+#: src/apps/settings/CodingSettings.tsx:50
 msgid "Coding mode will start when the pictures, videos and songs being made finish. New ones are held until then. Choose Normal to cancel."
 msgstr "Coding mode will start when the pictures, videos and songs being made finish. New ones are held until then. Choose Normal to cancel."
 
@@ -6357,14 +6342,9 @@ msgid "setting.engines.coding.choice.label"
 msgstr "Coding model choice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:147
+#: src/apps/settings/CodingSettings.tsx:120
 msgid "Coding model files"
 msgstr "Coding model files"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:130
-msgid "Coding needs these pieces."
-msgstr "Coding needs these pieces."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:64
@@ -6377,17 +6357,12 @@ msgid "Coding parts to install"
 msgstr "Coding parts to install"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:130
-msgid "Coding pieces"
-msgstr "Coding pieces"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "Coding requests stop until you resume. Keys stay in place and can be used again later."
 msgstr "Coding requests stop until you resume. Keys stay in place and can be used again later."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:150
+#: src/apps/settings/CodingSettings.tsx:123
 msgid "Coding test"
 msgstr "Coding test"
 
@@ -6513,7 +6488,7 @@ msgid "Complexity"
 msgstr "Complexity"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:148
+#: src/apps/settings/CodingSettings.tsx:121
 msgid "Computer hardware"
 msgstr "Computer hardware"
 
@@ -6558,7 +6533,7 @@ msgid "Confirmed."
 msgstr "Confirmed."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:191
+#: src/apps/settings/CodingSettings.tsx:164
 msgid "Connect a coding tool"
 msgstr "Connect a coding tool"
 
@@ -6779,7 +6754,7 @@ msgid "Conversations"
 msgstr "Conversations"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 #: src/apps/settings/EngineLinkCredentialSection.tsx:75
 #: src/apps/setup/SetupWizard.tsx:484
 msgid "Copied"
@@ -6796,8 +6771,8 @@ msgid "Copies in this browser"
 msgstr "Copies in this browser"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
+#: src/apps/settings/CodingSettings.tsx:167
 #: src/apps/settings/EngineLinkCredentialSection.tsx:75
 #: src/apps/setup/SetupWizard.tsx:484
 msgid "Copy"
@@ -6815,12 +6790,12 @@ msgid "Copy is not available in this browser. Select the key and copy it."
 msgstr "Copy is not available in this browser. Select the key and copy it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:177
+#: src/apps/settings/CodingSettings.tsx:150
 msgid "Copy is not available in this browser. Select the text and copy it."
 msgstr "Copy is not available in this browser. Select the text and copy it."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "Copy it now. You will not see it again. Anyone with this key can use Coding as you."
 msgstr "Copy it now. You will not see it again. Anyone with this key can use Coding as you."
 
@@ -6931,7 +6906,7 @@ msgid "Could not change the companion. Check your connection and try again."
 msgstr "Could not change the companion. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "Could not change the pause setting."
 msgstr "Could not change the pause setting."
 
@@ -7007,7 +6982,7 @@ msgid "Could not create that command."
 msgstr "Could not create that command."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:175
+#: src/apps/settings/CodingSettings.tsx:148
 msgid "Could not create this key."
 msgstr "Could not create this key."
 
@@ -7143,11 +7118,6 @@ msgstr "Could not load automatic locks. Check your connection and try again."
 #: src/apps/settings/BackupsSection.tsx:152
 msgid "Could not load backups."
 msgstr "Could not load backups."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:129
-msgid "Could not load Coding setup."
-msgstr "Could not load Coding setup."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:57
@@ -7308,12 +7278,12 @@ msgid "Could not load the household's robots."
 msgstr "Could not load the household's robots."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:110
+#: src/apps/settings/CodingSettings.tsx:92
 msgid "Could not load the Max chat checklist."
 msgstr "Could not load the Max chat checklist."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:126
+#: src/apps/settings/CodingSettings.tsx:108
 msgid "Could not load the pause setting."
 msgstr "Could not load the pause setting."
 
@@ -7403,7 +7373,7 @@ msgid "Could not load your family. Refresh Home to try again."
 msgstr "Could not load your family. Refresh Home to try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:186
+#: src/apps/settings/CodingSettings.tsx:159
 msgid "Could not load your keys."
 msgstr "Could not load your keys."
 
@@ -7578,11 +7548,6 @@ msgid "Could not remove that person. Check your connection and try again."
 msgstr "Could not remove that person. Check your connection and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:103
-msgid "Could not remove this piece."
-msgstr "Could not remove this piece."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PackageAppPage.tsx:327
 msgid "Could not remove this place."
 msgstr "Could not remove this place."
@@ -7603,7 +7568,7 @@ msgid "Could not rename this chat. Try again."
 msgstr "Could not rename this chat. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:195
+#: src/apps/settings/CodingSettings.tsx:168
 msgid "Could not rename this key."
 msgstr "Could not rename this key."
 
@@ -7648,7 +7613,7 @@ msgid "Could not revoke the link key."
 msgstr "Could not revoke the link key."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:196
+#: src/apps/settings/CodingSettings.tsx:169
 msgid "Could not revoke this key."
 msgstr "Could not revoke this key."
 
@@ -7876,11 +7841,6 @@ msgid "Could not start the tailnet test. Try again."
 msgstr "Could not start the tailnet test. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:96
-msgid "Could not start this install."
-msgstr "Could not start this install."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:114
 msgid "Could not stop {name}."
 msgstr "Could not stop {name}."
@@ -8014,7 +7974,7 @@ msgid "Create / Clone"
 msgstr "Create / Clone"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "Create a Coding key"
 msgstr "Create a Coding key"
 
@@ -8049,8 +8009,8 @@ msgid "Create folder"
 msgstr "Create folder"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:185
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:158
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "Create key"
 msgstr "Create key"
 
@@ -8088,7 +8048,7 @@ msgid "Create your owner account"
 msgstr "Create your owner account"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Created"
 msgstr "Created"
 
@@ -9010,7 +8970,7 @@ msgstr "Don't notify me about shares from"
 #: src/apps/reminders/ComingUpRow.tsx:58
 #: src/apps/settings/AddRobotSection.tsx:213
 #: src/apps/settings/AddRobotSection.tsx:229
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 #: src/apps/settings/EngineLinkCredentialSection.tsx:23
 #: src/apps/settings/StackChanInstallDialog.tsx:151
 #: src/apps/settings/StackChanInstallDialog.tsx:153
@@ -9138,7 +9098,7 @@ msgid "Downloading and checking the file"
 msgstr "Downloading and checking the file"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:69
+#: src/apps/settings/CodingSettings.tsx:67
 msgid "Downloading and installing"
 msgstr "Downloading and installing"
 
@@ -9940,8 +9900,8 @@ msgid "Examples"
 msgstr "Examples"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:160
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "Expires"
 msgstr "Expires"
 
@@ -10361,7 +10321,7 @@ msgid "Finish setting up"
 msgstr "Finish setting up"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:108
+#: src/apps/settings/CodingSettings.tsx:90
 msgid "Finish these steps before anyone can pick Max for chat or a coding app. Home loads the big model for them and gives it back by itself."
 msgstr "Finish these steps before anyone can pick Max for chat or a coding app. Home loads the big model for them and gives it back by itself."
 
@@ -10718,7 +10678,7 @@ msgid "Free for jobs: {gb} GB"
 msgstr "Free for jobs: {gb} GB"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:149
+#: src/apps/settings/CodingSettings.tsx:122
 msgid "Free memory"
 msgstr "Free memory"
 
@@ -11666,7 +11626,7 @@ msgid "Highest"
 msgstr "Highest"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Hint"
 msgstr "Hint"
 
@@ -11748,7 +11708,7 @@ msgid "Home address: {codingHome}/code/v1"
 msgstr "Home address: {codingHome}/code/v1"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:191
+#: src/apps/settings/CodingSettings.tsx:164
 msgid "Home address: {home}/code/v1. Get the model name from GET /code/v1/models. Only use tools you trust with your key."
 msgstr "Home address: {home}/code/v1. Get the model name from GET /code/v1/models. Only use tools you trust with your key."
 
@@ -12119,7 +12079,7 @@ msgid "Home could not restore this item. Refresh Trash and try again."
 msgstr "Home could not restore this item. Refresh Trash and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:88
+#: src/apps/settings/CodingSettings.tsx:84
 #: src/apps/setup/SetupWizard.tsx:218
 msgid "Home could not run the coding test. Try again."
 msgstr "Home could not run the coding test. Try again."
@@ -12185,7 +12145,7 @@ msgid "Home could not tell what this style was made for."
 msgstr "Home could not tell what this style was made for."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:88
+#: src/apps/settings/CodingSettings.tsx:84
 msgid "Home could not update coding mode. Try again."
 msgstr "Home could not update coding mode. Try again."
 
@@ -12321,11 +12281,6 @@ msgid "Home does not censor content in code. The AI model decides what it will a
 msgstr "Home does not censor content in code. The AI model decides what it will answer or create, including pictures, videos, songs, and companion media. Home still applies account access, age and surface availability, and technical limits."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:128
-msgid "Home downloads these parts to this computer. Home does not install a coding app."
-msgstr "Home downloads these parts to this computer. Home does not install a coding app."
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:125
 msgid "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work."
 msgstr "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work."
@@ -12352,7 +12307,7 @@ msgid "api.error.internal"
 msgstr "Home hit a problem it did not expect."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:191
+#: src/apps/settings/CodingSettings.tsx:164
 msgid "Home installs no coding tool."
 msgstr "Home installs no coding tool."
 
@@ -12378,7 +12333,7 @@ msgid "failure.composer.mode_change.more"
 msgstr "Home is getting ready for another job. Chat comes back by itself."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:114
+#: src/apps/settings/CodingSettings.tsx:96
 msgid "Home is loading the large model, checking it, and switching back. This takes a few minutes. You can leave this page."
 msgstr "Home is loading the large model, checking it, and switching back. This takes a few minutes. You can leave this page."
 
@@ -12393,7 +12348,7 @@ msgid "Home is setting up the AI engine on this computer. Now: {stage}. This pag
 msgstr "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:52
+#: src/apps/settings/CodingSettings.tsx:51
 msgid "Home is switching modes. This takes about a minute, and chat pauses briefly."
 msgstr "Home is switching modes. This takes about a minute, and chat pauses briefly."
 
@@ -12428,7 +12383,7 @@ msgid "setting.coding.home_mode.label"
 msgstr "Home mode"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Home network"
 msgstr "Home network"
 
@@ -12649,7 +12604,7 @@ msgid "Household voices are made on the Voices page. Make one first."
 msgstr "Household voices are made on the Voices page. Make one first."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:117
+#: src/apps/settings/CodingSettings.tsx:99
 #: src/apps/setup/SetupWizard.tsx:486
 #: src/apps/setup/SetupWizard.tsx:486
 msgid "How"
@@ -13362,8 +13317,7 @@ msgid "Inspired voice ({level})"
 msgstr "Inspired voice ({level})"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:119
-#: src/apps/settings/CodingSettings.tsx:132
+#: src/apps/settings/CodingSettings.tsx:101
 #: src/shell/pages/EnginesPage.tsx:242
 msgid "Install"
 msgstr "Install"
@@ -13434,7 +13388,6 @@ msgid "Install without a backup."
 msgstr "Install without a backup."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/settings/styles/StyleBrowser.tsx:129
@@ -13462,10 +13415,8 @@ msgid "setting.robot.firmware.installed.label"
 msgstr "Installed robot firmware"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:112
-#: src/apps/settings/CodingSettings.tsx:119
-#: src/apps/settings/CodingSettings.tsx:131
-#: src/apps/settings/CodingSettings.tsx:132
+#: src/apps/settings/CodingSettings.tsx:94
+#: src/apps/settings/CodingSettings.tsx:101
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/apps/setup/SetupWizard.tsx:482
@@ -13809,7 +13760,6 @@ msgstr "Keep installing"
 #: src/apps/reminders/DeviceSchedulesView.tsx:42
 #: src/apps/settings/AssistantKeysSettings.tsx:113
 #: src/apps/settings/AwaySessionsSection.tsx:50
-#: src/apps/settings/CodingSettings.tsx:135
 #: src/apps/settings/DevicesSection.tsx:141
 #: src/apps/settings/DevicesSection.tsx:222
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
@@ -13822,7 +13772,7 @@ msgid "Keep it"
 msgstr "Keep it"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:196
+#: src/apps/settings/CodingSettings.tsx:169
 msgid "Keep key"
 msgstr "Keep key"
 
@@ -14339,7 +14289,7 @@ msgid "Last try {when}: {line}"
 msgstr "Last try {when}: {line}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Last used"
 msgstr "Last used"
 
@@ -15142,11 +15092,6 @@ msgid "Loading coding setup"
 msgstr "Loading coding setup"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:129
-msgid "Loading Coding setup"
-msgstr "Loading Coding setup"
-
-#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:334
 msgid "Loading conversations"
 msgstr "Loading conversations"
@@ -15223,7 +15168,7 @@ msgid "Loading MaiPai Home"
 msgstr "Loading MaiPai Home"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:110
+#: src/apps/settings/CodingSettings.tsx:92
 msgid "Loading Max chat checklist"
 msgstr "Loading Max chat checklist"
 
@@ -15424,7 +15369,7 @@ msgid "Loading your files"
 msgstr "Loading your files"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:186
+#: src/apps/settings/CodingSettings.tsx:159
 msgid "Loading your keys"
 msgstr "Loading your keys"
 
@@ -16460,8 +16405,8 @@ msgid "setting.research.max_web.label"
 msgstr "Max can search the web in depth"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:108
-#: src/apps/settings/CodingSettings.tsx:111
+#: src/apps/settings/CodingSettings.tsx:90
+#: src/apps/settings/CodingSettings.tsx:93
 msgid "Max chat checklist"
 msgstr "Max chat checklist"
 
@@ -16893,7 +16838,7 @@ msgid "More actions"
 msgstr "More actions"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:125
+#: src/apps/settings/CodingSettings.tsx:107
 msgid "More Coding settings"
 msgstr "More Coding settings"
 
@@ -17200,7 +17145,7 @@ msgid "My creations"
 msgstr "My creations"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:193
+#: src/apps/settings/CodingSettings.tsx:166
 msgid "My laptop"
 msgstr "My laptop"
 
@@ -17223,9 +17168,9 @@ msgstr "My styles"
 #: src/apps/reminders/ListMenu.tsx:45
 #: src/apps/settings/AddVoiceForm.tsx:80
 #: src/apps/settings/AssistantKeysSettings.tsx:83
-#: src/apps/settings/CodingSettings.tsx:187
-#: src/apps/settings/CodingSettings.tsx:193
-#: src/apps/settings/CodingSettings.tsx:195
+#: src/apps/settings/CodingSettings.tsx:160
+#: src/apps/settings/CodingSettings.tsx:166
+#: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
 #: src/apps/settings/styles/StyleAddFile.tsx:52
 #: src/apps/settings/styles/StyleConfirm.tsx:85
@@ -17360,7 +17305,7 @@ msgid "Needs a look"
 msgstr "Needs a look"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:112
+#: src/apps/settings/CodingSettings.tsx:94
 msgid "Needs a step from you"
 msgstr "Needs a step from you"
 
@@ -17370,7 +17315,6 @@ msgid "Needs another try"
 msgstr "Needs another try"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/status/StatusApps.tsx:47
 #: src/shell/pages/status/StatusComponents.tsx:159
@@ -17398,7 +17342,7 @@ msgid "Needs restart"
 msgstr "Needs restart"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:112
+#: src/apps/settings/CodingSettings.tsx:94
 msgid "Needs setup"
 msgstr "Needs setup"
 
@@ -17453,9 +17397,9 @@ msgstr "Neutral is the standard black-and-white theme, the same as shadcn's own 
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:26
+#: src/apps/settings/CodingSettings.tsx:31
 #: src/apps/settings/CodingSettings.tsx:32
-#: src/apps/settings/CodingSettings.tsx:33
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 #: src/shell/pages/status/StatusBoard.tsx:113
 #: src/shell/pages/status/StatusBoard.tsx:113
 #: src/shell/pages/UpdatesPage.tsx:72
@@ -17529,7 +17473,7 @@ msgid "New chat in {folder}"
 msgstr "New chat in {folder}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "New Coding key"
 msgstr "New Coding key"
 
@@ -18389,7 +18333,7 @@ msgid "Normal keeps chat and pictures running as usual."
 msgstr "Normal keeps chat and pictures running as usual."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:55
+#: src/apps/settings/CodingSettings.tsx:54
 msgid "Normal mode is on. Chat, pictures, videos and songs run as usual."
 msgstr "Normal mode is on. Chat, pictures, videos and songs run as usual."
 
@@ -18441,7 +18385,6 @@ msgid "Not in chat yet"
 msgstr "Not in chat yet"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:131
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/setup/SetupWizard.tsx:480
@@ -18548,11 +18491,6 @@ msgstr "Not shown."
 #: src/apps/settings/VoiceManagerSection.tsx:29
 msgid "Not stated"
 msgstr "Not stated"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:131
-msgid "Not supported"
-msgstr "Not supported"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingField.tsx:241
@@ -20046,7 +19984,7 @@ msgid "setting.coding.paused.label"
 msgstr "Pause coding"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:126
+#: src/apps/settings/CodingSettings.tsx:108
 msgid "Pause coding requests until you resume. This does not delete keys."
 msgstr "Pause coding requests until you resume. This does not delete keys."
 
@@ -20080,7 +20018,7 @@ msgid "People can grow attached to AI"
 msgstr "People can grow attached to AI"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "People with access can use Coding again."
 msgstr "People with access can use Coding again."
 
@@ -21546,7 +21484,7 @@ msgstr "Ready"
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:60
 #: src/apps/library/appPresentation.ts:18
-#: src/apps/settings/CodingSettings.tsx:112
+#: src/apps/settings/CodingSettings.tsx:94
 #: src/apps/settings/RobotBody.tsx:19
 #: src/apps/setup/AwayFromHome.tsx:120
 #: src/apps/setup/AwayFromHome.tsx:127
@@ -21806,8 +21744,6 @@ msgstr "Remix this song"
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:154
 #: src/apps/settings/CloseAppsSettings.tsx:65
-#: src/apps/settings/CodingSettings.tsx:132
-#: src/apps/settings/CodingSettings.tsx:135
 #: src/apps/settings/DevicesSection.tsx:150
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
@@ -21834,11 +21770,6 @@ msgstr "Remove {count} books?"
 #: src/apps/settings/PersonMore.tsx:95
 msgid "Remove {display_name} from your household?"
 msgstr "Remove {display_name} from your household?"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:135
-msgid "Remove {label}?"
-msgstr "Remove {label}?"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:154
@@ -21982,11 +21913,6 @@ msgid "Removed today"
 msgstr "Removed today"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:132
-msgid "Removing"
-msgstr "Removing"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:156
 msgid "Removing {title}…"
 msgstr "Removing {title}…"
@@ -22006,7 +21932,7 @@ msgstr "Removing…"
 #: src/apps/clock/TimersTab.tsx:164
 #: src/apps/code/SessionRow.tsx:86
 #: src/apps/reminders/ListMenu.tsx:36
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 #: src/apps/settings/VoiceManagerSection.tsx:126
 #: src/shell/library/LibraryItems.tsx:38
 #: src/shell/library/LibraryViewer.tsx:113
@@ -22030,7 +21956,7 @@ msgid "Rename file"
 msgstr "Rename file"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:195
+#: src/apps/settings/CodingSettings.tsx:168
 msgid "Rename key"
 msgstr "Rename key"
 
@@ -22372,13 +22298,13 @@ msgid "Resume"
 msgstr "Resume"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:126
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:108
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "Resume coding"
 msgstr "Resume coding"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "Resume coding?"
 msgstr "Resume coding?"
 
@@ -22525,8 +22451,8 @@ msgstr "Review your computers, files, checks, and plan."
 #: src/apps/settings/AssistantKeysSettings.tsx:68
 #: src/apps/settings/AssistantKeysSettings.tsx:113
 #: src/apps/settings/AwaySessionsSection.tsx:53
-#: src/apps/settings/CodingSettings.tsx:187
-#: src/apps/settings/CodingSettings.tsx:196
+#: src/apps/settings/CodingSettings.tsx:160
+#: src/apps/settings/CodingSettings.tsx:169
 msgid "Revoke"
 msgstr "Revoke"
 
@@ -22547,7 +22473,7 @@ msgstr "Revoke this engine link key?"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AssistantKeysSettings.tsx:112
-#: src/apps/settings/CodingSettings.tsx:196
+#: src/apps/settings/CodingSettings.tsx:169
 msgid "Revoke this key?"
 msgstr "Revoke this key?"
 
@@ -22916,7 +22842,7 @@ msgid "Run setup again"
 msgstr "Run setup again"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:119
+#: src/apps/settings/CodingSettings.tsx:101
 #: src/apps/setup/SetupWizard.tsx:483
 msgid "Run the test"
 msgstr "Run the test"
@@ -22927,10 +22853,10 @@ msgid "Rung:"
 msgstr "Rung:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:112
-#: src/apps/settings/CodingSettings.tsx:112
-#: src/apps/settings/CodingSettings.tsx:119
-#: src/apps/settings/CodingSettings.tsx:119
+#: src/apps/settings/CodingSettings.tsx:94
+#: src/apps/settings/CodingSettings.tsx:94
+#: src/apps/settings/CodingSettings.tsx:101
+#: src/apps/settings/CodingSettings.tsx:101
 #: src/apps/setup/SetupWizard.tsx:483
 #: src/shell/pages/CompanionsPage.tsx:338
 #: src/shell/pages/status/StatusComponents.tsx:40
@@ -23022,7 +22948,7 @@ msgstr "Sat"
 #: src/apps/people/ProfileForm.tsx:199
 #: src/apps/reminders/ListMenu.tsx:46
 #: src/apps/settings/AiLevelAccess.tsx:68
-#: src/apps/settings/CodingSettings.tsx:195
+#: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/PersonMore.tsx:86
 #: src/apps/settings/styles/StylesTab.tsx:159
@@ -23420,7 +23346,7 @@ msgid "setting.news.default_topics.teen.option_label.science"
 msgstr "Science"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Scope"
 msgstr "Scope"
 
@@ -24259,8 +24185,8 @@ msgid "settings.attention.setup.complete"
 msgstr "Setup complete"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:191
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:164
+#: src/apps/settings/CodingSettings.tsx:167
 #: src/apps/setup/SetupWizard.tsx:484
 msgid "Setup lines for your tool"
 msgstr "Setup lines for your tool"
@@ -24863,7 +24789,6 @@ msgid "Size"
 msgstr "Size"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:31
 #: src/apps/setup/SetupWizard.tsx:480
 msgid "Size not reported"
 msgstr "Size not reported"
@@ -25505,7 +25430,7 @@ msgid "Speed"
 msgstr "Speed"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:152
+#: src/apps/settings/CodingSettings.tsx:125
 msgid "Speed check"
 msgstr "Speed check"
 
@@ -25888,7 +25813,7 @@ msgid "Starts at (seconds)"
 msgstr "Starts at (seconds)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 #: src/shell/pageHeaderTitle.tsx:100
 #: src/shell/pages/EnginesPage.tsx:47
 #: src/shell/pages/EnginesPage.tsx:71
@@ -25906,7 +25831,7 @@ msgid "area.Status"
 msgstr "Status"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:139
+#: src/apps/settings/CodingSettings.tsx:112
 msgid "Status page"
 msgstr "Status page"
 
@@ -25988,18 +25913,18 @@ msgid "Stop after this one"
 msgstr "Stop after this one"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "Stop all coding"
 msgstr "Stop all coding"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:126
-#: src/apps/settings/CodingSettings.tsx:126
+#: src/apps/settings/CodingSettings.tsx:108
+#: src/apps/settings/CodingSettings.tsx:108
 msgid "Stop all coding now"
 msgstr "Stop all coding now"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:140
+#: src/apps/settings/CodingSettings.tsx:113
 msgid "Stop all coding now?"
 msgstr "Stop all coding now?"
 
@@ -26863,10 +26788,10 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/AwaySessionsSection.tsx:39
 #: src/apps/settings/BackupsSection.tsx:96
 #: src/apps/settings/BackupsSection.tsx:205
-#: src/apps/settings/CodingSettings.tsx:123
-#: src/apps/settings/CodingSettings.tsx:126
-#: src/apps/settings/CodingSettings.tsx:137
-#: src/apps/settings/CodingSettings.tsx:192
+#: src/apps/settings/CodingSettings.tsx:105
+#: src/apps/settings/CodingSettings.tsx:108
+#: src/apps/settings/CodingSettings.tsx:110
+#: src/apps/settings/CodingSettings.tsx:165
 #: src/apps/settings/CommandsSection.tsx:111
 #: src/apps/settings/CommandsSection.tsx:182
 #: src/apps/settings/CommandsSection.tsx:190
@@ -27491,7 +27416,7 @@ msgid "The coding model is not loaded. Give it a minute to start, then send your
 msgstr "The coding model is not loaded. Give it a minute to start, then send your message again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:44
+#: src/apps/settings/CodingSettings.tsx:43
 msgid "The coding test is taking longer than expected. Check the Status page, then try again."
 msgstr "The coding test is taking longer than expected. Check the Status page, then try again."
 
@@ -27756,7 +27681,7 @@ msgid "setting.person.locale.help"
 msgstr "The language Home uses for you. When this is set to household, the household language is used. Spanish is translated by Home's own model and checked at home; if a line reads wrong, tell the person who runs your home."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:53
+#: src/apps/settings/CodingSettings.tsx:52
 msgid "The last mode change did not finish: {reason}"
 msgstr "The last mode change did not finish: {reason}"
 
@@ -28783,7 +28708,7 @@ msgid "This is the newest version. There is nothing to redo."
 msgstr "This is the newest version. There is nothing to redo."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "This is the only key. The tool lines below use this same key."
 msgstr "This is the only key. The tool lines below use this same key."
 
@@ -28803,7 +28728,7 @@ msgid "api.error.trash_item_missing"
 msgstr "This item is not available in your trash. Refresh Trash and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "This key is shown once."
 msgstr "This key is shown once."
 
@@ -28891,11 +28816,6 @@ msgstr "This removes it for the whole home."
 #: src/shell/pages/TrashPage.tsx:67
 msgid "This removes the item from Home for good. You cannot undo this."
 msgstr "This removes the item from Home for good. You cannot undo this."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:135
-msgid "This removes the piece from this computer. You can install it again later."
-msgstr "This removes the piece from this computer. You can install it again later."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:133
@@ -29241,7 +29161,7 @@ msgid "Tools per turn (median)"
 msgstr "Tools per turn (median)"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:196
+#: src/apps/settings/CodingSettings.tsx:169
 msgid "Tools using it will no longer connect to Home."
 msgstr "Tools using it will no longer connect to Home."
 
@@ -29518,7 +29438,7 @@ msgid "Turn Boost or Max on or off per job on the AI and models page."
 msgstr "Turn Boost or Max on or off per job on the AI and models page."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:119
+#: src/apps/settings/CodingSettings.tsx:101
 msgid "Turn coding on"
 msgstr "Turn coding on"
 
@@ -31212,11 +31132,6 @@ msgid "setting.generation.music.length.help"
 msgstr "What chat makes when nobody says. Anyone can ask for the other kind. A song is as long as its words."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:128
-msgid "What Coding needs"
-msgstr "What Coding needs"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1999
 msgid "area.What connects to the internet"
 msgstr "What connects to the internet"
@@ -31853,7 +31768,7 @@ msgstr "Worked for {seconds, plural, one {# second} other {# seconds}}, {steps, 
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:58
-#: src/apps/settings/CodingSettings.tsx:119
+#: src/apps/settings/CodingSettings.tsx:101
 #: src/shell/pages/CompanionsPage.tsx:315
 #: src/shell/pages/CompanionsPage.tsx:330
 #: src/shell/pages/CompanionsPage.tsx:335
@@ -32208,7 +32123,7 @@ msgid "api.error.cannot_disable_self"
 msgstr "you cannot disable your own profile"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:185
+#: src/apps/settings/CodingSettings.tsx:158
 msgid "You cannot make a new key with your current Coding access."
 msgstr "You cannot make a new key with your current Coding access."
 
@@ -32253,7 +32168,7 @@ msgid "You have no clips yet. Make one on the Create page."
 msgstr "You have no clips yet. Make one on the Create page."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "You have no Coding keys yet."
 msgstr "You have no Coding keys yet."
 
@@ -32424,8 +32339,8 @@ msgid "Your coding access changed, so this stopped. Ask an admin to check your C
 msgstr "Your coding access changed, so this stopped. Ask an admin to check your Coding access in Settings."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:184
-#: src/apps/settings/CodingSettings.tsx:187
+#: src/apps/settings/CodingSettings.tsx:157
+#: src/apps/settings/CodingSettings.tsx:160
 msgid "Your Coding keys"
 msgstr "Your Coding keys"
 
@@ -32552,7 +32467,7 @@ msgid "setting.talent.shows.enabled.does_teen"
 msgstr "Your household can make audio shows."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/CodingSettings.tsx:194
+#: src/apps/settings/CodingSettings.tsx:167
 msgid "Your key is ready"
 msgstr "Your key is ready"
 
