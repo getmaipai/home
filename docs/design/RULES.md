@@ -706,6 +706,9 @@ E4. **Home makes no fit decision.** Whether a part can run on this computer, wha
 E5. **The household's model choice is stored once, by the Stack.** The order, the on or off state, and the per-tier and per-hardware-profile picks per
     category live in the Stack's settings store. Home and Bot read and write them only through the Stack's choices API, and Home keeps no copy. Who may
     use each level needs people and stays in Home. No household's own choice is written into a repo, a default or a migration.
+    This includes the quick or detailed picture model, the video quality, and whether music is on: they are levels and on or off states of the
+    Stack's feature rows, not Home settings. Home passes the household's audience (whether a child or teen lives there) with a request to apply a
+    level, because the Stack has no people (E6). Amended Owner-approved: 2026-11-24 (Jesse, in the question box).
     Record: [stack-owns-model-choices](../plans/stack-owns-model-choices-2026-11-21.md). Owner-approved: 2026-11-21 (Jesse, in the question box).
 E6. **A minor gets the minor's list, and only that.** Home asks the Stack for the minor's list: neutral names, and adult-only parts left
     out (chat rules 0 and 8). The Stack runs a minor's job only on a part in that list. A part whose output can carry speech that is not
