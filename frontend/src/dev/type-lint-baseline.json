@@ -94,7 +94,7 @@
     "apps/settings/BackupsSection.tsx": 8,
     "apps/settings/RobotSelfTests.tsx": 3,
     "apps/settings/StagedApplyBar.tsx": 1,
-    "apps/settings/CodingSettings.tsx": 10,
+    "apps/settings/CodingSettings.tsx": 9,
     "apps/memory/PersonMemories.tsx": 2,
     "apps/chat/MusicCardView.tsx": 3,
     "apps/chat/composerAddMenu.tsx": 2,
