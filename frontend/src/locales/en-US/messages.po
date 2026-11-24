@@ -535,7 +535,7 @@ msgid "{frequency} Hz"
 msgstr "{frequency} Hz"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:139
+#: src/apps/setup/PlanStep.tsx:138
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/performance/DiskHardwareBody.tsx:15
 msgid "{gb} GB"
@@ -852,7 +852,7 @@ msgid "{name} can be closed again if it is on the Always close list."
 msgstr "{name} can be closed again if it is on the Always close list."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:165
+#: src/apps/setup/PlanStep.tsx:164
 msgid "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage."
 msgstr "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage."
 
@@ -1343,11 +1343,6 @@ msgstr "{title} was cancelled."
 #: src/shell/pages/status/StatusBoard.tsx:73
 msgid "{title} will be marked as cancelled."
 msgstr "{title} will be marked as cancelled."
-
-#. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:193
-msgid "{title}: which one"
-msgstr "{title}: which one"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:823
@@ -4024,7 +4019,7 @@ msgid "Battery level"
 msgstr "Battery level"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:156
+#: src/apps/setup/PlanStep.tsx:155
 msgid "Before it downloads: the maker's licence ({name})"
 msgstr "Before it downloads: the maker's licence ({name})"
 
@@ -5191,8 +5186,8 @@ msgstr "Chat works, but a part is down."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:245
-#: src/apps/setup/PlanStep.tsx:127
-#: src/apps/setup/PlanStep.tsx:168
+#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/PlanStep.tsx:167
 msgid "Check again"
 msgstr "Check again"
 
@@ -9066,7 +9061,7 @@ msgid "setting.reference.update.max_mbps.label"
 msgstr "Reference update speed limit (MB/s)"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:116
+#: src/apps/setup/PlanStep.tsx:115
 msgid "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes."
 msgstr "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes."
 
@@ -12211,7 +12206,7 @@ msgid "Home couldn't reach that address. Check it and that the search service is
 msgstr "Home couldn't reach that address. Check it and that the search service is running, then press Test."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:127
+#: src/apps/setup/PlanStep.tsx:126
 msgid "Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again."
 msgstr "Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again."
 
@@ -12261,7 +12256,7 @@ msgid "failure.voice.speaking_failed.adultNoRepairs"
 msgstr "Home couldn't speak that reply, so read it on screen. Voice will try again on your next question."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:121
+#: src/apps/setup/PlanStep.tsx:120
 msgid "Home couldn't start the download. Press Install again."
 msgstr "Home couldn't start the download. Press Install again."
 
@@ -12343,7 +12338,7 @@ msgid "Home is ready to turn on its secure address."
 msgstr "Home is ready to turn on its secure address."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:125
+#: src/apps/setup/PlanStep.tsx:124
 msgid "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready."
 msgstr "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready."
 
@@ -13081,7 +13076,7 @@ msgid "I have copied it"
 msgstr "I have copied it"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:159
+#: src/apps/setup/PlanStep.tsx:158
 msgid "I have read it and I accept it"
 msgstr "I have read it and I accept it"
 
@@ -13323,7 +13318,7 @@ msgid "Install"
 msgstr "Install"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:43
+#: src/apps/setup/PlanStep.tsx:42
 msgid "Install and continue"
 msgstr "Install and continue"
 
@@ -13391,7 +13386,7 @@ msgstr "Install without a backup."
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/settings/styles/StyleBrowser.tsx:129
-#: src/apps/setup/PlanStep.tsx:185
+#: src/apps/setup/PlanStep.tsx:182
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:50
@@ -15506,7 +15501,7 @@ msgid "Looking at this computer."
 msgstr "Looking at this computer."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:128
+#: src/apps/setup/PlanStep.tsx:127
 msgid "Looking at this computer…"
 msgstr "Looking at this computer…"
 
@@ -18375,7 +18370,7 @@ msgid "Not connected yet"
 msgstr "Not connected yet"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:160
+#: src/apps/setup/PlanStep.tsx:159
 msgid "Not for you? Turn Videos off above and nothing of it downloads."
 msgstr "Not for you? Turn Videos off above and nothing of it downloads."
 
@@ -18623,7 +18618,7 @@ msgid "Nothing shared yet."
 msgstr "Nothing shared yet."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:116
+#: src/apps/setup/PlanStep.tsx:115
 msgid "Nothing to download: everything you ticked is already installed."
 msgstr "Nothing to download: everything you ticked is already installed."
 
@@ -18714,7 +18709,7 @@ msgstr "Nudges"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:46
-#: src/apps/setup/PlanStep.tsx:202
+#: src/apps/setup/PlanStep.tsx:192
 msgid "off"
 msgstr "off"
 
@@ -19031,7 +19026,7 @@ msgstr "Olive"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:46
-#: src/apps/setup/PlanStep.tsx:202
+#: src/apps/setup/PlanStep.tsx:192
 msgid "on"
 msgstr "on"
 
@@ -24139,7 +24134,7 @@ msgid "Setting"
 msgstr "Setting"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/PlanStep.tsx:125
 msgid "Setting up the AI engine stopped."
 msgstr "Setting up the AI engine stopped."
 
@@ -25716,7 +25711,7 @@ msgid "Starter style"
 msgstr "Starter style"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:125
+#: src/apps/setup/PlanStep.tsx:124
 #: src/shell/pages/MusicSongDetails.tsx:151
 msgid "starting"
 msgstr "starting"
@@ -27346,7 +27341,7 @@ msgid "The base synth is missing. Refresh the Synths list and try again."
 msgstr "The base synth is missing. Refresh the Synths list and try again."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:170
+#: src/apps/setup/PlanStep.tsx:169
 msgid "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on."
 msgstr "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on."
 
@@ -27576,7 +27571,7 @@ msgid "setting.safety.alarm.voice.help"
 msgstr "The fixed alarm voice; the deterministic alarm path does not use a model."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:158
+#: src/apps/setup/PlanStep.tsx:157
 msgid "The full licence: {url}"
 msgstr "The full licence: {url}"
 
@@ -28623,7 +28618,7 @@ msgid "setting.engines.stack.where.option_label.this_computer"
 msgstr "This Computer"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:145
+#: src/apps/setup/PlanStep.tsx:144
 msgid "This computer can't run this, so nothing is downloaded for it."
 msgstr "This computer can't run this, so nothing is downloaded for it."
 
@@ -29196,7 +29191,7 @@ msgid "setting.news.default_topics.teen.label"
 msgstr "Topics followed by default for teen"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:137
+#: src/apps/setup/PlanStep.tsx:136
 msgid "Total graphics memory"
 msgstr "Total graphics memory"
 
@@ -29353,7 +29348,7 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
-#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/PlanStep.tsx:125
 #: src/apps/setup/SetupWizard.tsx:450
 #: src/apps/setup/SetupWizard.tsx:503
 #: src/apps/setup/StorageStep.tsx:35
@@ -31137,7 +31132,7 @@ msgid "area.What connects to the internet"
 msgstr "What connects to the internet"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:145
+#: src/apps/setup/PlanStep.tsx:144
 msgid "What gets installed"
 msgstr "What gets installed"
 

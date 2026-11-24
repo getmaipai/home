@@ -601,7 +601,7 @@ msgid "{frequency} Hz"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:139
+#: src/apps/setup/PlanStep.tsx:138
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/performance/DiskHardwareBody.tsx:15
 #, needs-review
@@ -972,7 +972,7 @@ msgid "{name} can be closed again if it is on the Always close list."
 msgstr "{name} se puede cerrar de nuevo si está en la lista Cerrar siempre."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:165
+#: src/apps/setup/PlanStep.tsx:164
 #, needs-review
 msgid "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage."
 msgstr "{name} viene con esta parte. Aceptaste su licencia al inicio. Los términos están en Modelos y almacenamiento."
@@ -1545,12 +1545,6 @@ msgstr "{title} se canceló."
 #, needs-review
 msgid "{title} will be marked as cancelled."
 msgstr "{title} se marcará como cancelado."
-
-#. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:193
-#, needs-review
-msgid "{title}: which one"
-msgstr "{title}: cuál"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:823
@@ -4564,7 +4558,7 @@ msgid "Battery level"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:156
+#: src/apps/setup/PlanStep.tsx:155
 #, needs-review
 msgid "Before it downloads: the maker's licence ({name})"
 msgstr "Antes de que se descargue: la licencia del creador ({name})"
@@ -5885,8 +5879,8 @@ msgstr "El chat funciona, pero una parte está caída."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:245
-#: src/apps/setup/PlanStep.tsx:127
-#: src/apps/setup/PlanStep.tsx:168
+#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/PlanStep.tsx:167
 msgid "Check again"
 msgstr ""
 
@@ -10276,7 +10270,7 @@ msgid "setting.reference.update.max_mbps.label"
 msgstr "Límite de velocidad de actualización de referencias (MB/s)"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:116
+#: src/apps/setup/PlanStep.tsx:115
 #, needs-review
 msgid "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes."
 msgstr "La descarga empezó. Mírala en la barra arriba de esta página. Puedes seguir usando Home mientras termina."
@@ -13839,7 +13833,7 @@ msgid "Home couldn't reach that address. Check it and that the search service is
 msgstr "Home no pudo llegar a esa dirección. Revísala y asegúrate de que el servicio de búsqueda esté activo. Luego, pulsa Probar."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:127
+#: src/apps/setup/PlanStep.tsx:126
 #, needs-review
 msgid "Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again."
 msgstr "Home no pudo conectar con el motor de IA para hacer un plan. Espera un minuto y vuelve a pulsar Comprobar."
@@ -13899,7 +13893,7 @@ msgid "failure.voice.speaking_failed.adultNoRepairs"
 msgstr "Home no pudo hablar esa respuesta, así que léela en pantalla. La voz lo intentará de nuevo con tu próxima pregunta."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:121
+#: src/apps/setup/PlanStep.tsx:120
 #, needs-review
 msgid "Home couldn't start the download. Press Install again."
 msgstr "Home no pudo iniciar la descarga. Pulsa Instalar otra vez."
@@ -13996,7 +13990,7 @@ msgid "Home is ready to turn on its secure address."
 msgstr "Home está listo para activar su dirección segura."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:125
+#: src/apps/setup/PlanStep.tsx:124
 #, needs-review
 msgid "Home is setting up the AI engine on this computer. Now: {stage}. This page continues by itself when it is ready."
 msgstr "Home está configurando el motor de IA en este equipo. Ahora: {stage}. Esta página continúa sola cuando esté lista."
@@ -14836,7 +14830,7 @@ msgid "I have copied it"
 msgstr "Ya la copié"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:159
+#: src/apps/setup/PlanStep.tsx:158
 #, needs-review
 msgid "I have read it and I accept it"
 msgstr "Lo he leído y lo acepto"
@@ -15112,7 +15106,7 @@ msgid "Install"
 msgstr "Instalar"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:43
+#: src/apps/setup/PlanStep.tsx:42
 #, needs-review
 msgid "Install and continue"
 msgstr "Instalar y continuar"
@@ -15193,7 +15187,7 @@ msgstr "Instalar sin copia de seguridad."
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
 #: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/settings/styles/StyleBrowser.tsx:129
-#: src/apps/setup/PlanStep.tsx:185
+#: src/apps/setup/PlanStep.tsx:182
 #: src/apps/setup/SetupWizard.tsx:480
 #: src/shell/pages/EnginesPage.tsx:32
 #: src/shell/pages/UpdatesPage.tsx:50
@@ -17608,7 +17602,7 @@ msgid "Looking at this computer."
 msgstr "Mirando este equipo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:128
+#: src/apps/setup/PlanStep.tsx:127
 #, needs-review
 msgid "Looking at this computer…"
 msgstr "Revisando este equipo…"
@@ -20826,7 +20820,7 @@ msgid "Not connected yet"
 msgstr "Aún no conectado"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:160
+#: src/apps/setup/PlanStep.tsx:159
 msgid "Not for you? Turn Videos off above and nothing of it downloads."
 msgstr ""
 
@@ -21104,7 +21098,7 @@ msgid "Nothing shared yet."
 msgstr "Aún no hay nada compartido."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:116
+#: src/apps/setup/PlanStep.tsx:115
 #, needs-review
 msgid "Nothing to download: everything you ticked is already installed."
 msgstr "Nada que descargar: todo lo que marcaste ya está instalado."
@@ -21208,7 +21202,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:46
-#: src/apps/setup/PlanStep.tsx:202
+#: src/apps/setup/PlanStep.tsx:192
 #, needs-review
 msgid "off"
 msgstr "desactivado"
@@ -21562,7 +21556,7 @@ msgstr "Oliva"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:46
-#: src/apps/setup/PlanStep.tsx:202
+#: src/apps/setup/PlanStep.tsx:192
 #, needs-review
 msgid "on"
 msgstr "activa"
@@ -27320,7 +27314,7 @@ msgid "Setting"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/PlanStep.tsx:125
 #, needs-review
 msgid "Setting up the AI engine stopped."
 msgstr "La configuración del motor de IA se detuvo."
@@ -29094,7 +29088,7 @@ msgid "Starter style"
 msgstr "Estilo inicial"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:125
+#: src/apps/setup/PlanStep.tsx:124
 #: src/shell/pages/MusicSongDetails.tsx:151
 #, needs-review
 msgid "starting"
@@ -30918,7 +30912,7 @@ msgid "The base synth is missing. Refresh the Synths list and try again."
 msgstr "Falta el synth base. Actualiza la lista de Synths e inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:170
+#: src/apps/setup/PlanStep.tsx:169
 #, needs-review
 msgid "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on."
 msgstr "El botón espera que aceptes la licencia del creador arriba. Acepta o quita la marca de esa fila para seguir."
@@ -31175,7 +31169,7 @@ msgid "setting.safety.alarm.voice.help"
 msgstr "La voz fija de la alarma; la ruta determinista de la alarma no usa un modelo."
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:158
+#: src/apps/setup/PlanStep.tsx:157
 #, needs-review
 msgid "The full licence: {url}"
 msgstr "La licencia completa: {url}"
@@ -32345,7 +32339,7 @@ msgid "setting.engines.stack.where.option_label.this_computer"
 msgstr "Este ordenador"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:145
+#: src/apps/setup/PlanStep.tsx:144
 #, needs-review
 msgid "This computer can't run this, so nothing is downloaded for it."
 msgstr "Este equipo no puede ejecutar esto. Por eso nada se descarga para él."
@@ -32989,7 +32983,7 @@ msgid "setting.news.default_topics.teen.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:137
+#: src/apps/setup/PlanStep.tsx:136
 #, needs-review
 msgid "Total graphics memory"
 msgstr "Memoria gráfica total"
@@ -33170,7 +33164,7 @@ msgstr "Frase de activación, p. ej. \"noche de cine\""
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
-#: src/apps/setup/PlanStep.tsx:126
+#: src/apps/setup/PlanStep.tsx:125
 #: src/apps/setup/SetupWizard.tsx:450
 #: src/apps/setup/SetupWizard.tsx:503
 #: src/apps/setup/StorageStep.tsx:35
@@ -35192,7 +35186,7 @@ msgid "area.What connects to the internet"
 msgstr "Lo que se conecta a internet"
 
 #. js-lingui-explicit-id
-#: src/apps/setup/PlanStep.tsx:145
+#: src/apps/setup/PlanStep.tsx:144
 #, needs-review
 msgid "What gets installed"
 msgstr "Lo que se instala"
