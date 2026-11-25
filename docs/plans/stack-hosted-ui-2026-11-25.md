@@ -28,7 +28,7 @@ The Stack owns models, features, modes and connections. Home is a frontend for h
 
 ## The constraint that shapes every option
 
-A person's browser, often a phone, cannot reach the Stack. The Stack is on loopback of the Stack computer, and the SSH forward belongs to Home's backend, not to the browser. So every option below needs Home's backend to relay bytes between the browser and the Stack. The options differ in what runs in the browser and how much it trusts Home's page.
+Update 2026-11-25: Jesse lifted the loopback-only rule (relayed by another session; see option 4c). This section describes the Stack as built today. A person's browser, often a phone, cannot reach the Stack. The Stack is on loopback of the Stack computer, and the SSH forward belongs to Home's backend, not to the browser. So every option below needs Home's backend to relay bytes between the browser and the Stack. The options differ in what runs in the browser and how much it trusts Home's page.
 
 One generic relay, `/stack-ui/*`, does three jobs for every screen:
 
@@ -108,9 +108,23 @@ Only 4a is evaluated below.
 | Phone layout | full-page frame | native | native | native |
 | Smallest change in Home | frame, relay, CSP `frame-src` | loader, relay | build plugin, relay | loader, pass-through |
 
+### 4c. Direct call to the Stack, now that loopback-only is lifted
+
+Jesse's decision as relayed on 2026-11-25 (not yet confirmed to this session by Jesse; see "Questions"): the Stack no longer has to listen on loopback only. A browser can then call the Stack itself. Nothing here changes what the code binds to today; the model below is what the Stack needs before any build opens a port.
+
+- **Where it listens.** A Stack setting with three values: this computer (the default and today's behavior), home network, tailnet (an admin turns it on, as the Tailscale listener works now). Changed only from the Stack's own admin page, behind the admin session, never by Home's token. A banner on that page shows the current value. Off-loopback, a request that fails authentication gets 401 with no detail; the only open route is a bare health check.
+- **Transport.** Plain http off the machine is refused. On the tailnet, the Stack serves https with a Tailscale-issued certificate, which browsers trust. On the home network there is no certificate a browser trusts without a household certificate authority installed on each device, which is too heavy for a phone or a TV. So on the home network a browser still goes through Home's pass-through (4a), and Home talks to the Stack over the existing SSH forward. Mixed content also blocks an https Home page from calling an http Stack.
+- **Who may call, and how each call is checked.** Home issues a short-lived signed token: `{role, lane, audience, actor label, screens, expiry, id}`, valid about 5 minutes, signed with a key whose public half the Stack stored at pairing (the Stack never holds a private key). The browser asks Home for it (Home applies its gates first: sign-in, role, lane), keeps it in memory only (never in storage or a URL), and sends it as `Authorization: Bearer`. The Stack checks signature, expiry, audience (this Stack), scope (the screen's API prefixes and methods) and that the id is not revoked. Removing a connection, or pausing it, revokes every token it issued. The admin session stays, for the Stack's own page only, in a separate `SameSite=Strict` cookie that no token route accepts.
+- **CORS.** An allow-list of exact Home origins, written at pairing. No wildcard, no credentials mode on token routes, preflight answered only for listed origins. An origin that is not listed gets no CORS headers.
+- **Rate limits.** Per token id and per address, in classes: reads, changes, and expensive jobs. A bad signature counts against the address and locks it out for a window, as the admin login does today.
+- **No outbound connection.** Unchanged. Listening adds inbound traffic only. The Stack fetches nothing to verify a token (the public key is already stored) and never calls Home.
+- **What stays refused for minors.** The Stack refuses a token whose lane is child or teen on every admin scope, and runs a minor's job only on a part in the minor's list (E6), whatever the request says. Home never issues an admin-scope token to a minor. A token cannot raise its own lane, and a request with no valid token gets nothing, including from the same computer once any off-loopback listener is on.
+- **What Home still decides.** Sign-in, role, lane, which screens appear, per-person tool and level use, token issue, audit of issue. The Stack decides whether a token is valid for the route.
+- **Comparison with 4a.** 4c removes Home's per-request hop and the pass-through for tailnet clients, and puts the Stack's security surface on the network, so its authentication code must be as careful as Home's own. 4a needs none of that and works on the home network today. They share the manifest, the scope table, the module and the token claims, so 4a first and 4c later is not a rewrite.
+
 ## Recommendation: option 4a, direct call through a generic pass-through
 
-Jesse's performance and security concerns point the same way, and the facts support them for the common case. A frame boots a second app and needs its theme and language sent by message; option 4a has neither cost. The security difference is real (the module runs in Home's page), but the control that matters most, who may do what on the Stack, sits in the one pass-through and its scope table for both options. Take option 4a, with a shadow root and the module's own React copy. Keep option 1 as the answer for any screen whose code Jesse does not want in Home's page, and for a third-party Stack screen if one ever exists (the relay, assertion and manifest carry over unchanged). Federation (option 3) is out for coupling Home's build to the Stack. Exposing the Stack to the browser (4b) is out.
+Jesse's performance and security concerns point the same way, and the facts support them for the common case. A frame boots a second app and needs its theme and language sent by message; option 4a has neither cost. The security difference is real (the module runs in Home's page), but the control that matters most, who may do what on the Stack, sits in the one pass-through and its scope table for both options. Take option 4a first, with a shadow root and the module's own React copy. Keep option 1 as the answer for any screen whose code Jesse does not want in Home's page, and for a third-party Stack screen if one ever exists (the relay, assertion and manifest carry over unchanged). Federation (option 3) is out for coupling Home's build to the Stack. Exposing the Stack to the browser as it is today (4b) is out. Direct calls (4c) come later, when the Stack has the security model above; they need a tailnet certificate and do not replace the pass-through on the home network.
 
 Everything below that was written for the frame (the ticket in the path, the sandbox) becomes a per-request assertion and a scope table under 4a. The first step, the Stack changes, the rules and the losses are otherwise the same; where they differ, the text says so.
 
@@ -140,6 +154,8 @@ The embed does not remove what needs people. These stay as Home components besid
 
 ## Rule changes needed (only Jesse changes a rule)
 
+**Stack (`AGENTS.md` and `docs/dev.md`, the loopback-only and no-LAN-exposure statement).** Replace it with: where the Stack listens is a household setting (this computer, home network, tailnet), and every request must be authenticated; details in this note, option 4c. The edit needs Jesse's own word and carries `Owner-approved: <date>`.
+
 **Stack (`AGENTS.md`, the connections and no-people rule).** The Stack accepts one more kind of caller credential: a ticket Home signs, carrying a role, a lane, an audience and an opaque actor label for audit, never a name. It is accepted for the embed routes only, scoped to one screen's API prefixes, short lived. "No people" still holds: the Stack stores no person and never decides who may act; it checks Home's signature and the scope. It also gains the embed routes and the manifest.
 
 **Home `RULES.md`, Engine boundary.** Add a rule E9: Home shows Stack-owned screens only by embedding what the Stack serves through the one relay, and never writes a Stack screen, adapter or per-feature forwarder; an age or surface gate is decided by Home before a ticket exists. E5 stays as written (Home keeps no copy of a choice). The existing forwarders are retired by build rows, not by this note.
@@ -166,4 +182,5 @@ The embed does not remove what needs people. These stay as Home components besid
 2. Is one generic relay in Home acceptable, since the Stack stays loopback-only and the browser cannot reach it?
 3. Which screen first: Drives (recommended) or Modes?
 4. Today's audit line carries the person's Home id. Keep that, or send only the role to the Stack (the Stack would then log the role and screen)?
-5. Do you accept option 4a, where the Stack's code runs in Home's page with the person's cookie, or do you want the sandboxed iframe for that reason?
+5. Please confirm yourself that the Stack's loopback-only rule is lifted (this note has only another session's relay of it), and that tokens, not the admin session, authenticate browser calls.
+6. Do you accept option 4a, where the Stack's code runs in Home's page with the person's cookie, or do you want the sandboxed iframe for that reason?
