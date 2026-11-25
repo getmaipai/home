@@ -123,3 +123,7 @@ aiStackRoutes.openapi(driveRoute("get", "/disks/moves", "Recent moves with progr
 aiStackRoutes.openapi(driveRoute("post", "/disks/moves", "Plan or start moving a feature's files to another drive (the Stack's POST /stack/v1/disks/moves)"),
   async (c) => { const sent = (await readBody(c)) as { dry_run?: unknown }; return pass(c, sent.dry_run === true ? "read" : "disks.move", () => forwardToStack("POST", "/stack/v1/disks/moves", sent), sent.dry_run === true ? undefined : choicesChanged); });
 aiStackRoutes.openapi(driveRoute("post", "/disks/moves/cancel", "Cancel the running move (the Stack's POST /stack/v1/disks/moves/cancel)"), (c) => pass(c, "disks.move.cancel", () => forwardToStack("POST", "/stack/v1/disks/moves/cancel", {})));
+aiStackRoutes.openapi(driveRoute("post", "/disks", "Add a drive that can hold models (the Stack's POST /stack/v1/disks)"),
+  async (c) => pass(c, "disks.add", async () => forwardToStack("POST", "/stack/v1/disks", await readBody(c)), choicesChanged));
+aiStackRoutes.openapi(createRoute({ method: "delete", path: "/disks/{id}", tags: ["AI"], summary: "Forget a drive (the Stack's DELETE /stack/v1/disks/{id}; refused while models are on it)", middleware: [requireRole("owner", "admin")] as const, request: { params: idParam }, responses: ok("Removed.") }),
+  (c) => pass(c, `disks.remove ${c.req.valid("param").id}`, () => forwardToStack("DELETE", `/stack/v1/disks/${encodeURIComponent(c.req.valid("param").id)}`), choicesChanged));

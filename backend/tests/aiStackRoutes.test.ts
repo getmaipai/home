@@ -227,4 +227,13 @@ describe("drives", () => {
     expect((await client.get("/api/ai/stack/disks")).status).toBe(403);
     expect(calls.filter((call) => call.path.startsWith("/stack/v1/disks"))).toEqual([]);
   });
+  test("adding and removing a drive reach the Stack and are audited; a plain adult is refused", async () => {
+    const { client, actor } = await admin();
+    expect((await client.post("/api/ai/stack/disks", { label: "Spare", root_path: "/Volumes/Spare", removable: true })).status).toBe(200);
+    expect((await client.delete("/api/ai/stack/disks/spare")).status).toBe(200);
+    expect(calls.filter((call) => call.path.startsWith("/stack/v1/disks")).map((call) => `${call.method} ${call.path}`)).toEqual(["POST /stack/v1/disks", "DELETE /stack/v1/disks/spare"]);
+    calls = []; demote(actor.id, "adult");
+    expect((await client.post("/api/ai/stack/disks", { label: "X", root_path: "/x", removable: false })).status).toBe(403);
+    expect(calls).toEqual([]);
+  });
 });

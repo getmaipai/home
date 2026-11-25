@@ -27,6 +27,8 @@ export function createHomeStackClient(): StackClient {
       move: (featureId, toDiskId) => call("/disks/moves", json("POST", { feature_id: featureId, to_disk_id: toDiskId })),
       moves: () => call("/disks/moves"),
       cancel: () => call("/disks/moves/cancel", json("POST", {})),
+      add: (body) => call("/disks", json("POST", body)),
+      remove: (id) => call(`/disks/${part(id)}`, { method: "DELETE" }),
     },
     readChoices: () => call("/choices"),
     setRoleEnabled: async (role, enabled) => { await call("/settings", json("PUT", { [`stack.roles.${role}.enabled`]: enabled })); },
