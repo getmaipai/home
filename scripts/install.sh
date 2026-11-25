@@ -47,7 +47,7 @@ STACK_REPO="getmaipai/stack"
 # the Chatterbox Turbo voice engine (VOICE-STUDIO-01), voices made from a clip with their own temperature and pitch (VOICES-02) and, from 2026-10-21, the optional Qwen3.6-35B-A3B chat model and a chat-model choice that survives a restart (MODEL-SWITCH-01) and the media job that finishes a companion character's clip (CMEDIA-STACK-01). A bump to this line
 # must be checked against every one of those: an old value silently rebuilds
 # the Stack without them.
-STACK_TAG="e6fbd0f7095b27e77384f34b03869202ce68fd5c"
+STACK_TAG="30e84048eff3e024be6fbd3dbf5cb1c1be03d836"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
@@ -1908,6 +1908,7 @@ commons_archive_sha256() {
     ui-v0.5.751) printf '%s\n' "202065a695fbd2fd1357f304e01ad10df1508ed681f337c1f9d939df7604599e" ;;
     ui-v0.5.752) printf '%s\n' "57e587f3b219146e60508263cd5e2466f0ad62f62e64626b1e913e78ca8d5969" ;;
     ui-v0.5.753) printf '%s\n' "dd716720e922819d8309095bc625114e96abcd476db2bb820ddbefa12c7b2c99" ;;
+    spec-v0.1.484) printf '%s\n' "61ad55931a2402322b40f13e276330c6eb538216a42f816657f6532a9955c4fd" ;;
     *) return 1 ;;
   esac
 }
