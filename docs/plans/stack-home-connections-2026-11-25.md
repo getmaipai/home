@@ -66,3 +66,11 @@ The Stack's "no people, no clients, no keys" rule. This design gives the Stack a
 
 - Whether the existing OS helper can remove one Home's authorization without a restart of the SSH service. Check before step 2.
 - Whether more than one Home can pair to one Stack today. The record assumes yes.
+
+## Learned in phase 1 (2026-11-25, spec 0.1.484, Stack `/stack/v1/connections`)
+
+- **The Stack has one Home token, not one per Home.** Admission checks a single shared token (`keys/home-view-token`), so the Stack cannot tell two Homes apart. Phase 1 keeps one `home` record, made the first time a request carries the valid token, and stamps its `last_seen_at` (at most every 30 seconds). More than one paired Home needs a per-Home identity first; the record shape already allows it.
+- **Home's `reach` is a guess.** The Stack cannot see whether a Home came by this computer, the home network or Tailscale (all arrive on loopback). The record says `this_computer` until the pairing helper reports it. `key_fingerprint` stays null for the same reason.
+- **Pause and Remove are record-only.** They change the Stack's list. They do not yet stop that Home's calls or revoke its SSH authorization. That needs the OS helper (the first "Not sure about" item below, still open).
+- **Secrets:** read `docs/CREDENTIALS.md` and `lib/secrets.ts`. The rule is clear for a record: no value in a table or reply. The record holds only `secret_ref`, an opaque name, and the add route refuses anything else. Storing a token under that name (encrypted with the Stack's keystore, status only, one-click revoke) is not built; it belongs to the phase that runs MCP servers.
+- **Added at the Stack:** `last_used_at` and `tools` exist but stay empty until MCP execution; Test answers "not available yet".
