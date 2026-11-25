@@ -20,6 +20,14 @@ const part = (id: string) => encodeURIComponent(id);
 
 export function createHomeStackClient(): StackClient {
   return {
+    drives: {
+      list: () => call("/disks"),
+      features: () => call("/disks/features"),
+      plan: (featureId, toDiskId) => call("/disks/moves", json("POST", { feature_id: featureId, to_disk_id: toDiskId, dry_run: true })),
+      move: (featureId, toDiskId) => call("/disks/moves", json("POST", { feature_id: featureId, to_disk_id: toDiskId })),
+      moves: () => call("/disks/moves"),
+      cancel: () => call("/disks/moves/cancel", json("POST", {})),
+    },
     readChoices: () => call("/choices"),
     setRoleEnabled: async (role, enabled) => { await call("/settings", json("PUT", { [`stack.roles.${role}.enabled`]: enabled })); },
     setRolePriorities: async (priorities) => { await call("/settings", json("PUT", Object.fromEntries(Object.entries(priorities).map(([role, value]) => [`stack.roles.${role}.priority`, value])))); },

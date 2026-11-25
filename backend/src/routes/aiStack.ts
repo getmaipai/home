@@ -113,3 +113,13 @@ aiStackRoutes.openapi(createRoute({ method: "post", path: "/migration/dismiss", 
 // Where the Stack's own admin page is (its address on this computer, and over Tailscale when the Stack allows it), for the "Open Stack admin" link.
 aiStackRoutes.openapi(createRoute({ method: "get", path: "/admin-link", tags: ["AI"], summary: "Where the Stack's own admin page is", middleware: [requireRole("owner", "admin")] as const, responses: ok("The link and the plain reason.") }),
   async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readAdminLink(), 200) as never; });
+
+// Drives (multi-disk, 2026-11-25): which drives hold the models, where each feature's files are, and the Move button. The Stack does the work;
+// these pass the calls through unchanged (`/api/ai/stack/disks...` is `/stack/v1/disks...`).
+const driveRoute = (method: "get" | "post", path: string, summary: string) => createRoute({ method, path, tags: ["AI"], summary, middleware: [requireRole("owner", "admin")] as const, ...(method === "post" ? { request: { body: body(false) } } : {}), responses: ok(summary) });
+aiStackRoutes.openapi(driveRoute("get", "/disks", "The drives that hold models (the Stack's GET /stack/v1/disks)"), (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/disks")));
+aiStackRoutes.openapi(driveRoute("get", "/disks/features", "Which drive each feature's files are on (the Stack's GET /stack/v1/disks/features)"), (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/disks/features")));
+aiStackRoutes.openapi(driveRoute("get", "/disks/moves", "Recent moves with progress (the Stack's GET /stack/v1/disks/moves)"), (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/disks/moves")));
+aiStackRoutes.openapi(driveRoute("post", "/disks/moves", "Plan or start moving a feature's files to another drive (the Stack's POST /stack/v1/disks/moves)"),
+  async (c) => { const sent = (await readBody(c)) as { dry_run?: unknown }; return pass(c, sent.dry_run === true ? "read" : "disks.move", () => forwardToStack("POST", "/stack/v1/disks/moves", sent), sent.dry_run === true ? undefined : choicesChanged); });
+aiStackRoutes.openapi(driveRoute("post", "/disks/moves/cancel", "Cancel the running move (the Stack's POST /stack/v1/disks/moves/cancel)"), (c) => pass(c, "disks.move.cancel", () => forwardToStack("POST", "/stack/v1/disks/moves/cancel", {})));

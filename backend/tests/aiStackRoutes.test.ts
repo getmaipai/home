@@ -208,3 +208,23 @@ describe("the link to the Stack's own admin page", () => {
     expect((await client.get("/api/ai/stack/admin-link")).status).toBe(403);
   });
 });
+
+describe("drives", () => {
+  test("an admin reads drives, feature locations and moves; a dry run is a read; a real move is audited and reaches the Stack", async () => {
+    const { client } = await admin();
+    expect((await client.get("/api/ai/stack/disks")).status).toBe(200);
+    expect((await client.get("/api/ai/stack/disks/features")).status).toBe(200);
+    expect((await client.get("/api/ai/stack/disks/moves")).status).toBe(200);
+    await client.post("/api/ai/stack/disks/moves", { feature_id: "coding", to_disk_id: "usb", dry_run: true });
+    await client.post("/api/ai/stack/disks/moves", { feature_id: "coding", to_disk_id: "usb" });
+    await client.post("/api/ai/stack/disks/moves/cancel", {});
+    expect(calls.filter((call) => call.path.startsWith("/stack/v1/disks")).map((call) => `${call.method} ${call.path}${(call.body as { dry_run?: boolean } | undefined)?.dry_run ? " dry" : ""}`)).toEqual([
+      "GET /stack/v1/disks", "GET /stack/v1/disks/features", "GET /stack/v1/disks/moves", "POST /stack/v1/disks/moves dry", "POST /stack/v1/disks/moves", "POST /stack/v1/disks/moves/cancel"]);
+  });
+  test("a plain adult is refused and nothing reaches the Stack", async () => {
+    const { client, actor } = await admin(); demote(actor.id, "adult");
+    expect((await client.post("/api/ai/stack/disks/moves", { feature_id: "coding", to_disk_id: "usb" })).status).toBe(403);
+    expect((await client.get("/api/ai/stack/disks")).status).toBe(403);
+    expect(calls.filter((call) => call.path.startsWith("/stack/v1/disks"))).toEqual([]);
+  });
+});
