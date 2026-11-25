@@ -29,6 +29,18 @@ The Stack admin page should show and manage the Homes connected to it. The conne
 4. Stack admin adapter and Home forwarder plus adapter; pairing UI in Home reduced to a thin section.
 5. Pin bumps, previews on desktop and phone width, ship.
 
+## Scope widened by Jesse, 2026-11-25: every connection, custom MCPs included
+
+The Stack manages all connections, not only Homes. The record gets a `kind`: `home` (a paired Home) or `mcp` (a custom MCP server the household adds). Both appear in the one Connections section on the Stack admin page and, through the same forwarder, in Home. Later kinds (an integration, a robot) use the same record.
+
+What an `mcp` connection adds:
+- **Fields:** name, how it starts or where it is (a local command or a URL), the tools it offers (read from the server), state, last used, and a reference to its secret.
+- **Actions:** Add, Test (starts it and lists its tools), Pause, Remove.
+- **Who may use which tool stays in Home.** The Stack manages whether the connection exists and works. Home's age and surface gates decide which person may call which tool (RULES: age and surface gates outrank everything). A tool the Stack offers is never usable until Home's gates allow it for that person.
+- **Secrets:** an MCP server often needs an API token. That is key material, so the amended Stack rule needs one more line: tokens are stored through the Stack's existing secrets mechanism and the credentials center, never in the record and never shown again. Load `docs/CREDENTIALS.md` before building; this note does not settle it.
+- **Where the MCP runs:** not decided. Today Home runs MCP tools in its package host (`lib/denoHost.ts`). If the connection is owned by the Stack, either the Stack runs the client and Home calls tools through it, or Home keeps running them and reads the Stack's record. The first matches "managed at the Stack" fully and is the recommendation; it needs a design pass on the tool-call path before any code.
+- **Adjacent backlog:** "Speak MCP for local tools inside the hub" (CREATOR-32) is the other direction (Home as an MCP server) and stays separate.
+
 ## Reuse check (RULES S4, 9b)
 
 The list is drawn inside the kit's settings shell as a section, like Drives, using shipped primitives only (rows, status badge, Button, confirm dialog from `commons/ui`). No prebuilt kit block lists paired devices, so `StackConnections` is a thin composition of those primitives, not a new look. No Element gets a `className` that changes its shape.
