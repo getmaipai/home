@@ -140,6 +140,8 @@ lorasSourceRoutes.openapi(createRoute({
 }), async (c) => {
   const no = denied(c); if (no) return no as never;
   if (surfaceOf(c) !== "own_written") return c.json({ error: OWN_SCREEN_LINE, code: "own_screen" }, 403) as never;
+  // Choosing All ages at install lowers what the source may have called adult: it needs the admin's own open Adult lock, as the old install flow did.
+  if (c.req.valid("json").audience === "all-ages" && !unlockedFor(person(c), requestProof())) return c.json({ error: "Unlock adult items first to choose All ages for this style.", code: "unlock_needed" }, 403) as never;
   try {
     // The adder is the signed-in admin, never a value from the page. An uncertain audience is the Stack's to decide; a person's explicit choice rides along.
     const out = await callStack("POST", "/stack/v1/loras/install", { ...c.req.valid("json"), added_by: person(c).id });

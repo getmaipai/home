@@ -204,3 +204,16 @@ describe("the adult-lock ticket the Stack uses up through Home", () => {
     expect(view.classification).toBe("all-ages");
   });
 });
+
+describe("installing as All ages needs the open Adult lock", () => {
+  const body = { media: "picture", source: "civitai", url: "https://civitai.com/models/1", name: "Paper boat", audience: "all-ages" };
+  test("a signed-in admin with the lock closed is refused before anything reaches the Stack; with it open the request goes through", async () => {
+    const { owner } = await household();
+    const closed = await owner.request(`${STYLES}/install`, { method: "POST", body });
+    expect(closed.status).toBe(403);
+    expect(((await closed.json()) as { code: string }).code).toBe("unlock_needed");
+    const proof = unlockHeader(await unlock(owner, "correcthorse"));
+    const open = await owner.request(`${STYLES}/install`, { method: "POST", body, headers: proof });
+    expect(open.status).not.toBe(403);
+  });
+});

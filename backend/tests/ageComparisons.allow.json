@@ -178,7 +178,6 @@
   "frontend/src/apps/people/NewPersonForm.tsx": 5,
   "frontend/src/apps/people/roles.ts": 3,
   "frontend/src/apps/reminders/RemindersPage.tsx": 2,
-  "frontend/src/apps/settings/styles/StyleEditor.tsx": 2,
   "frontend/src/apps/settings/UsersSection.tsx": 3,
   "frontend/src/apps/settings/VoiceBrowserSection.tsx": 5,
   "frontend/src/lib/currentLocation.ts": 1,
