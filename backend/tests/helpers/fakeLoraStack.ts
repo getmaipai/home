@@ -32,12 +32,17 @@ export function viewOfLora(lora: Lora): StackLoraView {
 // usable by admins only and a picture style by adults, as the old first read made them; a change to one lands on the registered object itself.
 type LegacyLora = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 const legacy: Partial<Record<"video" | "picture", () => LegacyLora[]>> = {};
-export function registerLegacyLoras(media: "video" | "picture", provider: (() => LegacyLora[]) | null): void { if (provider) legacy[media] = provider; else delete legacy[media]; }
+// A style that was in the fake when it was installed is the household's old library (a picture style is on for adults, as it was); one added afterwards is new, so
+// it starts for admins only, like every style the Stack installs.
+const initial = new Set<string>();
+export function registerLegacyLoras(media: "video" | "picture", provider: (() => LegacyLora[]) | null): void {
+  if (provider) { legacy[media] = provider; for (const l of provider()) initial.add(l.id); } else delete legacy[media];
+}
 const overlays = new Map<string, { who?: string; removed_at?: string | null; trash_until?: string | null; home?: Record<string, unknown> }>();
 
 function legacyView(media: "video" | "picture", l: LegacyLora): StackLoraView {
   const o = overlays.get(l.id) ?? {};
-  const home: Record<string, unknown> = { availability: { who: o.who ?? (media === "picture" ? "adults" : "admins"), people: [] }, ...(o.home ?? {}) };
+  const home: Record<string, unknown> = { availability: { who: o.who ?? (media === "picture" && initial.has(l.id) ? "adults" : "admins"), people: [] }, ...(o.home ?? {}) };
   if (l.tested_on_25 !== undefined) home.tested_on_25 = l.tested_on_25;
   if (l.untested_on_25 !== undefined) home.untested_on_25 = l.untested_on_25;
   return {

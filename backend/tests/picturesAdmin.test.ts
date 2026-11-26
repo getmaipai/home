@@ -73,7 +73,7 @@ describe("adding a style", () => {
     const res = await client.postForm("/api/pictures/admin/adapters", form(GOOD));
     expect(res.status).toBe(200);
     const added = ((await res.json()) as { adapter: { id: string; enabled: boolean; needs_confirmation: boolean; classification: string; sha256: string } }).adapter;
-    expect(added).toMatchObject({ enabled: false, needs_confirmation: true, classification: "all-ages" });
+    expect(added).toMatchObject({ enabled: false, needs_confirmation: false, classification: "all-ages" });
     expect(fake.loraAdds[0]).toMatchObject({ name: "Ink Wash", licence: "apache-2.0", classification: "all-ages", trigger_words: JSON.stringify(["inkwash", "sumi"]) });
     // Not offered to anyone until it is confirmed.
     dropAdapterCache();
@@ -112,7 +112,7 @@ describe("adding a style", () => {
     const { client } = await owner();
     const res = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, path: "/Users/you/Downloads/ink-wash.safetensors" }, false));
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { adapter: { enabled: boolean; needs_confirmation: boolean } }).adapter).toMatchObject({ enabled: false, needs_confirmation: true });
+    expect(((await res.json()) as { adapter: { enabled: boolean; needs_confirmation: boolean } }).adapter).toMatchObject({ enabled: false, needs_confirmation: false });
     expect(fake.loraAdds.at(-1)).toMatchObject({ path: "/Users/you/Downloads/ink-wash.safetensors", name: "Ink Wash" });
     const bad = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, path: "Downloads/ink-wash.ckpt" }, false));
     expect(bad.status).toBe(422);
@@ -126,7 +126,7 @@ describe("adding a style", () => {
     expect(job).toBe("lora-job-1");
     const done = (await (await client.get(`/api/pictures/admin/jobs/${job}`)).json()) as { state: string; adapter: { id: string; enabled: boolean; needs_confirmation: boolean } };
     expect(done.state).toBe("done");
-    expect(done.adapter).toMatchObject({ id: "lora-eeeeeeeeeeeeeeee", enabled: false, needs_confirmation: true });
+    expect(done.adapter).toMatchObject({ id: "lora-eeeeeeeeeeeeeeee", enabled: false, needs_confirmation: false });
   });
 });
 
