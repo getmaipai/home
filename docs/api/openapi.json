@@ -94398,69 +94398,6 @@
         }
       }
     },
-    "/api/stack/adult-ticket/consume": {
-      "post": {
-        "tags": [
-          "Stack callbacks"
-        ],
-        "summary": "The Stack uses up an adult-lock ticket (paired token only)",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "ticket": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200
-                  },
-                  "item": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 120
-                  }
-                },
-                "required": [
-                  "ticket",
-                  "item"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "True once, for a live ticket made for this item.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "ok"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "The paired key is missing or wrong",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/loras": {
       "get": {
         "tags": [

@@ -7,9 +7,8 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { loraPeople, loras } from "@/db/schema";
-import { __resetAdultLockForTests, issueTicket } from "@/lib/adultLock";
+import { __resetAdultLockForTests, consumeTicket, issueTicket, peekTicket } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __setHomeViewTokenForTests } from "@/lib/stack/homeViewToken";
 import { getLoraRecord, listLoraRecords, refreshLoras, loraLibraryReadable } from "@/lib/loras/stackLibrary";
 import { loraUsable, readLoras } from "@/lib/loras/access";
 import { usesAdultOnlyStyle } from "@/lib/videos/adultStyle";
@@ -155,24 +154,8 @@ describe("the named adults of a style", () => {
   });
 });
 
-describe("the adult-lock ticket the Stack uses up through Home", () => {
-  const callback = (body: unknown, token: string | null) => app.request("/api/stack/adult-ticket/consume", { method: "POST", headers: { "content-type": "application/json", ...(token ? { "x-maipai-home-token": token } : {}) }, body: JSON.stringify(body) });
-  test("needs the paired key; a ticket works once, only for the style it was made for", async () => {
-    __setHomeViewTokenForTests("k".repeat(32));
-    const { row } = await household();
-    const sage = row("Sage");
-    const a = issueTicket(sage.id, "session-key", "lora-aaaaaaaaaaaa").ticket;
-    expect((await callback({ ticket: a, item: "lora-aaaaaaaaaaaa" }, null)).status).toBe(401);
-    expect((await callback({ ticket: a, item: "lora-aaaaaaaaaaaa" }, "wrong".repeat(8))).status).toBe(401);
-    expect(await (await callback({ ticket: a, item: "lora-bbbbbbbbbbbb" }, "k".repeat(32))).json()).toEqual({ ok: false }); // another style; the ticket is spent by the try
-    expect(await (await callback({ ticket: a, item: "lora-aaaaaaaaaaaa" }, "k".repeat(32))).json()).toEqual({ ok: false });
-    const b = issueTicket(sage.id, "session-key", "lora-aaaaaaaaaaaa").ticket;
-    expect(await (await callback({ ticket: b, item: "lora-aaaaaaaaaaaa" }, "k".repeat(32))).json()).toEqual({ ok: true });
-    expect(await (await callback({ ticket: b, item: "lora-aaaaaaaaaaaa" }, "k".repeat(32))).json()).toEqual({ ok: false });
-    __setHomeViewTokenForTests(undefined);
-  });
-
-  test("lowering an adult-only style through the Styles route goes to the Stack with the ticket, and the Stack asks Home to use it up", async () => {
+describe("lowering the Stack's nsfw tag from Home", () => {
+  test("Home checks its own ticket, then calls the Stack with no ticket; the ticket is used up only after the Stack accepts", async () => {
     const { owner, row } = await household();
     const style = secretLora(row("Sage").id);
     const proof = unlockHeader(await unlock(owner, "correcthorse"));
@@ -181,27 +164,26 @@ describe("the adult-lock ticket the Stack uses up through Home", () => {
     expect(((await res.json()) as { classification: string }).classification).toBe("all-ages");
     const sent = fakeLoraStack().patches.get(style.id)!;
     expect(sent.classification).toBe("all-ages");
-    expect(typeof sent.ticket).toBe("string");
-    expect(sent.ticket).not.toBe("home"); // Home issued the real single-use ticket itself
-    // Raising needs no ticket.
+    expect(sent.ticket).toBeUndefined(); // the Stack knows no tickets
+    // Raising needs no ticket either.
     const back = await owner.request(`${STYLES}/${style.id}`, { method: "PATCH", body: { classification: "adult-only" }, headers: proof });
     expect(back.status).toBe(200);
     expect(fakeLoraStack().patches.get(style.id)!.ticket).toBeUndefined();
   });
 
-  test("a ticket the Stack does not accept leaves the style adult-only, with the Stack's own sentence", async () => {
-    const { owner, row } = await household();
-    const style = secretLora(row("Sage").id);
-    const proof = unlockHeader(await unlock(owner, "correcthorse"));
-    // The page's ticket is a marker; the real one is Home's. Use the Stack's refusal path by spending the real ticket first: the Stack's call comes back false.
-    const real = issueTicket(row("Sage").id, "other-session", style.id).ticket;
-    expect(real.length).toBeGreaterThan(8);
-    const original = fakeLoraStack().views.get(style.id)!;
-    original.classification = "adult-only";
-    const res = await owner.request(`${STYLES}/${style.id}`, { method: "PATCH", body: { classification: "all-ages" }, headers: proof });
-    expect(res.status).toBe(200); // Home issues its own ticket for this session, so an unrelated one changes nothing
-    const view = fakeLoraStack().views.get(style.id)!;
-    expect(view.classification).toBe("all-ages");
+  test("a ticket for another style or a spent one never reaches the Stack as a lowering when the source said adult", async () => {
+    const { row } = await household();
+    const sage = row("Sage");
+    const a = issueTicket(sage.id, "session-key", "lora-aaaaaaaaaaaa").ticket;
+    expect(peekTicket(a, sage.id, "session-key", "lora-bbbbbbbbbbbb")).toBe(false);
+    expect(peekTicket(a, sage.id, "session-key", "lora-aaaaaaaaaaaa")).toBe(true);
+    expect(consumeTicket(a, sage.id, "session-key", "lora-aaaaaaaaaaaa")).toBe(true);
+    expect(consumeTicket(a, sage.id, "session-key", "lora-aaaaaaaaaaaa")).toBe(false);
+  });
+
+  test("the old callback route is gone", async () => {
+    const res = await app.request("/api/stack/adult-ticket/consume", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticket: "x", item: "y" }) });
+    expect(res.status).toBe(404);
   });
 });
 

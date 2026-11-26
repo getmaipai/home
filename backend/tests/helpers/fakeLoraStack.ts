@@ -1,7 +1,5 @@
 // STACK-LORAS-01 slice 4: a fake Stack for the LoRA library. It answers `/stack/v1/loras` (list, patch, trash, restore, move, install, sources, preview) and
-// `/stack/v1/jobs/{id}` from memory, the way the real one does, and sends the adult-lock ticket of a lowering back to Home's own `consumeTicketForStack` (what the
-// Stack's verifier does through the callback route). `reset-db.ts` installs a fresh one for every test; `tests/fixtures/lora.ts` puts records into it.
-import { consumeTicketForStack } from "@/lib/adultLock";
+// `/stack/v1/jobs/{id}` from memory, the way the real one does. The real Stack takes a tag change with no ticket (owner decision 2026-11-26), so the fake does too. `reset-db.ts` installs a fresh one for every test; `tests/fixtures/lora.ts` puts records into it.
 import { __primeLoraSnapshotForTests, __resetLoraSnapshotForTests, __setLorasFetchForTests, type Lora, type StackLoraView } from "@/lib/loras/stackLibrary";
 
 export interface FakeLoraStack {
@@ -113,10 +111,6 @@ export function installFakeLoraStack(): FakeLoraStack {
     }
     if (method === "PATCH") {
       fake.patches.set(id, body);
-      if (view.classification === "adult-only" && body.classification === "all-ages") {
-        if (typeof body.ticket !== "string" || body.ticket === "") return refusal(403, "ticket_required", "Making an adult-only style available to everyone needs the adult lock opened in Home first.");
-        if (!consumeTicketForStack(body.ticket, id)) return refusal(403, "ticket_refused", "Home did not accept that confirmation, or it has been used already.");
-      }
       if (own) {
         if (typeof body.name === "string") view.name = body.name;
         if (body.classification === "adult-only" || body.classification === "all-ages") view.classification = body.classification;

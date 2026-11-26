@@ -6,7 +6,7 @@ import { and, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { issueTicket, lockItemOfProvenance, peekTicket } from "@/lib/adultLock";
+import { consumeTicket, lockItemOfProvenance, peekTicket } from "@/lib/adultLock";
 import { logMark, setItemLock } from "@/lib/adultMarks";
 import { isAdult } from "@/lib/loras/access";
 import { getLoraRecord, callStack, LorasStackError, refreshLoras, setLoraPeople, type Lora } from "@/lib/loras/stackLibrary";
@@ -114,12 +114,12 @@ export async function markAdultOnly(admin: PersonRow, id: string): Promise<Lora>
   return after(id);
 }
 
-/** Mark all-ages: only ever an admin's explicit choice, audited. `ticket` is Home's fresh single-use adult-lock ticket; the Stack uses it up through Home. */
-export async function markAllAges(admin: PersonRow, id: string, ticket: string): Promise<Lora> {
+/** Mark all-ages: only ever an admin's explicit choice, audited. Home's own rules (the open adult lock, the ticket) were checked by the caller; the Stack takes the tag change from Home's token with no ticket. */
+export async function markAllAges(admin: PersonRow, id: string): Promise<Lora> {
   must(admin);
   const lora = present(id);
   if (lora.audience === "all-ages") return lora;
-  await patchStack(id, { classification: "all-ages", ticket });
+  await patchStack(id, { classification: "all-ages" });
   logMark({ itemId: id, action: "clear", actorId: admin.id, via: "admin" });
   return after(id);
 }
@@ -146,22 +146,21 @@ export const LOWER_ADULT_LINE = "This style was marked adult by its source. Ente
 export const LOWER_SESSION_LINE = "Open the adult lock on your own screen to make a style all ages.";
 
 /**
- * Make an adult-only style all-ages for this admin. The Stack refuses every lowering without Home's single-use ticket, so Home hands one over: the one the admin
- * just made with their passcode (checked here for this person, session and style, not used up), or, when the source did not call it adult, one Home issues now
- * because the admin's own unlock (which the caller already required) is enough. The Stack then asks Home to use the ticket up.
+ * Make an adult-only style all-ages for this admin. The Stack does not know users and holds no ticket, so Home applies its own rules first: when the source called the
+ * style adult, the admin's fresh passcode ticket for this person, session and style must be live (checked here, not used up yet); otherwise the admin's own open unlock
+ * (a browser session) is enough. Then Home asks the Stack to lower the tag with its token, and only after the Stack accepts is the ticket used up.
  */
 export async function lowerToAllAges(admin: PersonRow, id: string, sessionKey: string | null, ticket?: string): Promise<Lora> {
   must(admin);
   const lora = present(id);
   if (lora.audience === "all-ages") return lora;
-  let use = ticket;
-  if (lora.adult_check?.state === "adult") {
+  const needsTicket = lora.adult_check?.state === "adult";
+  if (needsTicket) {
     if (!peekTicket(ticket, admin.id, sessionKey, id)) throw stackRefusal(422, "ticket_required", LOWER_ADULT_LINE);
-  } else {
-    if (!sessionKey) throw stackRefusal(422, "session_required", LOWER_SESSION_LINE);
-    use = issueTicket(admin.id, sessionKey, id).ticket;
-  }
-  return markAllAges(admin, id, use as string);
+  } else if (!sessionKey) throw stackRefusal(422, "session_required", LOWER_SESSION_LINE);
+  const lowered = await markAllAges(admin, id);
+  if (needsTicket) consumeTicket(ticket, admin.id, sessionKey, id);
+  return lowered;
 }
 
 /** Delete a style and its file for good (the trash page's "empty" action). */
