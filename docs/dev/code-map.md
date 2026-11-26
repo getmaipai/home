@@ -808,9 +808,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/libraryTrash.ts` | trashDays, companionsOf, parentOf, canDeleteInherited, trashFile, listTrashedFiles |
 | `backend/src/lib/libraryUpload.ts` | MAX_LIBRARY_UPLOAD_BYTES |
 | `backend/src/lib/libraryUploadStream.ts` | LIBRARY_CHUNK_BYTES, UploadError, __setLibraryUploadCapForTests, assertLibraryUploadAllowed, beginLibraryUpload, appendLibraryUpload |
-| `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
-| `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
-| `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
 | `backend/src/lib/listActionNames.ts` | LIST_ACTIONS |
 | `backend/src/lib/listActions.ts` | PARENT_CAN_DO_THAT, runListAction |
 | `backend/src/lib/listContext.ts` | lastListContextFor |
@@ -1293,7 +1290,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackChoicesMigration.ts` | HOME_FEATURE_SWITCHES, collectHomeValues, readMigrationRecord, dismissMigrationNotice, ensureChoicesMigrated |
 | `backend/src/lib/stackCodingPieces.ts` | CodingPieceError, CODING_ON_REFUSAL, __setCodingStackForTests, missingFrom, missingCodingPiece, __setMissingCodingPieceForTests |
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
-| `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, coveredConsent, installStackComponent, uninstallStackComponent |
+| `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent, listTierCandidates |
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, isStackRoleEnabled, getHomeOwnedRoles |
 | `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues, syncHostGuardIssue |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
