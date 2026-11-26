@@ -19,7 +19,7 @@ export type { Lora };
 
 /** What the Stack answers for one style (`GET /stack/v1/loras`). `home` is the spec record Home sent on import, kept as sent. */
 export interface StackLoraView {
-  id: string; media: "picture" | "video"; name: string; base_model: string; classification: "all-ages" | "adult-only"; sha256: string; bytes: number; strength_default: number;
+  id: string; media: "picture" | "video"; name: string; base_model: string; classification: "all-ages" | "adult-only"; /** Who set the nsfw tag: the download site's check or a Stack admin; absent or null on an older record. */ classification_origin?: "site" | "admin" | null; sha256: string; bytes: number; strength_default: number;
   trigger_words: string[]; licence: string; source_url: string | null; added_by: string | null; added_at: string; disk_id: string | null; disk_label: string;
   status: "ready" | "drive_missing" | "installing" | "failed"; status_note: string | null; removed_at: string | null; trash_until: string | null; preview: string | null;
   home: Record<string, unknown> | null;

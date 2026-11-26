@@ -9,7 +9,7 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { consumeTicket, lockItemOfProvenance, peekTicket } from "@/lib/adultLock";
 import { logMark, setItemLock } from "@/lib/adultMarks";
 import { isAdult } from "@/lib/loras/access";
-import { getLoraRecord, callStack, LorasStackError, refreshLoras, setLoraPeople, type Lora } from "@/lib/loras/stackLibrary";
+import { getLoraRecord, callStack, LorasStackError, refreshLoras, setLoraPeople, stackViewOf, type Lora } from "@/lib/loras/stackLibrary";
 import { clipsUsingStyle } from "@/lib/loras/usage";
 import type { PersonRow } from "@/types";
 
@@ -147,14 +147,15 @@ export const LOWER_SESSION_LINE = "Open the adult lock on your own screen to mak
 
 /**
  * Make an adult-only style all-ages for this admin. The Stack does not know users and holds no ticket, so Home applies its own rules first: when the source called the
- * style adult, the admin's fresh passcode ticket for this person, session and style must be live (checked here, not used up yet); otherwise the admin's own open unlock
+ * style adult (its own check, or the Stack tagged it nsfw from the site's flag), the admin's fresh passcode ticket for this person, session and style must be live (checked here, not used up yet); otherwise the admin's own open unlock
  * (a browser session) is enough. Then Home asks the Stack to lower the tag with its token, and only after the Stack accepts is the ticket used up.
  */
 export async function lowerToAllAges(admin: PersonRow, id: string, sessionKey: string | null, ticket?: string): Promise<Lora> {
   must(admin);
   const lora = present(id);
   if (lora.audience === "all-ages") return lora;
-  const needsTicket = lora.adult_check?.state === "adult";
+  // A tag the download site set (`classification_origin` "site") counts as the source calling it adult, so lowering it needs the passcode ticket too.
+  const needsTicket = lora.adult_check?.state === "adult" || stackViewOf(id)?.classification_origin === "site";
   if (needsTicket) {
     if (!peekTicket(ticket, admin.id, sessionKey, id)) throw stackRefusal(422, "ticket_required", LOWER_ADULT_LINE);
   } else if (!sessionKey) throw stackRefusal(422, "session_required", LOWER_SESSION_LINE);

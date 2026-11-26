@@ -181,6 +181,22 @@ describe("lowering the Stack's nsfw tag from Home", () => {
     expect(consumeTicket(a, sage.id, "session-key", "lora-aaaaaaaaaaaa")).toBe(false);
   });
 
+  test("a style the download site tagged nsfw (origin site) is lowered through Home only with a live ticket", async () => {
+    const { owner, row } = await household();
+    const style = secretLora(row("Sage").id);
+    fakeLoraStack().views.get(style.id)!.classification_origin = "site";
+    await refreshLoras(true);
+    const proof = unlockHeader(await unlock(owner, "correcthorse"));
+    const refused = await owner.request(`${STYLES}/${style.id}`, { method: "PATCH", body: { classification: "all-ages" }, headers: proof });
+    expect(refused.status).toBe(422);
+    expect(((await refused.json()) as { code: string }).code).toBe("ticket_required");
+    expect(fakeLoraStack().views.get(style.id)!.classification).toBe("adult-only");
+    const ticket = ((await (await owner.post("/api/adult-lock/confirm", { secret: "correcthorse", action: "unmark", item: style.id })).json()) as { ticket: string }).ticket;
+    const done = await owner.request(`${STYLES}/${style.id}`, { method: "PATCH", body: { classification: "all-ages", ticket }, headers: proof });
+    expect(done.status).toBe(200);
+    expect(fakeLoraStack().views.get(style.id)!.classification).toBe("all-ages");
+  });
+
   test("the old callback route is gone", async () => {
     const res = await app.request("/api/stack/adult-ticket/consume", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticket: "x", item: "y" }) });
     expect(res.status).toBe(404);
