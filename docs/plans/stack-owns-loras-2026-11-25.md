@@ -1,12 +1,13 @@
 # Stack owns LoRAs (design note, 2026-11-25)
 
-Status: draft, waiting for the architect verdict. Item: STACK-LORAS-01.
+Status: APPROVED by the architect with five edits (applied below). Item: STACK-LORAS-01.
 
 ## Supersedes
 
 - Home's ownership of LoRAs. The `loras` table and `backend/src/lib/loras/` stop being the store. Home keeps no LoRA table, no copy and no cache on disk after migration.
 - Home's per-install licence step ("read the licence and confirm"). The one global accept at the Stack replaces it. That global accept is being built in another session and is not landed yet.
 - The adult-only mirror in `lib/loras/sync.ts` and the source fetching in `source.ts`: the Stack classifies and fetches directly.
+- This note supersedes `docs/design/video-loras-2026-11-02.md` sections 4.2 (where each part lives), 4.4 (the source token kept in Home, never at the Stack; it now lives as a Stack connection), 5.2 (browsing), 5.3 step 1 (Home fetches the hit), and 15.1 and 15.2 (where the Home writer checks the adult lock proof for the classifier). A one-line "Superseded by stack-owns-loras-2026-11-25.md" marker is added to each of those sections in slice 4.
 - Adjacent, not duplicated: [stack-owns-model-choices-2026-11-21.md](stack-owns-model-choices-2026-11-21.md) (models), [stack-home-connections-2026-11-25.md](stack-home-connections-2026-11-25.md) (`StackConnection`), the hosted-UI note `stack-hosted-ui-2026-11-25.md`.
 
 Everything else in those notes stands. Nothing here changes `docs/design/RULES.md`, with the exceptions listed under Open for Jesse.
@@ -50,6 +51,12 @@ Add a second fence in the Stack. It already receives the audience on each reques
 
 Unchanged, with their tests: marking and unmarking rules, the ticket for lowering, the 404-for-hidden rule, minors never in availability, and the minor lane getting all-ages only. Child and teen filtering is unchanged. Nothing here changes `docs/design/RULES.md`, with the exceptions listed under Open for Jesse.
 
+Rule C11 (`docs/design/RULES.md`): only a person or an automated check locks something, and not having been checked is never by itself a reason to mark or lock. The classifier moves to the Stack unchanged. A Stack record whose adult check state is `unknown` is not marked or locked because of that; it behaves as today, all-ages unless a person or the check marked it. Failing closed on an id the Stack cannot resolve is a different case and stays: it is E6 and the existing `adultStyle.ts` behavior.
+
+Lowering keeps its ticket, and the Stack now enforces it. The Stack's PATCH route and its admin page refuse a change from adult-only to all-ages unless the request carries Home's fresh single-use ticket (the same one as today, `/api/adult-lock/confirm`); the Stack verifies the ticket through the paired Home token. Without this, "unmarking is unchanged" above would be false, because the admin page can reach the PATCH route directly. Marking (raising to adult-only) needs no ticket.
+
+Redaction of the kit page depends on who is looking. The kit page shown in Home's Styles tab receives its data from Home's pass-through, with adult-only records already redacted to the one locked tile (no name, id or count) unless the person has the adult lock open. The Stack's own admin page shows everything to a Stack admin session, as it does for models, because the admin is on the Stack. See slice 4 for the matching test.
+
 ## Reuse check
 
 | Model design piece | Reused for LoRAs |
@@ -71,16 +78,16 @@ Note: the multi-disk plan has no note file yet, only code, so this table names t
 In order. Each slice carries its test and verify. Slices 1 and 2 are Stack work (own worktree in the stack repo), 3 is commons, 4 to 6 are Home. Shipping stays Jesse's word.
 
 0. Spec (commons): `disk_id` and `status` on `Lora`; tag it. Test: spec validate tests. Verify: Stack and Home typecheck against the tag.
-1. Stack backend A, catalog: unified library, manifest merge, `/stack/v1/loras` read, patch, delete, restore, import; the audience fence on generation requests. Test: Stack unit tests including fail-closed unknown id, adult request refusal, manifest merge idempotence on a copy. Verify: curl the routes against a Stack started on a scratch data dir with copied manifests.
-2. Stack backend B, installs and moves: `disk_id` on installs, move job, drive_missing status, browse and install from Hugging Face and Civitai using connections, global licence check. Test: tests with a fake source and a fake second drive. Verify: install one small file and move it on the scratch Stack.
+1. Stack backend A, catalog: unified library, manifest merge, `/stack/v1/loras` read, patch, delete, restore, import; the audience fence on generation requests; the PATCH route refusing adult-only to all-ages without Home's ticket. Test: Stack unit tests including fail-closed unknown id, adult request refusal, manifest merge idempotence on a copy, and the ticket check on lowering. Verify: curl the routes against a Stack started on a scratch data dir with copied manifests.
+2. Stack backend B, installs and moves: `disk_id` on installs, move job, drive_missing status, browse and install from Hugging Face and Civitai using connections, global licence check. This slice waits on the open rule change in the connections note (`stack-home-connections-2026-11-25.md`), because the source keys live in `StackConnection`. Test: tests with a fake source and a fake second drive. Verify: install one small file and move it on the scratch Stack.
 3. Kit: `StackLorasPage` in commons/ui, tag, pin in Stack admin-ui. Test: component tests. Verify: `preview` skill at desktop and phone width, light and dark, Stack stopped.
-4. Home reader: `access.ts` and callers read the Stack; picture and video wire unchanged; Styles tab shows the kit page; adult-lock UI kept. Test: all existing access, adultLock, video policy and picture lock tests pass unchanged against a fake Stack; add a Stack-down fail-closed test. Verify: dev workbench as an adult, a teen and a child; screenshots opened.
+4. Home reader: `access.ts` and callers read the Stack; picture and video wire unchanged; Styles tab shows the kit page; adult-lock UI kept; Home adds the small per-person availability table keyed by lora id and fills it from `availability.people` (see Open for Jesse 1); the one-line "Superseded by stack-owns-loras-2026-11-25.md" markers go into `docs/design/video-loras-2026-11-02.md` sections 4.2, 4.4, 5.2, 5.3 step 1, 15.1 and 15.2. Test: all existing access, adultLock, video policy and picture lock tests pass unchanged against a fake Stack; add a Stack-down fail-closed test; add a test that a teen and an adult with the adult lock closed see no adult-only name through the Styles tab. Verify: dev workbench as an adult, a teen and a child; screenshots opened.
 5. Migration (dry run on a copy, then real on Jesse's word): Home posts its records to the Stack import route, then compares counts and sha256 for every record. Home refuses to continue while one is missing. Verify: counts match, one image and one video job still resolve a style.
 6. Home removal: migration that drops the `loras` and legacy prefs tables only after step 5 reports full match (keep a backup file of the table dump), delete the files named above, lint guard that fails on a `loras` table or `lib/loras/store.ts`. Test: lander gate plus the new guard. Verify: grep shows no reader of the table.
 
 ## Migration
 
-Port before delete. The `lora-...` ids already match the Stack's file ids, so import is keyed by id and idempotent. Order: the Stack with import ships first; Home exports its records and previews; the Stack confirms; Home verifies; only then Home drops the table. Previews move into the Stack record. The `adult_mark_log` stays. Rollback: the table dump file. No data loss path: the import never deletes, and Home deletes only after a full match.
+Port before delete. The `lora-...` ids already match the Stack's file ids, so import is keyed by id and idempotent. Order: the Stack with import ships first; Home exports its records and previews; the Stack confirms; Home verifies; only then Home drops the table. Previews move into the Stack record. The `adult_mark_log` stays. The `availability.people` list does not move to the Stack: it is copied out of the `loras` rows into the small Home table keyed by lora id before the drop, alongside `adult_mark_log`. Rollback: the table dump file. No data loss path: the import never deletes, and Home deletes only after a full match.
 
 ## Not sure about
 
@@ -90,8 +97,8 @@ Port before delete. The `lora-...` ids already match the Stack's file ids, so im
 
 ## Open for Jesse
 
-1. Named-people availability (`availability.people`): the Stack stores no people. Recommendation: the Stack record holds opaque person ids it never resolves and Home enforces them. Alternative: drop named lists and keep role-level only (admins or adults). Which do you want?
+1. Named-people availability (`availability.people`): decided by the architect. `availability.who` stays on the Stack record; the named `availability.people` list lives in Home in a small table keyed by lora id, like `adult_mark_log`, because E5 keeps who may use something in Home. Home keeps no LoRA catalog copy, only this per-person access list. Alternative (the earlier option): the Stack record holds opaque person ids it never resolves and Home enforces them.
 2. Drop the per-install licence confirmation in favour of the one global accept? Recommended: yes.
 3. Merge the image and video libraries into one? Recommended: yes, one library with a `media` field, rather than keeping two.
-4. The Stack's second fence on adult-only styles is a safety-gate change, so it needs Owner-approved on the commit if the architect says it touches a gate. Recommendation: yes. Do you approve?
+4. The Stack's second fence on adult-only styles is a safety-gate change, so it needs Owner-approved on the commit if the architect says it touches a gate. Recommendation: yes. Do you approve? The architect's note: the fence needs no separate Owner-approved line (E6 already requires it), but it is a risky surface, so it takes the full `check.sh` and code-review at medium.
 5. Any `RULES.md` change: none proposed. The hosted-screen rule change is already open in the hosted-UI note. Correct?
