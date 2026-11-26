@@ -134,58 +134,6 @@ describe("the plan step's job cards", () => {
     expect(within(view.getByTestId("plan-job-pictures")).getByText("Installed")).toBeTruthy();
   });
 
-  const licence = { row_id: "video-ltx25", component: "ltx-2-5-distilled-mlx", id: "video-community-license", name: "Video model licence", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
-  // An adult-only home has one video choice (the licensed LTX model), so turning Videos on picks it.
-  const pickDetailed = (view: ReturnType<typeof render>) => fireEvent.click(sw(view, "Videos"));
-
-  test("turning Videos on (the licensed model) shows the licence plainly and Install waits for the accept", async () => {
-    const start = mock(async () => ({}));
-    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [licence] })} start={start} onInstalled={() => {}} />);
-    await view.findByRole("group", { name: "What gets installed" });
-    expect(view.queryByTestId("plan-licence")).toBeNull();
-    pickDetailed(view);
-    expect(view.getByText(/under \$10 million a year/)).toBeTruthy();
-    const install = view.getByRole("button", { name: "Install and continue" }) as HTMLButtonElement;
-    expect(install.disabled).toBe(true);
-    expect(view.getByTestId("plan-accept-hint").textContent).toMatch(/waiting for you to accept the maker's licence/);
-    fireEvent.click(view.getByRole("checkbox", { name: /I have read it and I accept it/ }));
-    await waitFor(() => expect(install.disabled).toBe(false));
-    fireEvent.click(install);
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-    const call = start.mock.calls[0] as unknown[];
-    expect(call[1]).toContain("video-ltx25");
-    expect(call[1]).not.toContain("video");
-    expect(call[2]).toEqual([licence.id]);
-    expect(call[3]).toBeUndefined();
-  });
-
-  test("a covered licence is information: no accept is needed", async () => {
-    const start = mock(async () => ({}));
-    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [{ ...licence, covered: true }] })} start={start} onInstalled={() => {}} />);
-    await view.findByRole("group", { name: "What gets installed" });
-    pickDetailed(view);
-    expect(view.queryByTestId("plan-licence")).toBeNull();
-    expect(view.getByTestId("plan-licence-info").textContent).toMatch(/You accepted its licence at the start/);
-    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-    expect((start.mock.calls[0] as unknown[])[2]).toEqual([]);
-  });
-
-  test("turning Videos off again drops the licence and sends no accept", async () => {
-    const start = mock(async () => ({}));
-    const view = render(<PlanStep readPlan={async () => read("p128", 800 * GIB, {}, { licences: [licence] })} start={start} onInstalled={() => {}} />);
-    await view.findByRole("group", { name: "What gets installed" });
-    pickDetailed(view);
-    expect(view.queryByTestId("plan-licence")).not.toBeNull();
-    fireEvent.click(sw(view, "Videos"));
-    expect(view.queryByTestId("plan-licence")).toBeNull();
-    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-    const call = start.mock.calls[0] as unknown[];
-    expect(call[1]).not.toContain("video-ltx25");
-    expect(call[2]).toEqual([]);
-  });
-
   test("a click that has nothing to download says so, and a refusal from the engine shows as the red alert", async () => {
     const none = render(<PlanStep readPlan={async () => read("p128", 800 * GIB)} start={async () => ({ started: true, models: 0 })} onInstalled={() => {}} />);
     await none.findByRole("group", { name: "What gets installed" });

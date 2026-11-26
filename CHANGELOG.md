@@ -11,6 +11,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 - The Ornith 1.5 122B heavy coding model and its draft are gone from Settings, Coding and the setup step; the Stack retired them and decides Max coding itself.
 
 ### Added
+- The Stack owns global licence acceptance; Home proxies its AI and models page.
 - `generate_video` can target an owned Production shot, use its saved picture as the start frame, and record the finished Library clip on that shot.
 
 ## [0.2.129] - 2026-10-25
@@ -309,7 +310,7 @@ A large release: music that is as long as its words with covers and sing-along l
 - **A quick song sings only the words that fit.** Long words used to be squeezed into the last second of a quick song and sung as nonsense. Now a quick song sings the first whole parts that fit, the card shows just those words, and **Make it full** sings every part. Lines the engine squeezed into an older song are left off its card. (MUSIC-GEN-17)
 
 ### Licences
-- Licences: the setup page Before you start now says, in its existing item Home goes online for you, that you also accept the licences of the AI models and tools Home installs. Home keeps one household record of that (who, when, terms version, which licences). A covered licence, such as the Detailed video model, installs without its own accept click; a new or changed licence still asks once. A Home set up earlier shows one prompt in Repairs and Models and storage to accept once, then one button to install the recommended extras (about 74 GB, never started by itself). New household setting install.recommended_auto_on_upgrade (off). LICENCE-ACK-01.
+- The Stack owns global licence acceptance; Home proxies its AI and models page.
 
 ## [0.2.21] - 2026-10-18
 

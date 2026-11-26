@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, settingsValues } from "@/db/schema";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { __setChoicesFetchForTests } from "@/lib/stackChoicesForward";
 import { __resetChoiceSnapshotForTests, refreshStackChoiceSnapshot } from "@/lib/stackChoiceSnapshot";
@@ -33,6 +33,7 @@ beforeEach(() => {
     calls.push({ method, path: url.pathname, body });
     if (url.pathname === "/stack/v1/choices/migrate") { migrated = true; return Response.json(migrateAnswer); }
     if (method === "GET" && url.pathname === "/stack/v1/choices") return Response.json(view);
+    if (url.pathname === "/stack/v1/licences") return Response.json({ terms_version: "2026-11-25", accepted: method === "POST", accepted_at: method === "POST" ? "now" : null, by: body?.by ?? null, licences: [] });
     if (method === "GET" && url.pathname === "/stack/v1/settings") return Response.json({ sections: [], settings: [{ key: "stack.admin.tailscale", in_effect: remoteOn }] });
     if (url.pathname.endsWith("/chat/standard") && method === "PUT") return Response.json({ error: "That model does not fit this computer. Pick a smaller one.", code: "does_not_fit" }, { status: 409 });
     if (method === "PUT" && url.pathname.startsWith("/stack/v1/choices/")) return Response.json({ ok: true, ...(body ?? {}) });
@@ -109,6 +110,31 @@ describe("forwarding", () => {
     expect(calls[0]).toMatchObject({ method: "PUT", path: "/stack/v1/settings", body: { "stack.roles.chat.enabled": false, "stack.roles.video.enabled": true, "stack.roles.music.priority": 5 } });
     expect(getHouseholdSettingValue("chat.paused")).toBe(true);
     expect(getHouseholdSettingValue("generation.video.enabled")).toBe(true);
+  });
+});
+
+
+describe("Stack licence proxy", () => {
+  test("GET and POST forward to the Stack without storing a Home acceptance", async () => {
+    const { client, actor } = await admin();
+    const read = await client.get("/api/ai/stack/licences");
+    expect(read.status).toBe(200);
+    expect((await read.json() as { terms_version: string }).terms_version).toBe("2026-11-25");
+    const accepted = await client.post("/api/ai/stack/licences", {});
+    expect(accepted.status).toBe(200);
+    expect(calls.filter((call) => call.path === "/stack/v1/licences")).toEqual([
+      { method: "GET", path: "/stack/v1/licences", body: undefined },
+      { method: "POST", path: "/stack/v1/licences", body: { by: actor.id } },
+    ]);
+    expect(db.select().from(settingsValues).all().some((row) => row.key === "_licences.accepted")).toBe(false);
+  });
+
+  test("a non-admin POST is refused and does not reach the Stack", async () => {
+    const { client, actor } = await admin();
+    demote(actor.id, "adult");
+    const before = calls.length;
+    expect((await client.post("/api/ai/stack/licences", {})).status).toBe(403);
+    expect(calls).toHaveLength(before);
   });
 });
 

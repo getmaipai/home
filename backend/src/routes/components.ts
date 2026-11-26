@@ -7,7 +7,6 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, emptyJsonBodyAsObject, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { componentFailure, installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent } from "@/lib/stackComponents";
-import { licenceCovered } from "@/lib/licenceAcceptance";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropAdapterCache, forgetAdapterPref } from "@/lib/pictures/adapters";
@@ -27,7 +26,7 @@ const ComponentSchema = z.object({
   last_used_at: z.string().nullable(), used_by: z.array(z.string()), depends_on: z.array(z.string()),
   licence_name: z.string().nullable().optional().describe("The licence a part ships under when it has no terms to accept (ffmpeg: GPL 3 or later); shown beside its size."),
   job: z.string().nullable(), percent: z.number().nullable(), failure: z.string().nullable(),
-  licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() }).nullable().optional().describe("A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."),
+  licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable() }).nullable().optional().describe("A licence with terms of its own (the Detailed video model). Licence terms from the Stack."),
   can_install: z.boolean(), install_block: z.string().nullable(), can_uninstall: z.boolean(), uninstall_block: z.string().nullable(),
 });
 const ListSchema = z.object({
@@ -45,8 +44,7 @@ const listRoute = createRoute({
 componentsRoutes.openapi(listRoute, async (c) => {
   try {
     const list = await listStackComponents();
-    // LICENCE-ACK-01: a licence the household's acknowledgement covers is information, not a gate.
-    const withLicence = list.components.map((part) => part.licence ? { ...part, licence: { ...part.licence, covered: licenceCovered(part.licence.id) } } : part);
+    const withLicence = list.components;
     // VIDEO-SETTINGS-02: an adult-only style is not a row until the person's own unlock proof is valid; one flag stands for all of them (never a count).
     const person = c.get("person") as PersonRow;
     const components: typeof withLicence = [];
@@ -68,7 +66,7 @@ componentsRoutes.openapi(listRoute, async (c) => {
 
 const installRoute = createRoute({
   method: "post", path: "/{id}/install", tags: ["Components"], summary: "Download and set up a part (progress on the install strip)", middleware: [requireRole("owner", "admin"), emptyJsonBodyAsObject] as const,
-  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ accepted_licence: z.string().max(120).optional().describe("The id of the licence notice the admin read and accepted (the component's `licence.id`). Needed once, for a part that has one.") }) } } } },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({}).strict() } } } },
   responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string(), component: z.string() }) } }, description: "Started, or already running." }, 200: { content: { "application/json": { schema: z.object({ job: z.null(), component: z.string() }) } }, description: "Already installed." }, ...refusals },
 });
 const NO_SUCH_PART = "That part isn't on this computer.";
@@ -76,9 +74,7 @@ componentsRoutes.openapi(installRoute, async (c) => {
   // A style the person cannot read (locked behind the Adult lock, or hidden) answers like a missing one.
   if ((await componentStyleAccess(c.get("person") as PersonRow, c.req.valid("param").id)) !== "open") return c.json({ error: NO_SUCH_PART, code: "unknown_component" }, 404) as never;
   try {
-    const consent = (await c.req.json().catch(() => ({}))) as { accepted_licence?: unknown };
-    const person = c.get("person") as { id?: string } | undefined;
-    const started = await installStackComponent(c.req.valid("param").id, typeof consent.accepted_licence === "string" ? { acceptedLicence: consent.accepted_licence, ...(person?.id ? { acceptedBy: person.id } : {}) } : {});
+    const started = await installStackComponent(c.req.valid("param").id);
     resetInstallStatusCache();
     return started.job ? c.json({ job: started.job, component: started.component }, 202) : c.json({ job: null, component: started.component }, 200);
   } catch (error) { return componentFailure(c, error) as never; }

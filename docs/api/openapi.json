@@ -29492,15 +29492,6 @@
                     "minimum": 1,
                     "maximum": 512
                   },
-                  "accepted_licences": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "maxLength": 120
-                    },
-                    "maxItems": 8,
-                    "description": "Ids of the licence notices the person read and accepted for licensed rows (Detailed video). A licensed row left on without its accept is refused."
-                  },
                   "components": {
                     "type": "array",
                     "items": {
@@ -29661,52 +29652,6 @@
                         "diskLine"
                       ]
                     },
-                    "licences": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "row_id": {
-                            "type": "string"
-                          },
-                          "component": {
-                            "type": "string"
-                          },
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "summary": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "accepted_at": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "covered": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "row_id",
-                          "component",
-                          "id",
-                          "name",
-                          "url",
-                          "summary",
-                          "accepted_at"
-                        ]
-                      },
-                      "description": "The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."
-                    },
                     "jobs": {
                       "type": "array",
                       "nullable": true,
@@ -29743,114 +29688,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/setup/licences": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "The licences Home lists with the wizard's internet item, and whether they were accepted",
-        "responses": {
-          "200": {
-            "description": "Each licensed part the AI engine lists (empty before the engine exists).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "stack": {
-                      "type": "string",
-                      "enum": [
-                        "ok",
-                        "unreachable"
-                      ]
-                    },
-                    "terms_version": {
-                      "type": "string"
-                    },
-                    "acknowledged": {
-                      "nullable": true
-                    },
-                    "licences": {
-                      "type": "array",
-                      "items": {
-                        "nullable": true
-                      }
-                    }
-                  },
-                  "required": [
-                    "stack",
-                    "terms_version",
-                    "licences"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Home is already set up",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/setup/licences/accept": {
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Record the wizard's acknowledgement, including the licences",
-        "responses": {
-          "200": {
-            "description": "Recorded for the household.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "accepted": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  },
-                  "required": [
-                    "accepted"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Home already has an owner: the admin prompt in Home settings does this instead.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "next": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
                 }
               }
             }
@@ -31727,15 +31564,6 @@
                     "minimum": 1,
                     "maximum": 512
                   },
-                  "accepted_licences": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "maxLength": 120
-                    },
-                    "maxItems": 8,
-                    "description": "Ids of the licence notices the person read and accepted for licensed rows (Detailed video). A licensed row left on without its accept is refused."
-                  },
                   "components": {
                     "type": "array",
                     "items": {
@@ -31787,179 +31615,6 @@
           },
           "409": {
             "description": "There is nothing the AI can install on this computer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/install/licences": {
-      "get": {
-        "tags": [
-          "Install"
-        ],
-        "summary": "The licences of the AI parts Home installs, and whether the household accepted them",
-        "responses": {
-          "200": {
-            "description": "Each licensed part with its terms, the household acknowledgement, and whether to show the one admin prompt.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "stack": {
-                      "type": "string",
-                      "enum": [
-                        "ok",
-                        "unreachable"
-                      ]
-                    },
-                    "terms_version": {
-                      "type": "string"
-                    },
-                    "acknowledged": {
-                      "nullable": true
-                    },
-                    "needs_prompt": {
-                      "type": "boolean"
-                    },
-                    "licences": {
-                      "type": "array",
-                      "items": {
-                        "nullable": true
-                      }
-                    },
-                    "extras": {
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "stack",
-                    "terms_version",
-                    "needs_prompt",
-                    "licences"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an owner or admin may do this",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/install/licences/accept": {
-      "post": {
-        "tags": [
-          "Install"
-        ],
-        "summary": "Accept the licences of the AI parts Home installs, once for the household",
-        "responses": {
-          "200": {
-            "description": "Recorded. When the household policy install.recommended_auto_on_upgrade is on, the recommended extras start too.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "accepted": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "auto_install": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "accepted",
-                    "auto_install"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an owner or admin may do this",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Home could not read the licence list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/install/licences/install-extras": {
-      "post": {
-        "tags": [
-          "Install"
-        ],
-        "summary": "Install the recommended extras (after the licences are accepted)",
-        "responses": {
-          "202": {
-            "description": "The downloads started; the install strip shows progress.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "started": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "models": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "started",
-                    "models"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an owner or admin may do this",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Not accepted yet, no room, or the engine is not ready (the message says which)",
             "content": {
               "application/json": {
                 "schema": {
@@ -32143,9 +31798,6 @@
                               "accepted_at": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "covered": {
-                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -32155,7 +31807,7 @@
                               "summary",
                               "accepted_at"
                             ],
-                            "description": "A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."
+                            "description": "A licence with terms of its own (the Detailed video model). Licence terms from the Stack."
                           },
                           "can_install": {
                             "type": "boolean"
@@ -32295,13 +31947,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {
-                  "accepted_licence": {
-                    "type": "string",
-                    "maxLength": 120,
-                    "description": "The id of the licence notice the admin read and accepted (the component's `licence.id`). Needed once, for a part that has one."
-                  }
-                }
+                "properties": {},
+                "additionalProperties": false
               }
             }
           }
@@ -33304,6 +32951,181 @@
           },
           "202": {
             "description": "Started or joined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/stack/licences": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The Stack's global licence acceptance",
+        "responses": {
+          "200": {
+            "description": "The Stack's global licence acceptance and licence list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Stack refused the value (its sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not possible right now (the sentence says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Accept the Stack's global licences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The Stack's global licence acceptance and licence list.",
             "content": {
               "application/json": {
                 "schema": {

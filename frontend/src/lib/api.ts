@@ -1053,8 +1053,8 @@ export interface PlanWording {
   headline: string; detail: string; gets: string[]; needsMemoryAnswer: boolean; sizeLine: string | null; diskLine: string | null;
   disk?: PlanDiskView | null;
 }
-/** The setup plan read: Home's words, the licences and the job cards Settings also shows (AIMODELS-SETUP-01). */
-export interface PlanRead { plan?: unknown; wording: PlanWording; licences?: import("../../../shared/licensedRows").PlanLicence[]; jobs?: import("../../../shared/setupJobs").SetupJob[] | null; cannot_run?: string[]; cannot_run_why?: Record<string, string> }
+/** The setup plan read: Home's words and the job cards Settings also shows (AIMODELS-SETUP-01). */
+export interface PlanRead { plan?: unknown; wording: PlanWording; jobs?: import("../../../shared/setupJobs").SetupJob[] | null; cannot_run?: string[]; cannot_run_why?: Record<string, string> }
 export interface InstallStatusView {
   state: "none" | "installing_engine" | "engine_failed" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
   chatReady: boolean; complete: boolean; percent: number; completedBytes: number; totalBytes: number;
@@ -1143,9 +1143,8 @@ export const api = {
   setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null; searchNeeded?: boolean }>("/api/setup/checks/run", { method: "POST" }),
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),
   repairsChecks: () => request<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>>("/api/repairs/checks", { method: "POST" }),
-  setupAcceptLicences: () => request<{ accepted: true }>("/api/setup/licences/accept", { method: "POST" }),
   setupPlan: (vramGb?: number) => request<PlanRead>(`/api/setup/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
-  setupInstall: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => request<{ started: true; models: number; left_out?: Array<{ job: string; reason: string }> }>("/api/setup/install", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}), ...(acceptedLicences?.length ? { accepted_licences: acceptedLicences } : {}) }) }),
+  setupInstall: (vramGb?: number, components?: string[]) => request<{ started: true; models: number; left_out?: Array<{ job: string; reason: string }> }>("/api/setup/install", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}) }) }),
   /** Wizard (before an owner): start or restart the AI engine install on this computer. */
   setupEngineInstall: () => request<{ started: true }>("/api/setup/engine-install", { method: "POST" }),
   setupCloseApps: () => request<SetupCloseApps>("/api/setup/close-apps"),
@@ -1155,8 +1154,8 @@ export const api = {
   setupHostTuneApply: (id: string) => request<{ item: HostTuneItem }>("/api/setup/host-tune/apply", { method: "POST", body: JSON.stringify({ id }) }),
   setupHostTuneRevert: (id: string) => request<{ item: HostTuneItem }>("/api/setup/host-tune/revert", { method: "POST", body: JSON.stringify({ id }) }),
   setupInstallStatus: () => request<InstallStatusView>("/api/setup/install"),
-  installPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording; licences?: import("../../../shared/licensedRows").PlanLicence[] }>(`/api/install/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
-  installStart: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}), ...(acceptedLicences?.length ? { accepted_licences: acceptedLicences } : {}) }) }),
+  installPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/install/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
+  installStart: (vramGb?: number, components?: string[]) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}) }) }),
   installStatus: () => request<InstallStatusView>("/api/install"),
   installRetry: () => request<{ started: true }>("/api/install/retry", { method: "POST" }),
   /** Wizard web search screen: `dryRun` tests the address and saves nothing. */

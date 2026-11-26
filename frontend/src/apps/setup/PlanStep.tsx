@@ -9,8 +9,6 @@ import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/compon
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { api, ApiError, type InstallStatusView, type PlanRead } from "@/lib/api";
-import { Checkbox } from "@maipai/ui/src/ui/checkbox";
-import type { PlanLicence } from "../../../../shared/licensedRows";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import { liveVerdict, PlanDiskSummary } from "./PlanDiskSummary";
 import { defaultPicks, selectedRows, type Picks, type SetupJob } from "./planChoices";
@@ -29,7 +27,7 @@ export interface PlanStepProps {
   onReady?: (ready: boolean) => void;
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
   readPlan?: (vramGb?: number) => Promise<PlanRead>;
-  start?: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => Promise<unknown>;
+  start?: (vramGb?: number, components?: string[]) => Promise<unknown>;
   /** What the AI engine install is doing; the plan waits on it when this computer is installing the engine. */
   readInstall?: () => Promise<InstallStatusView>;
   /** Try the AI engine install again after it failed. */
@@ -55,14 +53,11 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   // MEM-SPACE-05: jobs no tier can ever run on this computer stay off and download nothing.
   const [cannotRun, setCannotRun] = useState<ReadonlySet<string>>(new Set());
   const [cannotWhy, setCannotWhy] = useState<Record<string, string>>({});
-  // Licensed model rows: the notice is shown plainly and the install waits for the accept; unticking the row drops the need.
-  const [licences, setLicences] = useState<PlanLicence[]>([]);
-  const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let active = true;
     setFailed(false);
-    readPlan(vram).then((result) => { if (active) { setRead(result); setLicences(result.licences ?? []); const no = new Set(result.cannot_run ?? []); setCannotRun(no); setCannotWhy(result.cannot_run_why ?? {}); const base = result.wording.disk?.plan && result.jobs ? defaultPicks(result.jobs) : {}; setPicks(Object.fromEntries(Object.entries(base).map(([job, on]) => [job, no.has(job) ? false : on]))); } }).catch(() => { if (active) setFailed(true); });
+    readPlan(vram).then((result) => { if (active) { setRead(result); const no = new Set(result.cannot_run ?? []); setCannotRun(no); setCannotWhy(result.cannot_run_why ?? {}); const base = result.wording.disk?.plan && result.jobs ? defaultPicks(result.jobs) : {}; setPicks(Object.fromEntries(Object.entries(base).map(([job, on]) => [job, no.has(job) ? false : on]))); } }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
@@ -94,10 +89,6 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const verdict = disk ? liveVerdict(disk, selected) : null;
   const diskShort = disk ? verdict!.state === "red" : !!wording?.diskLine;
   const canRecheck = !!wording && !wording.needsMemoryAnswer && (wording.level === "unknown" || diskShort || verdict?.state === "amber");
-  const owed = licences.filter((licence) => selected.has(licence.row_id) && !licence.accepted_at && !licence.covered);
-  // Covered by the wizard's acknowledgement (LICENCE-ACK-01): shown as information, never a gate.
-  const known = licences.filter((licence) => selected.has(licence.row_id) && (licence.accepted_at || licence.covered));
-  const unaccepted = owed.some((licence) => !accepted.has(licence.id));
   const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !diskShort;
   // Continue stays blocked while the plan is still being read and while the
   // Install button is the way forward; it opens only when Home cannot
@@ -110,7 +101,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   async function install() {
     setBusy(true); setError(null); setNotice(null);
     try {
-      const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id)) : start(vram));
+      const result = await (disk ? start(vram, [...selected]) : start(vram));
       const models = typeof result === "object" && result !== null && "models" in result && typeof result.models === "number" ? result.models : null;
       setNotice(models === 0 ? i18n._({ id: "Nothing to download: everything you ticked is already installed.", message: "Nothing to download: everything you ticked is already installed." }) : i18n._({ id: "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes.", message: "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes." }));
       onInstalled();
@@ -149,24 +140,9 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
             {wording.diskLine ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{wording.diskLine}</AlertDescription></Alert> : null}
           </>
         )}
-        {owed.map((licence) => (
-          <Alert key={licence.id} data-testid="plan-licence">
-            <AlertDescription>
-              <span className="block font-medium">{i18n._({ id: "Before it downloads: the maker's licence ({name})", message: "Before it downloads: the maker's licence ({name})", values: { name: licence.name } })}</span>
-              <ul className="list-disc space-y-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
-              <span className="block break-all">{i18n._({ id: "The full licence: {url}", message: "The full licence: {url}", values: { url: licence.url } })}</span>
-              <Field orientation="horizontal"><Checkbox id={`licence-${licence.id}`} checked={accepted.has(licence.id)} onCheckedChange={(value) => setAccepted((current) => { const next = new Set(current); if (value === true) next.add(licence.id); else next.delete(licence.id); return next; })} /><FieldContent><FieldLabel htmlFor={`licence-${licence.id}`}>{i18n._({ id: "I have read it and I accept it", message: "I have read it and I accept it" })}</FieldLabel></FieldContent></Field>
-              <span className="block text-muted-foreground">{i18n._({ id: "Not for you? Turn Videos off above and nothing of it downloads.", message: "Not for you? Turn Videos off above and nothing of it downloads." })}</span>
-            </AlertDescription>
-          </Alert>
-        ))}
-        {known.map((licence) => (
-          <p key={licence.id} className="text-muted-foreground" data-testid="plan-licence-info">{i18n._({ id: "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.", message: "{name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.", values: { name: licence.name } })}</p>
-        ))}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setRead(null); setAttempt((n) => n + 1); }}>{i18n._({ id: "Check again", message: "Check again" })}</Button> : null}
-        {canInstall ? <Button type="button" size="lg" disabled={busy || unaccepted} onClick={() => void install()}>{actionLabel}</Button> : null}
-        {canInstall && unaccepted ? <p className="text-muted-foreground" data-testid="plan-accept-hint">{i18n._({ id: "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on.", message: "The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on." })}</p> : null}
+        {canInstall ? <Button type="button" size="lg" disabled={busy} onClick={() => void install()}>{actionLabel}</Button> : null}
         {notice ? <p role="status">{notice}</p> : null}
         </div>
       </CardContent>

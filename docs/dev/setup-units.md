@@ -17,7 +17,7 @@ Ported from the old job cards (`shared/aiChoices.ts`, deleted) before removal:
 |---|---|
 | `defaultOn` (WAN-DEFAULT-01) | A row with `minors_only` is offered and starts on only when `householdHasMinors`; an adult-only home never sees it. Stack `POST /choices/recommended` takes `household_has_minors` for the same rule. |
 | `blockedReason` | A hub part carries `blocked`; the wizard disables its switch and shows the line. |
-| Licences | Unchanged: `PlanLicence` per row id, accepted in the step (LICENCE-ACK-01). |
+| Licences | The Stack stores the one global acceptance; Home proxies its licence page. |
 | Unused / free-space view | Already served by the Stack (`GET /choices/unused`) in Settings; the wizard keeps `PlanDiskSummary`. |
 | MODEL-ADD-01 (added chat) | Added models are Stack rows (`addedModels` on the chat feature); the wizard never listed them. |
 | Wake word | Stack feature `wakeword`, not asked in the wizard (as before). |

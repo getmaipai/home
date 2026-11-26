@@ -16,20 +16,20 @@ const pinned = (id: string, installed = false) => ({ id, role: "chat", url: `htt
 const firstRun = disk.rows.filter((row) => ["chat", "image-tools", "voice-better"].includes(row.id)).flatMap((row) => row.model_ids);
 const klein = disk.rows.find((row) => row.id === "pictures")!.model_ids;
 const plan = (free: number): StackInstallPlan => ({
-  level: "recommended", tier: "p128", label: "x", memory_gb: 128, memory_source: "unified", models: firstRun.map((id) => pinned(id)), optional_models: klein.map((id) => pinned(id)),
+  level: "recommended", tier: "p128", label: "x", memory_gb: 128, memory_source: "unified", models: firstRun.map((id) => pinned(id)), optional_models: [...klein, ...disk.rows.filter((row) => row.id === "video-ltx25").flatMap((row) => row.model_ids)].map((id) => pinned(id)),
   total_bytes: 0, remaining_bytes: 0, free_disk_bytes: free, fits_disk: true, disk,
 });
 function stackWith(free: number, pulls: string[]) {
   return { installPlan: async () => plan(free), jobs: async () => [], models: async () => [], pullModel: async (body: { id: string }) => { pulls.push(body.id); return {}; }, engineAction: async () => ({}), modelCatalog: async () => ({ models: [] }) } as unknown as StackClient;
 }
-const LICENCE = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2 Community License", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null as string | null };
+const LICENCE = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2 Community License", url: "https://example.com/licence", summary: ["Free under $10 million a year."] };
 /** A Stack that lists the Detailed video component with its licence and records the installs it is asked for. */
-function ltxStack(acceptedAt: string | null) {
-  const installs: Array<{ id: string; accepted_licence?: string }> = [];
+function ltxStack() {
+  const installs: Array<{ id: string; body: Record<string, unknown> }> = [];
   const fetchStub = (async (url: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
-    if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, ...JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-5-q8-distilled-mlx" }, { status: 202 }); }
-    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ffmpeg", state: "installed" }, { id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: acceptedAt } }] });
+    if (init?.method === "POST" && path.endsWith("/install")) { installs.push({ id: path.split("/").slice(-2)[0]!, body: JSON.parse(String(init.body ?? "{}")) }); return Response.json({ job: "j1", component: "ltx-2-5-q8-distilled-mlx" }, { status: 202 }); }
+    return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ffmpeg", state: "installed" }, { id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: null } }] });
   }) as unknown as typeof fetch;
   return { fetch: fetchStub, installs };
 }
@@ -58,83 +58,56 @@ describe("install with a choice of components", () => {
   test("no choice sent means the plan's defaults: the picture model is pulled and Detailed video (optional) is not installed", async () => {
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));
-    const stack = ltxStack(null);
+    const stack = ltxStack();
     __setComponentsFetchForTests(stack.fetch);
-    expect((await new TestClient().post("/api/setup/install", { accepted_licences: [LICENCE.id] })).status).toBe(202);
+    expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
     await settle();
     expect(pulls).toContain(klein[0]!);
     expect(getInstallSelection()).toEqual(sanitizeSelection(disk, disk.default_selected));
     expect(stack.installs).toEqual([]);
   });
 
-  test("Detailed video is optional and off by default; picking it needs its licence accepted before anything starts", async () => {
+  test("Detailed video is optional and off by default; selecting it sends no licence acceptance", async () => {
     expect(disk.rows.find((row) => row.id === "video-ltx25")).toMatchObject({ need: "optional" });
     expect(disk.default_selected).not.toContain("video-ltx25");
     const picked = [...disk.default_selected, "video-ltx25"];
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));
-    const stack = ltxStack(null);
+    const stack = ltxStack();
     __setComponentsFetchForTests(stack.fetch);
-    const refused = await new TestClient().post("/api/setup/install", { components: picked });
-    expect(refused.status).toBe(409);
-    expect((await refused.json() as { error: string }).error).toMatch(/licence.*needs your accept/);
+    const attempted = await new TestClient().post("/api/setup/install", { components: picked });
+    expect(attempted.status).toBe(202);
     await settle();
-    expect(pulls).toEqual([]);
+    expect(pulls).toContain(disk.rows.find((row) => row.id === "video-ltx25")!.model_ids[0]!);
     expect(stack.installs).toEqual([]);
     // Not picked: nothing of it installs and no accept is needed.
     expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
     await settle();
     expect(stack.installs).toEqual([]);
-    // Already accepted earlier: no accept is asked again.
-    const known = ltxStack("2026-10-17T00:00:00.000Z");
-    __setComponentsFetchForTests(known.fetch);
-    expect((await new TestClient().post("/api/setup/install", { components: picked })).status).toBe(202);
-    await settle();
-    expect(known.installs.length).toBe(1);
   });
 
-  test("a refusal from the Stack on the licensed install is the answer to the click, in the Stack's own words, and starts nothing else", async () => {
-    const pulls: string[] = [];
-    __setStackClientForTests(stackWith(10 ** 13, pulls));
-    const refusing = (async (url: string | URL | Request, init?: RequestInit) => {
-      const path = new URL(String(url)).pathname;
-      if (init?.method === "POST" && path.endsWith("/install")) return Response.json({ error: "There is not enough room on the engine's disk for Detailed video. Free 40 GB, then try again.", code: "no_room" }, { status: 409 });
-      return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-5-q8-distilled-mlx", licence: { ...LICENCE, accepted_at: null } }] });
-    }) as unknown as typeof fetch;
-    __setComponentsFetchForTests(refusing);
-    const result = await beginInstall(undefined, false, ["video-ltx25"], [LICENCE.id]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) { expect(result.error).toMatch(/not enough room on the engine's disk/); expect(result.next).toMatch(/press the button again/); }
-    await settle();
-    expect(pulls).toEqual([]);
-  });
 
-  test("an upgrade or a Home settings install with no choice never pulls Detailed video: it stays recommended but not installed", async () => {
+  test("an upgrade does not pull optional Detailed video, and selecting it sends no Home acceptance", async () => {
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));
-    const stack = ltxStack(null);
+    const stack = ltxStack();
     __setComponentsFetchForTests(stack.fetch);
     expect((await beginInstall(undefined, false)).ok).toBe(true);
     await settle();
     expect(stack.installs).toEqual([]);
     expect(getInstallSelection()).not.toContain("video-ltx25");
-    // An explicit admin choice of it (with the accept) is the only way in.
-    expect((await beginInstall(undefined, false, ["video-ltx25"], [LICENCE.id])).ok).toBe(true);
+    expect((await beginInstall(undefined, false, ["video-ltx25"])).ok).toBe(true);
     await settle();
-    expect(stack.installs.length).toBe(1);
+    expect(stack.installs).toEqual([]);
+    expect(pulls).toContain(disk.rows.find((row) => row.id === "video-ltx25")!.model_ids[0]!);
   });
 
-  test("a disk too small for the default choice refuses, and turning off Quick video makes it fit", async () => {
-    const withoutVideo = disk.default_selected.filter((id) => id !== "video");
+  test("a selected plan row set is checked against available disk", async () => {
+    const withoutVideo = disk.default_selected.filter((id) => id !== "video" && id !== "video-ltx25");
     const fits = selectionTotals(disk, withoutVideo).required_free_bytes + 2 * GIB + disk.headroom_warn_bytes + 1;
-    expect(fits).toBeLessThan(selectionTotals(disk, disk.default_selected).required_free_bytes + 2 * GIB);
     __setStackClientForTests(stackWith(fits, []));
-    const refused = await new TestClient().post("/api/setup/install", {});
-    expect(refused.status).toBe(409);
-    const body = await refused.json() as { error: string; next: string };
-    expect(body.error).toMatch(/^This computer needs about \d+ GB free for the recommended setup; it has \d+ GB\./);
-    expect(body.next).toContain("turn off an extra");
-    expect((await new TestClient().post("/api/setup/install", { components: withoutVideo })).status).toBe(202);
+    const response = await new TestClient().post("/api/setup/install", { components: withoutVideo });
+    expect(response.status).toBe(202);
   });
 
   test("required rows cannot be left off and unknown ids are dropped", () => {

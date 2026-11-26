@@ -32,6 +32,7 @@ beforeEach(() => {
       return Response.json(Object.entries(stored).map(([key, value]) => ({ key, value, source: "user" })));
     }
     if (path === "/api/ai/stack/admin-link") return Response.json(adminLink);
+    if (path === "/api/ai/stack/licences") { wire.push({ method, path, body }); return Response.json({ terms_version: "2026-11", accepted: method === "POST", accepted_at: method === "POST" ? "now" : null, by: method === "POST" ? "owner-1" : null, licences: [{ id: "model-terms", name: "Model terms", url: "https://example.com/terms", summary: ["Terms apply."] }] }); }
     if (path === "/api/ai/stack/migration") return Response.json(migration);
     if (path === "/api/ai/stack/migration/dismiss") { migration = { ...migration, dismissed: true }; return Response.json(migration); }
     wire.push({ method, path, body });
@@ -72,6 +73,16 @@ describe("the Home client", () => {
     expect(wire[3]!.body).toEqual({ dry_run: true });
     expect(wire[6]!.body).toEqual({ "stack.roles.video.enabled": true });
     expect(wire[7]!.body).toEqual({ "stack.roles.chat.priority": 5, "stack.roles.music.priority": 7 });
+  });
+
+  test("licence reads and accepts use the Stack proxy routes", async () => {
+    const client = createHomeStackClient();
+    await client.licences!.read();
+    await client.licences!.accept();
+    expect(wire.slice(-2).map(({ method, path, body }) => ({ method, path, body }))).toEqual([
+      { method: "GET", path: "/api/ai/stack/licences", body: undefined },
+      { method: "POST", path: "/api/ai/stack/licences", body: {} },
+    ]);
   });
 
   test("a refusal is the Stack's sentence and code, not Home's", async () => {

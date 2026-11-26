@@ -12,15 +12,7 @@ export interface ComponentRow {
   /** MP-09: the licence a part ships under when there is nothing to accept (ffmpeg: GPL 3 or later). */
   licence_name?: string | null;
   job: string | null; percent: number | null; failure: string | null;
-  /** VIDEO-LTX-01: a licence with terms of its own, accepted once by an admin before the first install (null for every other part). */
-  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered?: boolean } | null;
   can_install: boolean; install_block: string | null; can_uninstall: boolean; uninstall_block: string | null;
-}
-export interface LicenceEntry { component: string; label: string; id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered: boolean }
-/** LICENCE-ACK-01: the household's licence acknowledgement, the one admin prompt and the recommended extras. */
-export interface LicenceOverview {
-  stack: "ok" | "unreachable"; terms_version: string; acknowledged: { by: string; at: string; terms_version: string } | null;
-  needs_prompt: boolean; licences: LicenceEntry[]; extras: { ids: string[]; labels: string[]; bytes: number; size: string } | null;
 }
 export interface ComponentsOverview {
   stack: "ok" | "unreachable"; message: string | null; tier: string | null;
@@ -35,9 +27,6 @@ export const componentsApi = {
   cleanup: () => requestJson<CleanupItem[]>("/api/storage/cleanup"),
   clearCleanup: (ids: string[]) => requestJson<{ bytes_freed: number }>("/api/storage/cleanup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ids }) }),
   list: () => requestJson<ComponentsOverview>("/api/components"),
-  install: (id: string, acceptedLicence?: string) => requestJson<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", ...(acceptedLicence ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ accepted_licence: acceptedLicence }) } : {}) }),
-  licences: () => requestJson<LicenceOverview>("/api/install/licences"),
-  acceptLicences: () => requestJson<{ accepted: true; auto_install: boolean }>("/api/install/licences/accept", { method: "POST" }),
-  installExtras: () => requestJson<{ started: true; models: number }>("/api/install/licences/install-extras", { method: "POST" }),
+  install: (id: string) => requestJson<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST" }),
   uninstall: (id: string) => requestJson<{ component: string; freed_bytes: number; removed: boolean }>(`/api/components/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

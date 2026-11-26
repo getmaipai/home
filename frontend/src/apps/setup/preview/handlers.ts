@@ -14,7 +14,6 @@ export function handlersFor(scenario: Scenario) {
     http.get("*/api/jobs", () => HttpResponse.json(scenario.progress ? [{ id: "preview-download", kind: "model_download", state: scenario.progress.state, title: "Starter model download", progress: { completedBytes: Math.round(10_000_000_000 * scenario.progress.percent / 100), totalBytes: 10_000_000_000, bytesPerSecond: scenario.progress.bytesPerSecond, percent: scenario.progress.percent }, actions: [] }] : [])),
     http.get("*/api/setup/install", () => HttpResponse.json({ state: "idle", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0, bytesPerSecond: null, etaSeconds: null, problem: null, items: [] })),
     http.post("*/api/setup/checks/run", () => HttpResponse.json({ rows: scenario.checks.map((row) => row.action === "allow_tailnet" && allowedTailnet ? { ...row, state: "green", text: "Allowed." } : row), state, searchCandidate: chosenSearch ? null : scenario.searchCandidate })),
-    http.post("*/api/setup/licences/accept", () => HttpResponse.json({ accepted: true })),
     http.get("*/api/setup/host-tune", () => HttpResponse.json({ supported: true, items: [
       { id: "lowpower", title: "Keep this computer awake", why: "Sleep pauses downloads and answers.", mode: "auto", state: "needs", current: "Can sleep", proposed: "Stays awake" },
       { id: "charger", title: "Plug this computer in", why: "It runs slower on battery.", mode: "advice", state: "needs", current: "On battery", proposed: "Use the charger." },

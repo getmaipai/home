@@ -6,10 +6,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { requireRole } from "@/middleware/auth";
+import { requireAuth, requireRole } from "@/middleware/auth";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { forwardToStack, refusalStatus, StackChoicesError, type Forwarded } from "@/lib/stackChoicesForward";
-import { coveredConsent } from "@/lib/stackComponents";
 import { dismissMigrationNotice, ensureChoicesMigrated, HOME_FEATURE_SWITCHES, readMigrationRecord } from "@/lib/stackChoicesMigration";
 import { readAdminLink } from "@/lib/stackAdminLink";
 import { refreshStackChoiceSnapshot } from "@/lib/stackChoiceSnapshot";
@@ -91,14 +90,15 @@ aiStackRoutes.openapi(createRoute({ method: "put", path: "/settings", tags: ["AI
 
 aiStackRoutes.openapi(createRoute({ method: "post", path: "/parts/{id}/install", tags: ["AI"], summary: "Download a model (the Stack's POST /stack/v1/parts/{id}/install)", middleware: [requireRole("owner", "admin")] as const, request: { params: idParam, body: body(false) }, responses: { 202: { content: { "application/json": { schema: Any } }, description: "Started or joined." }, ...ok("Already installed.") } }),
   async (c) => {
-    const { id } = c.req.valid("param"); const sent = (await readBody(c)) as { accepted_licence?: unknown };
-    const person = c.get("person") as PersonRow;
-    return pass(c, `parts.install ${id}`, async () => {
-      // A licence the household's acknowledgement already covers installs with no click; the Stack still gets the notice id it requires.
-      const consent = typeof sent.accepted_licence === "string" ? { accepted_licence: sent.accepted_licence, accepted_by: person.id } : await coveredConsent(id).then((found) => found ? { accepted_licence: found.acceptedLicence, ...(found.acceptedBy ? { accepted_by: found.acceptedBy } : {}) } : undefined);
-      return forwardToStack("POST", `/stack/v1/parts/${encodeURIComponent(id)}/install`, consent);
-    }, choicesChanged);
+    const { id } = c.req.valid("param");
+    return pass(c, `parts.install ${id}`, () => forwardToStack("POST", `/stack/v1/parts/${encodeURIComponent(id)}/install`, {}), choicesChanged);
   });
+
+const licenceResponse = { 200: { content: { "application/json": { schema: Any } }, description: "The Stack's global licence acceptance and licence list." }, ...refusals };
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/licences", tags: ["AI"], summary: "The Stack's global licence acceptance", middleware: [requireAuth] as const, responses: licenceResponse }),
+  (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/licences")));
+aiStackRoutes.openapi(createRoute({ method: "post", path: "/licences", tags: ["AI"], summary: "Accept the Stack's global licences", middleware: [requireRole("owner", "admin")] as const, request: { body: { content: { "application/json": { schema: z.object({}).strict() } } } }, responses: licenceResponse }),
+  async (c) => { const person = c.get("person") as PersonRow; return pass(c, "licences.accept", () => forwardToStack("POST", "/stack/v1/licences", { by: person.id })); });
 
 aiStackRoutes.openapi(createRoute({ method: "delete", path: "/parts/{id}", tags: ["AI"], summary: "Remove a model (the Stack's DELETE /stack/v1/parts/{id})", middleware: [requireRole("owner", "admin")] as const, request: { params: idParam }, responses: ok("The Stack's answer, unchanged.") }),
   (c) => pass(c, `parts.remove ${c.req.valid("param").id}`, () => forwardToStack("DELETE", `/stack/v1/parts/${encodeURIComponent(c.req.valid("param").id)}`), choicesChanged));

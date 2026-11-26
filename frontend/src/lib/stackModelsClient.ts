@@ -4,7 +4,7 @@
 // yet, so there is no `subscribe`; the page asks again every 2 seconds while a model downloads.
 import { ApiError, requestJson } from "@/lib/api";
 import { StackClientError } from "@maipai/ui/src/stack/StackClient";
-import type { StackClient } from "@maipai/ui/src/stack/StackClient";
+import type { StackClient, StackLicences } from "@maipai/ui/src/stack/StackClient";
 
 const BASE = "/api/ai/stack";
 const json = (method: "POST" | "PUT", body: unknown): RequestInit => ({ method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -20,6 +20,10 @@ const part = (id: string) => encodeURIComponent(id);
 
 export function createHomeStackClient(): StackClient {
   return {
+    licences: {
+      read: () => call<StackLicences>("/licences"),
+      accept: () => call<StackLicences>("/licences", json("POST", {})),
+    },
     drives: {
       list: () => call("/disks"),
       features: () => call("/disks/features"),

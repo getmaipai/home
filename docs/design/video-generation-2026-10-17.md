@@ -392,3 +392,5 @@ Jesse accepted the LTX licence item by item in Settings and asked for the expect
 - `hub-on-apple-silicon-2026-09-17.md`'s video table: the animated path is Wan2.2 TI2V-5B FastWan on MLX, not LTX-2 (licence), and the
   quality path is the same model undistilled or the A14B later, not ComfyUI on MPS.
 - MEDIA-HOST-02's ComfyUI route for video: the Stack runs the MLX worker directly. Nothing in `RULES.md` changes.
+
+- Superseded 2026-11-25: the Stack holds the one global licence acceptance.

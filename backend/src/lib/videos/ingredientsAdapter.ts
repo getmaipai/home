@@ -3,9 +3,8 @@
 // wizard and Settings, AI and models (shared/setupJobs.ts, the "ingredients" unit) list it with size, licence and readiness like every other model.
 //
 // Install goes through the Stack's existing LoRA install route (POST /stack/v1/video/loras/install: a Hugging Face file link, the person's Hugging Face token in that one
-// body, the name below, all-ages, base ltx-2.5). The file is gated: its Hugging Face page asks the person to accept the LTX-2.x Community License there, and the household's
-// licence acknowledgement (LICENCE-ACK-01) must cover that licence here. The adapter is an engine part, not a style: it is never offered in the Styles library (loras/sync.ts).
-import { currentLicenceAck } from "@/lib/licenceAcceptance";
+// body, the name below, all-ages, base ltx-2.5). Its Hugging Face page asks the person to accept the LTX-2.x Community License there; the Stack checks its own global
+// acceptance when the install starts. The adapter is an engine part, not a style: it is never offered in the Styles library (loras/sync.ts).
 import { tokenFor } from "@/lib/loras/source";
 import { getStackInstallJob, installStackLora, listVideoLoras, removeVideoLora, StackInstallRefused, StackVideoError } from "@/lib/videos/stack";
 
@@ -22,8 +21,8 @@ export const INGREDIENTS_LICENCE_ID = "ltx-2.x-community-license";
 export const INGREDIENTS_BASE = "ltx-2.5";
 
 export const INGREDIENTS_NO_TOKEN_LINE = "Needs your Hugging Face token. Accept the terms on the adapter's Hugging Face page, then save your token in Settings, AI, Advanced, and press Install again.";
-export const INGREDIENTS_NO_LICENCE_LINE = "Needs the maker's licence accepted first. Accept the licences in Settings, Models and storage (the one licence prompt), then press Install again.";
-export const INGREDIENTS_AFTER_SETUP_LINE = "Add it after setup in Settings, AI and models: it needs your Hugging Face token and the maker's licence accepted first.";
+export const INGREDIENTS_NO_LICENCE_LINE = "Needs the Stack's licence accepted first. Ask an admin to accept licences on the AI and models page, then press Install again.";
+export const INGREDIENTS_AFTER_SETUP_LINE = "Add it after setup in Settings, AI and models: it needs your Hugging Face token and the Stack's licence accepted first.";
 export const INGREDIENTS_STACK_DOWN_LINE = "The AI engine is not answering, so Home cannot read or install the adapter. Check that the engine is running, then try again.";
 export const INGREDIENTS_FAILED_LINE = "The adapter did not download. Check that this computer is online and the Hugging Face token is saved in Settings, AI, Advanced, then press Install again.";
 
@@ -31,12 +30,7 @@ export function ingredientsDescription(): string {
   return `Needed to make a video from pictures: it teaches the Max video model to use a reference sheet. 1.3 GB. Licence: ${INGREDIENTS_LICENCE}. Comes from huggingface.co (Lightricks). It asks you to accept its terms on Hugging Face and needs your Hugging Face token to download.`;
 }
 
-/** The household's licence acknowledgement covers the LTX licence (the Stack lists it under a dated id; the wizard's first-run record covers whatever the plan shows). */
-export function ingredientsLicenceCovered(): boolean {
-  const ack = currentLicenceAck();
-  if (!ack) return false;
-  return ack.licence_ids.some((id) => id === INGREDIENTS_LICENCE_ID || id.startsWith("ltx-2.x-community")) || (ack.by === "setup" && ack.licence_ids.length === 0);
-}
+/** The Stack checks its global licence acceptance when the install starts. */
 
 export interface IngredientsState {
   /** The Stack answered. False leaves readiness unknown, never "installed". */
@@ -70,13 +64,13 @@ export async function ingredientsState(): Promise<IngredientsState> {
       else percent = running.percent;
     } catch { /* the job read is progress only; the library listing above is the truth */ }
   }
-  const blockedReason = !tokenFor("huggingface") ? INGREDIENTS_NO_TOKEN_LINE : !ingredientsLicenceCovered() ? INGREDIENTS_NO_LICENCE_LINE : null;
+  const blockedReason = !tokenFor("huggingface") ? INGREDIENTS_NO_TOKEN_LINE : null;
   return { reachable: true, installed: false, libraryId: null, installing: job !== null, percent, failure: job ? null : failure, blockedReason };
 }
 
 export type IngredientsInstall = { ok: true; job: string } | { ok: false; status: 409 | 503; error: string; code: string };
 
-/** Starts the Stack's install job. Only an admin's action calls this; the licence acknowledgement and the token are checked here, not trusted from the caller. */
+/** Starts the Stack's install job. Only an admin action calls this; the token is checked here and the Stack checks its own licence acceptance. */
 export async function installIngredients(addedBy: string): Promise<IngredientsInstall> {
   const state = await ingredientsState();
   if (!state.reachable) return { ok: false, status: 503, code: "stack_unreachable", error: INGREDIENTS_STACK_DOWN_LINE };
@@ -84,7 +78,6 @@ export async function installIngredients(addedBy: string): Promise<IngredientsIn
   if (state.installing) return { ok: false, status: 409, code: "installing", error: "The adapter is still downloading." };
   const token = tokenFor("huggingface");
   if (!token) return { ok: false, status: 409, code: "no_token", error: INGREDIENTS_NO_TOKEN_LINE };
-  if (!ingredientsLicenceCovered()) return { ok: false, status: 409, code: "licence_not_accepted", error: INGREDIENTS_NO_LICENCE_LINE };
   try {
     const started = await installStackLora("video", {
       source: "huggingface", url: INGREDIENTS_URL, name: INGREDIENTS_LIBRARY_NAME, licence: INGREDIENTS_LICENCE_ID, licence_acknowledged: true,

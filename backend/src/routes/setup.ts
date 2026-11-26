@@ -19,8 +19,8 @@ import { setupLocalOnly } from "@/middleware/setupLocalOnly";
 import { setupFolderRoutes } from "@/routes/setupFolders";
 import { setupHostTuneRoutes } from "@/routes/setupHostTune";
 import { setupCloseAppsRoutes } from "@/routes/setupCloseApps";
-import { getCookie } from "hono/cookie";
 import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
+import { getCookie } from "hono/cookie";
 import { resolveHumanSession, requireRole } from "@/middleware/auth";
 import { validateProposedPath } from "@/lib/folderBrowse";
 import { checkPlacement } from "@/lib/placement";
@@ -35,8 +35,6 @@ import { startEngineInstall } from "@/lib/stackInstall";
 import { getStackClient } from "@/lib/stackEngine";
 import { getInstallStatus } from "@/lib/installStatus";
 import { InstallStatusSchema } from "@/routes/install";
-import { adoptLicenceAck } from "@/lib/licenceAcceptance";
-import { acceptLicences, licenceOverview, widenLicenceAck } from "@/lib/licenceFlow";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { setupJobsFor } from "@/lib/setupJobsState";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
@@ -157,7 +155,7 @@ const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).op
 const planRoute = createRoute({
   method: "get", path: "/plan", tags: ["Setup"], summary: "What Home would install on the AI computer",
   request: { query: planQuery },
-  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."), jobs: z.array(z.unknown()).nullable().optional().describe("The wizard's units, one per Stack feature row (plus the hub's own parts), built from this plan's rows; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."), cannot_run_why: z.record(z.string(), z.string()).optional().describe("For each job in cannot_run, the reason in plain words (how much memory it asks for).") }) } }, description: "The Stack's plan and Home's words for it." }, ...errorResponses({ 409: "Home is already set up" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, jobs: z.array(z.unknown()).nullable().optional().describe("The wizard's units, one per Stack feature row (plus the hub's own parts), built from this plan's rows; null when there is no disk plan to build them from."), cannot_run: z.array(z.string()).optional().describe("Job ids (pictures, videos, music, voice) the Stack's capability table says no tier can run on this computer; the wizard leaves them off. Empty when the Stack cannot say."), cannot_run_why: z.record(z.string(), z.string()).optional().describe("For each job in cannot_run, the reason in plain words (how much memory it asks for).") }) } }, description: "The Stack's plan and Home's words for it." }, ...errorResponses({ 409: "Home is already set up" }) },
 });
 setupRoutes.openapi(planRoute, async (c) => {
   if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
@@ -175,7 +173,7 @@ async function cannotRunFields() {
 
 const installStartRoute = createRoute({
   method: "post", path: "/install", tags: ["Setup"], summary: "Install the plan: start the downloads and go on",
-  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional(), accepted_licences: z.array(z.string().max(120)).max(8).optional().openapi({ description: "Ids of the licence notices the person read and accepted for licensed rows (Detailed video). A licensed row left on without its accept is refused." }), components: z.array(z.string()).optional().openapi({ description: "The disk plan rows to install (ids from the plan's disk.plan.rows). Required rows are always installed; omitted means the plan's defaults." }) }).strict() } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional(), components: z.array(z.string()).optional().openapi({ description: "The disk plan rows to install (ids from the plan's disk.plan.rows). Required rows are always installed; omitted means the plan's defaults." }) }).strict() } } } },
   responses: {
     202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number(), left_out: z.array(z.object({ job: z.string(), reason: z.string() })).optional() }) } }, description: "The downloads started in the background. left_out names a job the request asked for that this computer can never run (the Stack's fits_ever), with the reason in plain words; nothing is downloaded for it." },
     409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "There is nothing the AI can install on this computer, or not enough free disk space for the rows chosen." },
@@ -184,31 +182,10 @@ const installStartRoute = createRoute({
 setupRoutes.openapi(installStartRoute, async (c) => {
   // This router is open on the local network until Home has an owner.
   if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
-  const { vram_gb: vramGb, components, accepted_licences: acceptedLicences } = c.req.valid("json");
-  // LICENCE-ACK-01: the first-run record now names every licence the plan page listed.
-  await widenLicenceAck("setup");
-  const result = await beginInstall(vramGb, true, components, acceptedLicences);
+  const { vram_gb: vramGb, components } = c.req.valid("json");
+  const result = await beginInstall(vramGb, true, components);
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   return c.json({ started: true as const, models: result.models, ...(result.leftOut?.length ? { left_out: result.leftOut } : {}) }, 202);
-});
-
-const licencesRoute = createRoute({
-  method: "get", path: "/licences", tags: ["Setup"], summary: "The licences Home lists with the wizard's internet item, and whether they were accepted",
-  responses: { 200: { content: { "application/json": { schema: z.object({ stack: z.enum(["ok", "unreachable"]), terms_version: z.string(), acknowledged: z.unknown().nullable(), licences: z.array(z.unknown()) }) } }, description: "Each licensed part the AI engine lists (empty before the engine exists)." }, ...errorResponses({ 409: "Home is already set up" }) },
-});
-setupRoutes.openapi(licencesRoute, async (c) => {
-  if (setupIsOver()) return c.json(SETUP_CLOSED, 409);
-  const { stack, terms_version, acknowledged, licences } = await licenceOverview();
-  return c.json({ stack, terms_version, acknowledged, licences }, 200);
-});
-const licencesAcceptRoute = createRoute({
-  method: "post", path: "/licences/accept", tags: ["Setup"], summary: "Record the wizard's acknowledgement, including the licences",
-  responses: { 200: { content: { "application/json": { schema: z.object({ accepted: z.literal(true) }) } }, description: "Recorded for the household." }, 409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "Home already has an owner: the admin prompt in Home settings does this instead." } },
-});
-setupRoutes.openapi(licencesAcceptRoute, async (c) => {
-  if (setupIsOver()) return c.json({ error: "Home is already set up. Sign in instead.", next: "An owner or admin accepts the licences from the prompt in Home settings." }, 409);
-  await acceptLicences("setup");
-  return c.json({ accepted: true as const }, 200);
 });
 
 const engineInstallRoute = createRoute({
@@ -515,11 +492,6 @@ setupRoutes.openapi(setupStepRoute, async (c) => {
     storageChoice = layout;
   }
   const updated = replaceSetupStep(step, { ...stepResult, ...(storageChoice ? { storageChoice } : {}) });
-  // LICENCE-ACK-01: the first-run licence record belongs to the owner once there is one.
-  if (step === "owner" && stepResult.status === "done") {
-    const owner = (() => { const token = getCookie(c, "session"); return token ? resolveHumanSession(token) : null; })();
-    if (owner) adoptLicenceAck(owner.id);
-  }
   // "This computer runs the AI" is the moment the MaiPai Stack gets built
   // (INSTALL-SPLIT-01). "Another computer" installs nothing here. Before an
   // owner exists only: later changes go through Home settings.

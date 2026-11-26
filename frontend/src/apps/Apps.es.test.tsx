@@ -3,8 +3,8 @@
 // and fails here). A second test formats every message id that comes from these apps in en-US, en-GB and es.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cleanup, render, waitFor } from "@testing-library/react";
-import type { ReactElement } from "react";
 import { readFileSync } from "node:fs";
+import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { i18n } from "@lingui/core";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
@@ -18,7 +18,6 @@ import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { ACCENT_LABELS, ROLE_LABELS } from "@/apps/people/roles";
 import { RemindersPage } from "@/apps/reminders/RemindersPage";
 import { SetupWizard, checksSummary, checksTitle } from "@/apps/setup/SetupWizard";
-import { LICENCE_ACK_SENTENCE } from "../../../shared/licenceTerms";
 
 const originalFetch = globalThis.fetch;
 beforeEach(async () => { await activateLocale("es"); });
@@ -79,13 +78,6 @@ describe("apps in Spanish", () => {
     expect(kindStyle("plugin").label).not.toBe("Plugin");
     expect(checksTitle("another_computer")).not.toBe("Checking your computers");
     expect(checksSummary([])).not.toBe("Everything looks ready.");
-  });
-});
-
-describe("the licence line in the wizard stays in step with the shared text", () => {
-  test("its message is the shared English sentence", () => {
-    const source = readFileSync("src/apps/setup/SetupWizard.tsx", "utf8");
-    expect(source).toContain(`id: ${JSON.stringify(LICENCE_ACK_SENTENCE)}`);
   });
 });
 

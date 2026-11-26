@@ -1471,6 +1471,13 @@
       "when": 1795366789201,
       "tag": "0210_coding_session_list",
       "breakpoints": true
+    },
+    {
+      "idx": 211,
+      "version": "6",
+      "when": 1795636800000,
+      "tag": "0211_remove_home_licence_ack",
+      "breakpoints": true
     }
   ]
 }
