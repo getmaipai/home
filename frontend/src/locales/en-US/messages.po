@@ -79,16 +79,6 @@ msgid ", {size} free"
 msgstr ", {size} free"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:156
-msgid ", confirmed by an admin"
-msgstr ", confirmed by an admin"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:156
-msgid ", not confirmed yet"
-msgstr ", not confirmed yet"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:219
 msgid ", or cancel to leave things as they are"
 msgstr ", or cancel to leave things as they are"
@@ -160,11 +150,6 @@ msgstr "{active} of {length} on"
 #: src/apps/clock/TimersTab.tsx:116
 msgid "{activeLabel}, {displayTime} remaining"
 msgstr "{activeLabel}, {displayTime} remaining"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:119
-msgid "{adultCheckLine} People under 18 never see styles."
-msgstr "{adultCheckLine} People under 18 never see styles."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:60
@@ -391,11 +376,6 @@ msgstr "{count} alarms"
 #: ../backend/src/routes/settings.ts:88
 msgid "settings.attention.backups.many"
 msgstr "{count} backups"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:41
-msgid "{count} downloads"
-msgstr "{count} downloads"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:188
@@ -650,11 +630,6 @@ msgid "{kind} ({size})"
 msgstr "{kind} ({size})"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:52
-msgid "{kind}, Videos, {base}"
-msgstr "{kind}, Videos, {base}"
-
-#. js-lingui-explicit-id
 #: src/apps/code/NewSession.tsx:113
 msgid "{kind}: {account}"
 msgstr "{kind}: {account}"
@@ -726,19 +701,9 @@ msgid "{label}: on"
 msgstr "{label}: on"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:94
-msgid "{label}. {size}."
-msgstr "{label}. {size}."
-
-#. js-lingui-explicit-id
 #: ../backend/src/lib/notificationCopy.ts:23
 msgid "notification.alarm.due"
 msgstr "{labelled, select, no {Alarm} other {Alarm: {task}}}"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:87
-msgid "{length} of 140 characters"
-msgstr "{length} of 140 characters"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:209
@@ -1672,16 +1637,6 @@ msgid "A few things to pick up"
 msgstr "A few things to pick up"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:64
-msgid "A file never says what age it is for. {value}"
-msgstr "A file never says what age it is for. {value}"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:155
-msgid "A file you added"
-msgstr "A file you added"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1326
 msgid "setting.robot.face.color.option.lemon"
 msgstr "A gentle yellow."
@@ -1775,11 +1730,6 @@ msgstr "A JSON table. Each row is a big job and its tier; each cell says what ch
 #: src/apps/settings/AssistantKeysSettings.tsx:55
 msgid "A key an assistant, such as Claude Code, can use. A settings key changes a short list of settings for you, like how Home helps the chat remember to search. A diagnostics key only reads timings and engine status, so the assistant can find out why chat is slow; it never sees what anyone said. Neither can change people, passwords, safety or anything else. It stops after the days you choose and you can revoke it here at any time."
 msgstr "A key an assistant, such as Claude Code, can use. A settings key changes a short list of settings for you, like how Home helps the chat remember to search. A diagnostics key only reads timings and engine status, so the assistant can find out why chat is slow; it never sees what anyone said. Neither can change people, passwords, safety or anything else. It stops after the days you choose and you can revoke it here at any time."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:200
-msgid "A key is saved. Home keeps it private and never shows it again."
-msgstr "A key is saved. Home keeps it private and never shows it again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:157
@@ -1917,11 +1867,6 @@ msgid "A token is connected."
 msgstr "A token is connected."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:192
-msgid "A token is saved. Home keeps it private and never shows it again."
-msgstr "A token is saved. Home keeps it private and never shows it again."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/PersonAccessEditor.tsx:27
 msgid "A visitor. The controls below decide which protections apply."
 msgstr "A visitor. The controls below decide which protections apply."
@@ -1942,7 +1887,6 @@ msgid "setting.robot.face.color.option.peach"
 msgstr "A warm soft orange."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:81
 #: src/shell/pages/CompanionsPage.tsx:333
 #: src/shell/pages/CompanionsPage.tsx:340
 #: src/shell/pages/CompanionsPage.tsx:353
@@ -2083,11 +2027,6 @@ msgid "Add {name} to favorites"
 msgstr "Add {name} to favorites"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:138
-msgid "Add a pair"
-msgstr "Add a pair"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicComposer.tsx:213
 msgid "Add a part"
 msgstr "Add a part"
@@ -2096,11 +2035,6 @@ msgstr "Add a part"
 #: src/shell/pages/settings/PersonMultiSelect.tsx:60
 msgid "Add a person…"
 msgstr "Add a person…"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:125
-msgid "Add a phrase"
-msgstr "Add a phrase"
 
 #. js-lingui-explicit-id
 #: src/shell/MediaPickerDialog.tsx:85
@@ -2160,11 +2094,6 @@ msgid "Add a voice"
 msgstr "Add a voice"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:124
-msgid "Add a word"
-msgstr "Add a word"
-
-#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:136
 msgid "Add a world clock"
 msgstr "Add a world clock"
@@ -2211,12 +2140,6 @@ msgid "Add an item"
 msgstr "Add an item"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:45
-#: src/apps/settings/styles/stylesShared.tsx:14
-msgid "Add from a file"
-msgstr "Add from a file"
-
-#. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:122
 #: src/shell/library/LibraryViewer.tsx:130
 msgid "Add music"
@@ -2260,11 +2183,6 @@ msgid "Add speaker"
 msgstr "Add speaker"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:68
-msgid "Add style"
-msgstr "Add style"
-
-#. js-lingui-explicit-id
 #: src/apps/reminders/ListMain.tsx:58
 msgid "Add the first thing and we'll keep it here for you."
 msgstr "Add the first thing and we'll keep it here for you."
@@ -2278,11 +2196,6 @@ msgstr "Add the music"
 #: src/shell/MediaPickerDialog.tsx:130
 msgid "Add this line"
 msgstr "Add this line"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:78
-msgid "Add this style"
-msgstr "Add this style"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicLibrary.tsx:132
@@ -2345,11 +2258,6 @@ msgid "Added by {name}"
 msgstr "Added by {name}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:123
-msgid "Added to the prompt"
-msgstr "Added to the prompt"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/settings/ChatSkillsSection.tsx:79
 msgid "Added to this home"
 msgstr "Added to this home"
@@ -2382,7 +2290,6 @@ msgstr "Adding your song…"
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:154
-#: src/apps/settings/styles/StyleAddFile.tsx:68
 msgid "Adding…"
 msgstr "Adding…"
 
@@ -2499,11 +2406,6 @@ msgid "setting.generation.styles.adult_only.label"
 msgstr "Adult-only styles"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:16
-msgid "Adult-only styles stay locked until you enter your own passcode."
-msgstr "Adult-only styles stay locked until you enter your own passcode."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:842
 msgid "setting.generation.video.adult_adapters.label"
 msgstr "Adult-only video styles"
@@ -2575,9 +2477,6 @@ msgstr "Adults follow the household setting. Children and teens can use Coding o
 
 #. js-lingui-explicit-id
 #: src/apps/memory/PersonMemories.tsx:45
-#: src/apps/settings/styles/StyleEditor.tsx:115
-#: src/apps/settings/styles/StyleEditor.tsx:117
-#: src/apps/settings/styles/StylesTab.tsx:121
 #: src/shell/pages/CompanionAudienceDialog.tsx:51
 msgid "Adults only"
 msgstr "Adults only"
@@ -2791,12 +2690,6 @@ msgid "setting.synths.real_people.option_label.all"
 msgstr "All"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:106
-#: src/apps/settings/styles/StylesTab.tsx:128
-msgid "All adults"
-msgstr "All adults"
-
-#. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:115
 #: src/shell/pages/AllAppsPage.tsx:103
 #: src/shell/pages/AllAppsPage.tsx:122
@@ -2985,30 +2878,10 @@ msgid "setting.videos.library_sort.option.az"
 msgstr "Alphabetical by title."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:176
-msgid "Already added as {name}. Press to open it."
-msgstr "Already added as {name}. Press to open it."
-
-#. js-lingui-explicit-id
 #: src/apps/setup/HostTuneStep.tsx:130
 #: src/apps/setup/HostTuneStep.tsx:156
 msgid "Already set."
 msgstr "Already set."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:125
-msgid "Also add"
-msgstr "Also add"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:178
-msgid "Also on {join}"
-msgstr "Also on {join}"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:90
-msgid "Also on {join}."
-msgstr "Also on {join}."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/HouseSettings.tsx:49
@@ -3107,11 +2980,6 @@ msgstr "An owner or admin can download it in Settings, Search, Offline books (pi
 #: src/shell/pages/settings/SettingsAreaPage.tsx:89
 msgid "An owner or admin sets this."
 msgstr "An owner or admin sets this."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesApi.ts:80
-msgid "an unknown base"
-msgstr "an unknown base"
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/notificationCopy.ts:17
@@ -3238,13 +3106,6 @@ msgstr "Answers your conversations."
 #: src/apps/setup/SetupWizard.tsx:480
 msgid "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
 msgstr "ANTHROPIC_BASE_URL={codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...{hint} claude"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:127
-#: src/apps/settings/styles/StyleBrowser.tsx:128
-#: src/apps/settings/styles/StyleBrowser.tsx:129
-msgid "Any"
-msgstr "Any"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:764
@@ -3622,16 +3483,6 @@ msgid "setting.robot.initiative.max_offers_per_hour.help"
 msgstr "At most three offers per hour by default; tier 3 is limited to one."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:132
-msgid "At the end"
-msgstr "At the end"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:132
-msgid "At the start"
-msgstr "At the start"
-
-#. js-lingui-explicit-id
 #: src/apps/library/appPresentation.ts:18
 msgid "Attention"
 msgstr "Attention"
@@ -3743,17 +3594,6 @@ msgstr "Available once the song is loaded."
 #: src/shell/pages/UpdatesPage.tsx:146
 msgid "Available updates"
 msgstr "Available updates"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:137
-#: src/apps/settings/styles/StyleEditor.tsx:138
-msgid "Avoid"
-msgstr "Avoid"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:138
-msgid "Avoid, and say this instead"
-msgstr "Avoid, and say this instead"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:160
@@ -4062,11 +3902,6 @@ msgstr "Belongs to {owner}"
 #: src/shell/pages/musicComposerMode.ts:93
 msgid "Best quality"
 msgstr "Best quality"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:151
-msgid "Between 0 and 2. The Create screen offers Less, Normal and More inside this range."
-msgstr "Between 0 and 2. The Create screen offers Less, Normal and More inside this range."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1229
@@ -4382,11 +4217,6 @@ msgid "setting.person.robot.topics.option_label.both"
 msgstr "Both"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:130
-msgid "Both"
-msgstr "Both"
-
-#. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:183
 msgid "Bots"
 msgstr "Bots"
@@ -4426,12 +4256,6 @@ msgstr "Bring a song to change its style, remove vocals, split stems, or sing it
 #: src/shell/pages/MusicLibrary.tsx:158
 msgid "Brought your song back."
 msgstr "Brought your song back."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:140
-#: src/apps/settings/styles/stylesShared.tsx:13
-msgid "Browse styles"
-msgstr "Browse styles"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/ReferencePage.tsx:53
@@ -4587,9 +4411,6 @@ msgstr "Can use it now"
 #: src/apps/settings/PersonMore.tsx:87
 #: src/apps/settings/ReferenceLibrarySettings.tsx:241
 #: src/apps/settings/RobotPasswordSection.tsx:110
-#: src/apps/settings/styles/StyleAddFile.tsx:68
-#: src/apps/settings/styles/StyleConfirm.tsx:143
-#: src/apps/settings/styles/StylesTab.tsx:160
 #: src/apps/settings/UsersSection.tsx:284
 #: src/apps/settings/VoiceManagerSection.tsx:151
 #: src/apps/settings/VoiceManagerSection.tsx:164
@@ -4894,11 +4715,6 @@ msgid "setting.ui.home_layout.does"
 msgstr "Changes how Home is arranged."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:76
-msgid "Changes save as you make them."
-msgstr "Changes save as you make them."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HostTuneSettings.tsx:36
 msgid "Changes that help the AI run well on this computer. Each one can be put back."
 msgstr "Changes that help the AI run well on this computer. Each one can be put back."
@@ -4919,11 +4735,6 @@ msgid "Changing the voice…"
 msgstr "Changing the voice…"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:39
-#: src/apps/settings/styles/StyleBrowser.tsx:127
-#: src/apps/settings/styles/StyleConfirm.tsx:109
-#: src/apps/settings/styles/StyleEditor.tsx:93
-#: src/apps/settings/styles/stylesShared.tsx:45
 #: src/shell/library/useSaveAsCharacter.tsx:48
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:264
 msgid "Character"
@@ -5246,11 +5057,6 @@ msgstr "Check the fields named and send it again."
 #: src/lib/settingCopy.generated.ts:1546
 msgid "setting.search.wayback_fallback.help"
 msgstr "Check the Wayback Machine when a cited page returns not found."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:79
-msgid "Check what it is, then download it. It starts for admins only."
-msgstr "Check what it is, then download it. It starts for admins only."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1579
@@ -5935,48 +5741,13 @@ msgid "setting.search.web_sources.does"
 msgstr "Chooses which services answer web searches."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:128
-msgid "Choosing all ages asks for your passcode again."
-msgstr "Choosing all ages asks for your passcode again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:106
-#: src/apps/settings/styles/StyleEditor.tsx:112
-#: src/apps/settings/styles/StylesTab.tsx:128
-msgid "Chosen people"
-msgstr "Chosen people"
-
-#. js-lingui-explicit-id
 #: src/apps/clock/WorldClocksTab.tsx:166
 msgid "City"
 msgstr "City"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:130
-#: src/apps/settings/styles/StyleConfirm.tsx:89
-#: src/apps/settings/styles/StylesTab.tsx:195
-#: src/apps/settings/styles/StylesTab.tsx:196
-msgid "Civitai"
-msgstr "Civitai"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:130
-msgid "Civitai (off)"
-msgstr "Civitai (off)"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:23
-msgid "Civitai has its own rules. Some styles there are for adults only, and some may show real people. You choose what to install."
-msgstr "Civitai has its own rules. Some styles there are for adults only, and some may show real people. You choose what to install."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:825
 msgid "setting.generation.styles.civitai_key.label"
-msgstr "Civitai key"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:199
-msgid "Civitai key"
 msgstr "Civitai key"
 
 #. js-lingui-explicit-id
@@ -6531,11 +6302,6 @@ msgstr "Confirm rollback."
 #: src/apps/settings/AutoLocksSection.tsx:82
 msgid "Confirm this change to make the automatically locked pictures visible again."
 msgstr "Confirm this change to make the automatically locked pictures visible again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:103
-msgid "Confirmed."
-msgstr "Confirmed."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:164
@@ -8130,16 +7896,6 @@ msgid "setting.resources.preset.option_label.custom"
 msgstr "Custom"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:51
-msgid "Custom licence"
-msgstr "Custom licence"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:25
-msgid "Custom licence. Read it on the source's page before you install."
-msgstr "Custom licence. Read it on the source's page before you install."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:282
 msgid "Custom style"
 msgstr "Custom style"
@@ -8554,11 +8310,6 @@ msgid "Delete list"
 msgstr "Delete list"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:31
-msgid "Delete now"
-msgstr "Delete now"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MusicLibrary.tsx:108
 #: src/shell/pages/MusicSongDetails.tsx:143
 msgid "Delete song"
@@ -8743,7 +8494,6 @@ msgstr "Detailed pictures"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:354
-#: src/apps/settings/styles/StyleEditor.tsx:153
 #: src/shell/components/SearchTestResultBody.tsx:23
 #: src/shell/InstallStrip.tsx:122
 #: src/shell/pages/dashboard/TodaySection.tsx:197
@@ -9098,11 +8848,6 @@ msgid "Downloading"
 msgstr "Downloading"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:111
-msgid "Downloading and checking the file"
-msgstr "Downloading and checking the file"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:67
 msgid "Downloading and installing"
 msgstr "Downloading and installing"
@@ -9255,7 +9000,6 @@ msgid "Echo"
 msgstr "Echo"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:130
 #: src/apps/settings/VoiceManagerSection.tsx:125
 #: src/shell/library/LibraryViewer.tsx:114
 #: src/shell/library/TranscriptPanel.tsx:288
@@ -9767,16 +9511,6 @@ msgstr "Everyone in the home can see this plan."
 #: src/apps/settings/BackupsSection.tsx:246
 msgid "Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts."
 msgstr "Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:191
-msgid "Everyone who can use it will see its name and picture without a passcode. Clips already made with it stay locked until the person who made each one unlocks them for good. People under 18 still never see styles."
-msgstr "Everyone who can use it will see its name and picture without a passcode. Clips already made with it stay locked until the person who made each one unlocks them for good. People under 18 still never see styles."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:65
-msgid "Everyone who can use it will see its name and picture without a passcode. People under 18 still never see styles. Enter your passcode to continue."
-msgstr "Everyone who can use it will see its name and picture without a passcode. People under 18 still never see styles. Enter your passcode to continue."
 
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:29
@@ -10300,11 +10034,6 @@ msgid "setting.generation.picture_tier.option.boost"
 msgstr "Finer detail, and it takes longer."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:159
-msgid "Fingerprint"
-msgstr "Fingerprint"
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:483
 msgid "Finish"
 msgstr "Finish"
@@ -10557,11 +10286,6 @@ msgstr "Follows your settings"
 #: src/lib/settingCopy.generated.ts:804
 msgid "setting.generation.picture_quick_model.option.ernie"
 msgstr "Follows your words closely."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:45
-msgid "For {base}"
-msgstr "For {base}"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:268
@@ -11505,7 +11229,6 @@ msgstr "Hero source"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:98
-#: src/apps/settings/styles/StylesTab.tsx:191
 msgid "hf_..."
 msgstr "hf_..."
 
@@ -11621,11 +11344,6 @@ msgid "setting.robot.dance.auto_sensitivity.option.high"
 msgstr "High, catches soft music"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:145
-msgid "Highest"
-msgstr "Highest"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:160
 msgid "Hint"
 msgstr "Hint"
@@ -11711,11 +11429,6 @@ msgstr "Home address: {codingHome}/code/v1"
 #: src/apps/settings/CodingSettings.tsx:164
 msgid "Home address: {home}/code/v1. Get the model name from GET /code/v1/models. Only use tools you trust with your key."
 msgstr "Home address: {home}/code/v1. Get the model name from GET /code/v1/models. Only use tools you trust with your key."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:124
-msgid "Home adds these to the person's words when they pick this style."
-msgstr "Home adds these to the person's words when they pick this style."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:143
@@ -11900,14 +11613,6 @@ msgid "Home could not change that voice. Try again."
 msgstr "Home could not change that voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:66
-#: src/apps/settings/styles/StyleEditor.tsx:68
-#: src/apps/settings/styles/StyleEditor.tsx:116
-#: src/apps/settings/styles/StylesTab.tsx:184
-msgid "Home could not change that. Try again."
-msgstr "Home could not change that. Try again."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:160
 msgid "Home could not change the offline books. Check the drive space and the Home connection, then try again."
 msgstr "Home could not change the offline books. Check the drive space and the Home connection, then try again."
@@ -11916,11 +11621,6 @@ msgstr "Home could not change the offline books. Check the drive space and the H
 #: src/apps/settings/ReferenceLibrarySettings.tsx:165
 msgid "Home could not change this download. Check the Home connection, then try again."
 msgstr "Home could not change this download. Check the Home connection, then try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:72
-msgid "Home could not change who can use that style. Try again."
-msgstr "Home could not change who can use that style. Try again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:192
@@ -11941,11 +11641,6 @@ msgstr "Home could not clear the saved copies. Check that Home is running and tr
 #: src/apps/setup/CloseAppsStep.tsx:28
 msgid "Home could not close a test app, so Close apps stays Off. You can try again later under Settings, then AI and models, then Performance."
 msgstr "Home could not close a test app, so Close apps stays Off. You can try again later under Settings, then AI and models, then Performance."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:103
-msgid "Home could not confirm that. Try again."
-msgstr "Home could not confirm that. Try again."
 
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:224
@@ -12008,11 +11703,6 @@ msgid "Home could not load the offline books. Check that Home is running, then r
 msgstr "Home could not load the offline books. Check that Home is running, then reload this page."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:85
-msgid "Home could not load the styles. Check the Home connection, then reload this page."
-msgstr "Home could not load the styles. Check the Home connection, then reload this page."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/TrashPage.tsx:60
 msgid "Home could not load Trash. Try again."
 msgstr "Home could not load Trash. Try again."
@@ -12048,11 +11738,6 @@ msgid "failure.advice.engine_computer.cause"
 msgstr "Home could not reach the engine computer."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:117
-msgid "Home could not read that link. Check it, then paste it again."
-msgstr "Home could not read that link. Check it, then paste it again."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:84
 msgid "Home could not read the web search settings. Reload the page, and check that Home is running."
 msgstr "Home could not read the web search settings. Reload the page, and check that Home is running."
@@ -12061,17 +11746,6 @@ msgstr "Home could not read the web search settings. Reload the page, and check 
 #: src/shell/library/LibraryStorage.tsx:15
 msgid "Home could not read your storage. Reload the page to try again."
 msgstr "Home could not read your storage. Reload the page to try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:183
-#: src/apps/settings/styles/StylesTab.tsx:168
-msgid "Home could not remove it. Try again."
-msgstr "Home could not remove it. Try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:237
-msgid "Home could not restore that style. Try again."
-msgstr "Home could not restore that style. Try again."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/TrashPage.tsx:50
@@ -12104,24 +11778,9 @@ msgid "Home could not save that voice. Try again."
 msgstr "Home could not save that voice. Try again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:157
-msgid "Home could not save that. Check it, then try again."
-msgstr "Home could not save that. Check it, then try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:51
-msgid "Home could not save that. Check the Home connection, then try again."
-msgstr "Home could not save that. Check the Home connection, then try again."
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:212
 msgid "Home could not save this choice. Try again."
 msgstr "Home could not save this choice. Try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:63
-msgid "Home could not search just now. Check the Home connection, then try again."
-msgstr "Home could not search just now. Check the Home connection, then try again."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicSpeechPage.tsx:48
@@ -12138,11 +11797,6 @@ msgstr "Home could not start the song. Check the request and try again."
 #: src/shell/pages/MusicComposer.tsx:152
 msgid "Home could not start the sound. Check the request and try again."
 msgstr "Home could not start the sound. Check the request and try again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:94
-msgid "Home could not tell what this style was made for."
-msgstr "Home could not tell what this style was made for."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:84
@@ -12432,11 +12086,6 @@ msgstr "Home runs on this computer. The AI runs on a bigger, more powerful compu
 #: src/apps/setup/StorageStep.tsx:22
 msgid "Home saves your pick, but for now downloads the AI models to its default folder."
 msgstr "Home saves your pick, but for now downloads the AI models to its default folder."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:141
-msgid "Home searches for you. Nothing is downloaded until you press Install style."
-msgstr "Home searches for you. Nothing is downloaded until you press Install style."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:853
@@ -12915,19 +12564,8 @@ msgid "http://searx.local:8888"
 msgstr "http://searx.local:8888"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:89
-#: src/apps/settings/styles/StylesTab.tsx:190
-msgid "Hugging Face"
-msgstr "Hugging Face"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1865
 msgid "setting.voice.hf_token.label"
-msgstr "Hugging Face token"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:191
-msgid "Hugging Face token"
 msgstr "Hugging Face token"
 
 #. js-lingui-explicit-id
@@ -13074,17 +12712,6 @@ msgstr "I had trouble remembering something from our conversation."
 #: src/apps/settings/AssistantKeysSettings.tsx:106
 msgid "I have copied it"
 msgstr "I have copied it"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:56
-#: src/apps/settings/styles/StyleConfirm.tsx:119
-msgid "I have read the licence and it lets us use this style at home"
-msgstr "I have read the licence and it lets us use this style at home"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:103
-msgid "I have read them"
-msgstr "I have read them"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:17
@@ -13323,11 +12950,6 @@ msgid "Install and sign in"
 msgstr "Install and sign in"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:137
-msgid "Install as a separate style"
-msgstr "Install as a separate style"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HelperStatusRow.tsx:30
 msgid "Install helper"
 msgstr "Install helper"
@@ -13336,11 +12958,6 @@ msgstr "Install helper"
 #: src/apps/settings/HelperStatusRow.tsx:28
 msgid "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on."
 msgstr "Install it so Home can see and close apps when a big job needs room. It runs only for you on this Mac, is built here, and sends nothing anywhere. Close apps stays Off until you turn it on."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:142
-msgid "Install style"
-msgstr "Install style"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/AwayFromHome.tsx:171
@@ -13374,8 +12991,6 @@ msgstr "Install without a backup."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
-#: src/apps/settings/styles/StyleBrowser.tsx:129
-#: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/setup/PlanStep.tsx:158
 #: src/apps/setup/SetupWizard.tsx:476
 #: src/shell/pages/EnginesPage.tsx:32
@@ -13498,14 +13113,6 @@ msgid "IP address {ip}"
 msgstr "IP address {ip}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:59
-#: src/apps/settings/styles/StyleAddFile.tsx:60
-#: src/apps/settings/styles/StyleConfirm.tsx:123
-#: src/apps/settings/styles/StyleConfirm.tsx:124
-msgid "Is this style for adults only?"
-msgstr "Is this style for adults only?"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:104
 msgid "Isolate the voice (remove music and other sounds)"
 msgstr "Isolate the voice (remove music and other sounds)"
@@ -13540,12 +13147,6 @@ msgstr "It is shared with everyone in the home."
 #: src/shell/pages/status/StatusBanner.tsx:18
 msgid "It should be back in a moment."
 msgstr "It should be back in a moment."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:69
-#: src/apps/settings/styles/StyleConfirm.tsx:145
-msgid "It starts for admins only. You choose who else can use it after you try it."
-msgstr "It starts for admins only. You choose who else can use it after you try it."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiJobCardView.tsx:24
@@ -13597,11 +13198,6 @@ msgstr "Its chat was deleted, so it cannot be edited here."
 #: src/shell/pages/ProjectsPage.tsx:224
 msgid "Its chats stay."
 msgstr "Its chats stay."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:179
-msgid "Its file moves to Recently removed for 30 days, then it is deleted. Clips already made with it stay."
-msgstr "Its file moves to Recently removed for 30 days, then it is deleted. Clips already made with it stay."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:404
@@ -13687,11 +13283,6 @@ msgid "Keep {role}"
 msgstr "Keep {role}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:194
-msgid "Keep adults only"
-msgstr "Keep adults only"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:157
 msgid "setting.coding.home_mode.option.normal"
 msgstr "Keep chat and pictures running as usual."
@@ -13748,7 +13339,6 @@ msgstr "Keep installing"
 #: src/apps/settings/DevicesSection.tsx:141
 #: src/apps/settings/DevicesSection.tsx:222
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
-#: src/apps/settings/styles/StyleEditor.tsx:182
 #: src/shell/pages/FilesPage.tsx:411
 #: src/shell/pages/MusicStudioPages.tsx:189
 #: src/shell/pages/settings/WebSearchSettings.tsx:129
@@ -14061,8 +13651,6 @@ msgid "setting.news.lists.child.option_label.feeds-children"
 msgstr "Kids' news"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:106
-#: src/apps/settings/styles/StyleEditor.tsx:90
 #: src/shell/library/useSaveAsCharacter.tsx:46
 #: src/shell/pages/performance/LabelsBody.tsx:28
 msgid "Kind"
@@ -14717,17 +14305,9 @@ msgid "Library size"
 msgstr "Library size"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:53
-#: src/apps/settings/styles/StyleConfirm.tsx:114
-#: src/apps/settings/styles/StyleEditor.tsx:156
 #: src/shell/library/LibraryViewer.tsx:161
 msgid "Licence"
 msgstr "Licence"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:51
-msgid "Licence not stated"
-msgstr "Licence not stated"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:348
@@ -15292,7 +14872,6 @@ msgid "Loading the song"
 msgstr "Loading the song"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:85
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:281
 msgid "Loading the styles"
 msgstr "Loading the styles"
@@ -15424,11 +15003,6 @@ msgstr "Locked after inactivity."
 #: src/shell/pages/settings/HouseSettings.tsx:50
 msgid "Locked by rule"
 msgstr "Locked by rule"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:168
-msgid "Locked items"
-msgstr "Locked items"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioView.tsx:145
@@ -15663,17 +15237,6 @@ msgid "setting.content.own_ceiling.news.does"
 msgstr "Lowers what you see in the news any time."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:145
-msgid "Lowest"
-msgstr "Lowest"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:100
-#: src/apps/settings/styles/StyleEditor.tsx:166
-msgid "LTX-2.5"
-msgstr "LTX-2.5"
-
-#. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:91
 #: src/shell/media/NowPlayingStage.tsx:148
 #: src/shell/media/NowPlayingStage.tsx:199
@@ -15706,23 +15269,6 @@ msgstr "Made at home"
 #: src/apps/settings/VoiceManagerSection.tsx:116
 msgid "Made by {name}"
 msgstr "Made by {name}"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:128
-#: src/apps/settings/styles/StyleConfirm.tsx:93
-#: src/apps/settings/styles/StyleEditor.tsx:157
-msgid "Made for"
-msgstr "Made for"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:48
-msgid "Made for an older video model, tested on the newer one"
-msgstr "Made for an older video model, tested on the newer one"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:49
-msgid "Made for the engine behind children's videos, so Home cannot use it"
-msgstr "Made for the engine behind children's videos, so Home cannot use it"
 
 #. js-lingui-explicit-id
 #: src/shell/library/LibraryViewer.tsx:167
@@ -15972,13 +15518,6 @@ msgid "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyo
 msgstr "Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:66
-#: src/apps/settings/styles/StyleEditor.tsx:65
-#: src/apps/settings/styles/StyleEditor.tsx:195
-msgid "Make all ages"
-msgstr "Make all ages"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/musicComposerMode.ts:169
 #: src/shell/pages/MusicStudioPages.tsx:90
 msgid "Make an album"
@@ -16098,13 +15637,6 @@ msgstr "Make the remix"
 #: src/shell/pages/CompanionsPage.tsx:76
 msgid "Make this my companion"
 msgstr "Make this my companion"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:65
-#: src/apps/settings/styles/StyleEditor.tsx:64
-#: src/apps/settings/styles/StyleEditor.tsx:190
-msgid "Make this style all ages?"
-msgstr "Make this style all ages?"
 
 #. js-lingui-explicit-id
 #: src/shell/library/TranscriptPanel.tsx:116
@@ -16798,7 +16330,6 @@ msgstr "Monthly"
 #: src/apps/chat/chatToolUis.tsx:103
 #: src/apps/clock/TimersTab.tsx:161
 #: src/apps/settings/PersonMore.tsx:72
-#: src/apps/settings/styles/StyleEditor.tsx:127
 #: src/shell/AlarmRinger.tsx:64
 #: src/shell/phoneMenuLinks.tsx:18
 msgid "More"
@@ -16873,11 +16404,6 @@ msgid "More synths from the catalog are coming soon."
 msgstr "More synths from the catalog are coming soon."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:131
-msgid "Most downloaded"
-msgstr "Most downloaded"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:944
 msgid "setting.music.library_sort.option.recents"
 msgstr "Most recently added first."
@@ -16891,12 +16417,6 @@ msgstr "Most recently added first."
 #: src/lib/settingCopy.generated.ts:865
 msgid "setting.host.guard.max_reboots_per_12h.label"
 msgstr "Most restarts per 12 hours"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:93
-#: src/apps/settings/styles/stylesShared.tsx:45
-msgid "Motion"
-msgstr "Motion"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:512
@@ -17157,9 +16677,6 @@ msgstr "My styles"
 #: src/apps/settings/CodingSettings.tsx:166
 #: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/HouseholdRobotsSection.tsx:215
-#: src/apps/settings/styles/StyleAddFile.tsx:52
-#: src/apps/settings/styles/StyleConfirm.tsx:85
-#: src/apps/settings/styles/StyleEditor.tsx:83
 #: src/shell/library/useSaveAsCharacter.tsx:52
 #: src/shell/pages/FilesPage.tsx:434
 #: src/shell/pages/MusicComposer.tsx:194
@@ -17543,11 +17060,6 @@ msgid "Newer release {newest} found"
 msgstr "Newer release {newest} found"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:131
-msgid "Newest"
-msgstr "Newest"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/personAccessCopy.ts:9
 #: src/shell/pages/StatusPage.tsx:30
 msgid "News"
@@ -17631,7 +17143,6 @@ msgstr "News written for young readers."
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:286
 #: src/apps/settings/EngineLinkCredentialSection.tsx:287
-#: src/apps/settings/styles/StyleBrowser.tsx:190
 #: src/shell/components/DataTableControls.tsx:34
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:125
@@ -18064,11 +17575,6 @@ msgid "No saved online data."
 msgstr "No saved online data."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:51
-msgid "No selling"
-msgstr "No selling"
-
-#. js-lingui-explicit-id
 #: src/apps/code/SessionList.tsx:37
 msgid "No session matches that. Clear the search to see them all."
 msgstr "No session matches that. Clear the search to see them all."
@@ -18126,19 +17632,9 @@ msgid "No Stack configured"
 msgstr "No Stack configured"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:163
-msgid "No styles match. Try fewer words."
-msgstr "No styles match. Try fewer words."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:160
 msgid "No styles yet."
 msgstr "No styles yet."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:15
-msgid "No styles yet. Browse styles to find one, or add one from a file."
-msgstr "No styles yet. Browse styles to find one, or add one from a file."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StatusPage.tsx:83
@@ -18221,17 +17717,6 @@ msgid "No voices match. Clear a filter or try another word."
 msgstr "No voices match. Clear a filter or try another word."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:24
-msgid "No-selling licence. You may use it at home, but not sell what you make with it."
-msgstr "No-selling licence. You may use it at home, but not sell what you make with it."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:62
-#: src/apps/settings/styles/StyleConfirm.tsx:126
-msgid "No, all ages"
-msgstr "No, all ages"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/RobotBody.tsx:238
 msgid "No, leave it"
 msgstr "No, leave it"
@@ -18308,11 +17793,6 @@ msgid "setting.coding.home_mode.option_label.normal"
 msgstr "Normal"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:145
-msgid "Normal"
-msgstr "Normal"
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:474
 msgid "Normal keeps chat and pictures running as usual."
 msgstr "Normal keeps chat and pictures running as usual."
@@ -18366,7 +17846,6 @@ msgstr "Not in chat yet"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:261
-#: src/apps/settings/styles/StyleBrowser.tsx:129
 #: src/apps/setup/SetupWizard.tsx:476
 #: src/shell/pages/EnginesPage.tsx:31
 msgid "Not installed"
@@ -18379,7 +17858,6 @@ msgstr "Not measured yet."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/FeatureAccess.tsx:44
-#: src/apps/settings/styles/stylesShared.tsx:24
 #: src/apps/setup/CloseAppsStep.tsx:56
 #: src/apps/setup/CloseAppsStep.tsx:73
 #: src/apps/setup/CloseAppsStep.tsx:73
@@ -18466,7 +17944,6 @@ msgid "setting.ease.word_help.option.off"
 msgstr "Not shown."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:156
 #: src/apps/settings/VoiceManagerSection.tsx:22
 #: src/apps/settings/VoiceManagerSection.tsx:29
 msgid "Not stated"
@@ -18663,17 +18140,6 @@ msgstr "Notifications"
 #: src/lib/settingCopy.generated.ts:214
 msgid "setting.companion.voice.lively_adult.label"
 msgstr "Nova's voice"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:116
-msgid "Now adults only."
-msgstr "Now adults only."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:65
-#: src/apps/settings/styles/StyleEditor.tsx:68
-msgid "Now all ages."
-msgstr "Now all ages."
 
 #. js-lingui-explicit-id
 #: src/shell/music/MusicPlayerBar.tsx:274
@@ -18974,16 +18440,6 @@ msgid "Offline, last seen {time}"
 msgstr "Offline, last seen {time}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:52
-msgid "Old colour film"
-msgstr "Old colour film"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:146
-msgid "old film, clay, anime"
-msgstr "old film, clay, anime"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:114
 msgid "Older backups can keep their data for up to three months. Restoring a whole older backup brings them back."
 msgstr "Older backups can keep their data for up to three months. Restoring a whole older backup brings them back."
@@ -19101,12 +18557,6 @@ msgid "setting.generation.styles.civitai.help"
 msgstr "Off until you turn it on. This computer only contacts civitai.com when you search or install."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:20
-#: src/apps/settings/styles/StylesTab.tsx:195
-msgid "On by default. This computer contacts civitai.com only when an admin searches or installs a style."
-msgstr "On by default. This computer contacts civitai.com only when an admin searches or installs a style."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1379
 msgid "setting.robot.sleep.auto.help"
 msgstr "On by default. This robot goes to sleep after 10 minutes of darkness and no speech, and during household quiet hours. A face, speech or a knock wakes it, and the wake word still works. Turn off to keep it awake. Only an admin changes this, for each robot on its own."
@@ -19127,11 +18577,6 @@ msgstr "On this device only"
 #: src/apps/settings/HostTuneSettings.tsx:47
 msgid "On. {proposed}."
 msgstr "On. {proposed}."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:19
-msgid "On. Search and download styles from Hugging Face. A token is only needed for styles that ask you to accept terms. Home sends it only for those files."
-msgstr "On. Search and download styles from Hugging Face. A token is only needed for styles that ask you to accept terms. Home sends it only for those files."
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:10
@@ -19279,12 +18724,6 @@ msgstr "Online"
 #: src/lib/settingCopy.generated.ts:1957
 msgid "area.Online radio and podcasts"
 msgstr "Online radio and podcasts"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:106
-#: src/apps/settings/styles/StylesTab.tsx:128
-msgid "Only admins"
-msgstr "Only admins"
 
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:272
@@ -19462,32 +18901,6 @@ msgid "Open in Studio"
 msgstr "Open in Studio"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:131
-#: src/apps/settings/styles/StyleConfirm.tsx:134
-msgid "Open it"
-msgstr "Open it"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:123
-msgid "Open it to read the licence first. "
-msgstr "Open it to read the licence first. "
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:89
-msgid "Open its page on {value}"
-msgstr "Open its page on {value}"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:51
-msgid "Open licence"
-msgstr "Open licence"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:23
-msgid "Open licence. It lets a household use the style at home."
-msgstr "Open licence. It lets a household use the style at home."
-
-#. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:499
 msgid "Open my Home"
 msgstr "Open my Home"
@@ -19655,11 +19068,6 @@ msgid "setting.chat.paused_message.help"
 msgstr "Optional. One short line everyone sees next to the pause notice, for example when chat comes back."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:192
-msgid "Optional. Paste a read token. Home keeps it private and never shows it again."
-msgstr "Optional. Paste a read token. Home keeps it private and never shows it again."
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1468
 msgid "setting.search.brave_api_key.help"
 msgstr "Optional. Search works without any key. If you add a Brave Search API key, an adult's web searches go to Brave Search instead of your SearXNG, so the words searched leave your house. A child's or teen's searches never do. The key is stored encrypted and can't be read back. Clear it to go back to keyless search."
@@ -19699,11 +19107,6 @@ msgstr "original songs"
 #: src/apps/settings/ReferenceLibrarySettings.tsx:80
 msgid "Other"
 msgstr "Other"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:33
-msgid "Other base"
-msgstr "Other base"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/TimersTab.tsx:128
@@ -19777,11 +19180,6 @@ msgstr "Page {value} of {pageCount}"
 #: src/shell/pages/NotFoundPage.tsx:8
 msgid "Page not found"
 msgstr "Page not found"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:187
-msgid "Pages of results"
-msgstr "Pages of results"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:217
@@ -19913,11 +19311,6 @@ msgstr "Past conversations"
 #: src/shell/pages/settings/SettingField.tsx:128
 msgid "Paste the new value"
 msgstr "Paste the new value"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:199
-msgid "Paste your Civitai key"
-msgstr "Paste your Civitai key"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/StatusPage.tsx:82
@@ -20233,11 +19626,6 @@ msgid "Photo"
 msgstr "Photo"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:125
-msgid "Phrases added to the person's words, never replacing them."
-msgstr "Phrases added to the person's words, never replacing them."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "Pick a person to see or change their voice."
 msgstr "Pick a person to see or change their voice."
@@ -20276,12 +19664,6 @@ msgstr "Pick a video for this song"
 #: src/lib/settingCopy.generated.ts:1084
 msgid "setting.notifications.file_shared.muted_senders.help"
 msgstr "Pick anyone in the household whose shared files you don't want a notification about. You'll still be notified about everyone else's."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:99
-#: src/apps/settings/styles/StyleEditor.tsx:165
-msgid "Pick one"
-msgstr "Pick one"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicWorkspacePage.tsx:136
@@ -20487,7 +19869,6 @@ msgstr "pictures"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:9
-#: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/activityRows.tsx:32
 #: src/shell/pages/settings/MediaCardViews.tsx:60
 msgid "Pictures"
@@ -20507,11 +19888,6 @@ msgstr "Pictures"
 #: src/lib/settingCopy.generated.ts:1962
 msgid "area.Pictures"
 msgstr "Pictures"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:148
-msgid "Pictures / Videos"
-msgstr "Pictures / Videos"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1271
@@ -21017,7 +20393,6 @@ msgid "Preview. Nothing is downloaded, installed or saved."
 msgstr "Preview. Nothing is downloaded, installed or saved."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:188
 #: src/shell/components/DataTableControls.tsx:33
 #: src/shell/pages/RepairsPage.tsx:148
 #: src/shell/pages/useDataTableControls.tsx:118
@@ -21412,11 +20787,6 @@ msgid "Read replies aloud"
 msgstr "Read replies aloud"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:103
-msgid "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style."
-msgstr "Read the licence and fingerprint under Details, then confirm them. Until you do, only admins can use this style."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/dashboard/MakeShelf.tsx:15
 msgid "Read the news"
 msgstr "Read the news"
@@ -21516,11 +20886,6 @@ msgstr "Recent safety changes"
 #: src/shell/pages/MediaHomePage.tsx:50
 msgid "Recently played"
 msgstr "Recently played"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:28
-msgid "Recently removed"
-msgstr "Recently removed"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:947
@@ -21722,9 +21087,6 @@ msgstr "Remix this song"
 #: src/apps/settings/DevicesSection.tsx:150
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
-#: src/apps/settings/styles/StyleEditor.tsx:98
-#: src/apps/settings/styles/StyleEditor.tsx:183
-#: src/apps/settings/styles/stylesShared.tsx:27
 #: src/shell/pages/MusicWorkspacePage.tsx:137
 #: src/shell/pages/WikipediaPage.tsx:100
 #: src/shell/pages/WikipediaPage.tsx:100
@@ -21848,19 +21210,9 @@ msgid "Remove this robot from the household."
 msgstr "Remove this robot from the household."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:178
-msgid "Remove this style?"
-msgstr "Remove this style?"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HuggingFaceTokenSection.tsx:112
 msgid "Remove token"
 msgstr "Remove token"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:29
-msgid "Removed {days} days ago. Deleted for good in {left} days."
-msgstr "Removed {days} days ago. Deleted for good in {left} days."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/SafetyChangesSection.tsx:23
@@ -22049,11 +21401,6 @@ msgid "Repeats with no end date"
 msgstr "Repeats with no end date"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:26
-msgid "Replace"
-msgstr "Replace"
-
-#. js-lingui-explicit-id
 #: src/shell/library/TranscriptFindReplace.tsx:91
 #: src/shell/library/TranscriptFindReplace.tsx:92
 msgid "Replace with"
@@ -22215,7 +21562,6 @@ msgstr "Restarting…"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/BackupsSection.tsx:272
-#: src/apps/settings/styles/stylesShared.tsx:30
 #: src/shell/library/LibraryTrash.tsx:43
 #: src/shell/pages/TrashPage.tsx:63
 msgid "Restore"
@@ -22282,11 +21628,6 @@ msgstr "Resume coding"
 #: src/apps/settings/CodingSettings.tsx:113
 msgid "Resume coding?"
 msgstr "Resume coding?"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesApi.ts:80
-msgid "Retired video model, no longer available"
-msgstr "Retired video model, no longer available"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:789
@@ -22926,7 +22267,6 @@ msgstr "Sat"
 #: src/apps/settings/CodingSettings.tsx:168
 #: src/apps/settings/HuggingFaceTokenSection.tsx:108
 #: src/apps/settings/PersonMore.tsx:86
-#: src/apps/settings/styles/StylesTab.tsx:159
 #: src/shell/pages/MusicSpeechPage.tsx:80
 #: src/shell/pages/settings/SettingField.tsx:138
 #: src/shell/pages/settings/WebSearchSettings.tsx:104
@@ -23080,15 +22420,9 @@ msgstr "Saved place"
 #: src/apps/people/ProfileForm.tsx:170
 #: src/apps/settings/HuggingFaceTokenSection.tsx:105
 #: src/apps/settings/PersonAccessEditor.tsx:57
-#: src/apps/settings/styles/StyleEditor.tsx:48
 #: src/apps/settings/VoiceBrowserSection.tsx:105
 msgid "Saved."
 msgstr "Saved."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:60
-msgid "Saved. Choose who below."
-msgstr "Saved. Choose who below."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1162
@@ -23147,11 +22481,6 @@ msgstr "Say how the song should sound instead, in at least 3 characters."
 #: src/shell/pages/musicComposerMode.ts:67
 msgid "Say how the song should sound instead, like soft jazz with a slow piano."
 msgstr "Say how the song should sound instead, like soft jazz with a slow piano."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:138
-msgid "Say instead"
-msgstr "Say instead"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:24
@@ -23495,11 +22824,6 @@ msgid "setting.search.source_mode.label"
 msgstr "Search sources"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:145
-msgid "Search styles, or paste a Hugging Face link"
-msgstr "Search styles, or paste a Hugging Face link"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:164
 #: src/shell/pages/CompanionsPage.tsx:164
 msgid "Search synths"
@@ -23551,24 +22875,9 @@ msgid "Searches may be limited right now."
 msgstr "Searches may be limited right now."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:162
-msgid "Searching for styles"
-msgstr "Searching for styles"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:158
-msgid "Searching for styles…"
-msgstr "Searching for styles…"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MediaSearchPage.tsx:28
 msgid "Searching Media"
 msgstr "Searching Media"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:57
-msgid "Searching too fast. Try again in a minute."
-msgstr "Searching too fast. Try again in a minute."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddRobotSection.tsx:162
@@ -24317,12 +23626,6 @@ msgid "Show {title} on Home"
 msgstr "Show {title} on Home"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:152
-#: src/apps/settings/styles/StyleBrowser.tsx:153
-msgid "Show adult results"
-msgstr "Show adult results"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1843
 msgid "setting.ui.show_turn_stats.label"
 msgstr "Show advanced reply stats"
@@ -24756,7 +24059,6 @@ msgid "Six-digit code"
 msgstr "Six-digit code"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:158
 #: src/shell/library/LibraryViewer.tsx:163
 #: src/shell/pages/performance/DiskHardwareBody.tsx:28
 #: src/shell/pages/StoragePage.tsx:54
@@ -24772,11 +24074,6 @@ msgstr "Size not reported"
 #: src/shell/pages/ReferencePage.tsx:17
 msgid "Size unavailable"
 msgstr "Size unavailable"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:41
-msgid "Size unknown"
-msgstr "Size unknown"
 
 #. js-lingui-explicit-id
 #: src/apps/library/appPresentation.ts:10
@@ -24979,11 +24276,6 @@ msgstr "Some chat features are limited."
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:826
 msgid "setting.generation.styles.civitai_key.help"
-msgstr "Some downloads need a free Civitai key. Home keeps it private and never shows it again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:200
-msgid "Some downloads need a free Civitai key. Home keeps it private and never shows it again."
 msgstr "Some downloads need a free Civitai key. Home keeps it private and never shows it again."
 
 #. js-lingui-explicit-id
@@ -25245,11 +24537,6 @@ msgid "Songs to make"
 msgstr "Songs to make"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:131
-msgid "Sort"
-msgstr "Sort"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:396
 msgid "Sort by"
 msgstr "Sort by"
@@ -25288,8 +24575,6 @@ msgid "Sounds you have saved."
 msgstr "Sounds you have saved."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:130
-#: src/apps/settings/styles/StyleEditor.tsx:155
 #: src/apps/settings/VoiceManagerSection.tsx:106
 #: src/shell/pages/StoragePage.tsx:52
 msgid "Source"
@@ -25738,11 +25023,6 @@ msgid "Starting speech…"
 msgstr "Starting speech…"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:142
-msgid "Starting the download…"
-msgstr "Starting the download…"
-
-#. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:110
 msgid "Starting the sandbox"
 msgstr "Starting the sandbox"
@@ -26053,11 +25333,6 @@ msgid "setting.coding.max_streams_per_person.label"
 msgstr "Streams per person"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:141
-msgid "Strength"
-msgstr "Strength"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1511
 msgid "setting.search.safe_search.option_label.strict"
 msgstr "Strict"
@@ -26144,11 +25419,6 @@ msgstr "Studio"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:91
-#: src/apps/settings/styles/StyleBrowser.tsx:39
-#: src/apps/settings/styles/StyleBrowser.tsx:127
-#: src/apps/settings/styles/StyleConfirm.tsx:109
-#: src/apps/settings/styles/StyleEditor.tsx:93
-#: src/apps/settings/styles/stylesShared.tsx:45
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:165
 #: src/shell/pages/musicComposerMode.ts:21
 #: src/shell/pages/MusicRemix.tsx:45
@@ -26162,7 +25432,6 @@ msgid "Style and tags"
 msgstr "Style and tags"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:77
 #: src/shell/library/LibraryViewer.tsx:165
 #: src/shell/pages/MakeSongPage.tsx:145
 #: src/shell/pages/MakeSongPage.tsx:146
@@ -26179,24 +25448,9 @@ msgid "area.Styles"
 msgstr "Styles"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:46
-msgid "Styles come as .safetensors files. Home checks the file before it can be used."
-msgstr "Styles come as .safetensors files. Home checks the file before it can be used."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:160
 msgid "Styles could not be loaded. Open this page again."
 msgstr "Styles could not be loaded. Open this page again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:166
-msgid "Styles from the source"
-msgstr "Styles from the source"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:89
-msgid "Styles in the library"
-msgstr "Styles in the library"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:757
@@ -26784,15 +26038,6 @@ msgstr "That did not send. Try again."
 #: src/apps/settings/SignInSecretSection.tsx:72
 #: src/apps/settings/SiteBlocksSection.tsx:53
 #: src/apps/settings/StackChanInstallDialog.tsx:128
-#: src/apps/settings/styles/StyleAddFile.tsx:66
-#: src/apps/settings/styles/StyleBrowser.tsx:157
-#: src/apps/settings/styles/StyleBrowser.tsx:160
-#: src/apps/settings/styles/StyleConfirm.tsx:139
-#: src/apps/settings/styles/StyleEditor.tsx:78
-#: src/apps/settings/styles/StylesTab.tsx:84
-#: src/apps/settings/styles/StylesTab.tsx:163
-#: src/apps/settings/styles/StylesTab.tsx:195
-#: src/apps/settings/styles/StylesTab.tsx:229
 #: src/apps/settings/UsersSection.tsx:166
 #: src/apps/settings/VoiceManagerSection.tsx:101
 #: src/apps/settings/VoiceManagerSection.tsx:102
@@ -27085,11 +26330,6 @@ msgid "That song is not here any more. It may have been removed from your Librar
 msgstr "That song is not here any more. It may have been removed from your Library."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:65
-msgid "That style is not in the list yet. Reload this page and look again."
-msgstr "That style is not in the list yet. Reload this page and look again."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:213
 msgid "That synth is not on your list. Go back and pick one from the gallery."
 msgstr "That synth is not on your list. Go back and pick one from the gallery."
@@ -27163,11 +26403,6 @@ msgstr "That voice sample is not available right now."
 #: ../backend/src/lib/failureCopy.ts:155
 msgid "failure.context_too_large.minor"
 msgstr "That was too much for me at once. Please ask me again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:51
-msgid "The .safetensors file"
-msgstr "The .safetensors file"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/HousePage.tsx:41
@@ -27469,11 +26704,6 @@ msgstr "The DJ talks between songs."
 #: src/shell/pages/ChatPage.tsx:1962
 msgid "The document from this reply"
 msgstr "The document from this reply"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:60
-msgid "The download could not start. Check your connection, then try again."
-msgstr "The download could not start. Check your connection, then try again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:89
@@ -28168,53 +27398,6 @@ msgid "The sound is longer than asked: this computer has no audio tool to cut it
 msgstr "The sound is longer than asked: this computer has no audio tool to cut it. Install ffmpeg, then make it again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:58
-msgid "The source asked Home to slow down. Try again in a few minutes."
-msgstr "The source asked Home to slow down. Try again in a few minutes."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:137
-msgid "The source changed this file since you installed it."
-msgstr "The source changed this file since you installed it."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:59
-msgid "The source did not answer. Check your connection, then search again."
-msgstr "The source did not answer. Check your connection, then search again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:26
-msgid "The source does not state a licence. Read its page before you install."
-msgstr "The source does not state a licence. Read its page before you install."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:64
-msgid "The source marked this style adult. Enter your passcode again to make it all ages."
-msgstr "The source marked this style adult. Enter your passcode again to make it all ages."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:21
-#: src/apps/settings/styles/stylesShared.tsx:58
-msgid "The source marks this adult."
-msgstr "The source marks this adult."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:21
-#: src/apps/settings/styles/stylesShared.tsx:57
-msgid "The source says it is safe."
-msgstr "The source says it is safe."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:59
-msgid "The source says nothing about age, so it stays locked until you decide."
-msgstr "The source says nothing about age, so it stays locked until you decide."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:21
-msgid "The source says nothing about age."
-msgstr "The source says nothing about age."
-
-#. js-lingui-explicit-id
 #: src/apps/settings/AiModelsPage.tsx:27
 msgid "The Stack has its own admin page with the same models and more settings. It opens in a new tab."
 msgstr "The Stack has its own admin page with the same models and more settings. It opens in a new tab."
@@ -28253,11 +27436,6 @@ msgstr "The still picture this animation starts from. Changing it marks the anim
 #: src/lib/settingCopy.generated.ts:1723
 msgid "setting.topics.family_story_names.help"
 msgstr "The stories MaiPai keeps for this child, separated by commas. Add your family's own, such as Elf on the Shelf or the Three Kings. Only a parent or admin can change a child's."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:36
-msgid "The style could not be added. Check that the engine is running, then try again."
-msgstr "The style could not be added. Check that the engine is running, then try again."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1665
@@ -29136,11 +28314,6 @@ msgid "Top kind"
 msgstr "Top kind"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:131
-msgid "Top rated"
-msgstr "Top rated"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:120
 msgid "Topics"
 msgstr "Topics"
@@ -29314,7 +28487,6 @@ msgstr "Trigger phrase, e.g. \"movie night\""
 #: src/apps/settings/AutoLocksSection.tsx:78
 #: src/apps/settings/CommandsSection.tsx:113
 #: src/apps/settings/StackChanInstallDialog.tsx:152
-#: src/apps/settings/styles/StyleBrowser.tsx:160
 #: src/apps/settings/VoiceBrowserSection.tsx:95
 #: src/apps/settings/VoiceManagerSection.tsx:103
 #: src/apps/setup/HostTuneStep.tsx:68
@@ -29372,11 +28544,6 @@ msgid "Try saving again"
 msgstr "Try saving again"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:97
-msgid "Try this style"
-msgstr "Try this style"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Tue"
 msgstr "Tue"
@@ -29425,7 +28592,6 @@ msgid "Turn off the timer"
 msgstr "Turn off the timer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:25
 #: src/apps/settings/TwoStepSignInSection.tsx:43
 msgid "Turn on"
 msgstr "Turn on"
@@ -29439,11 +28605,6 @@ msgstr "Turn on Automatic"
 #: src/apps/setup/AwayFromHome.tsx:185
 msgid "Turn on away access"
 msgstr "Turn on away access"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:21
-msgid "Turn on Civitai?"
-msgstr "Turn on Civitai?"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/AwayFromHome.tsx:139
@@ -29632,11 +28793,6 @@ msgid "Two-step sign-in is on."
 msgstr "Two-step sign-in is on."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:127
-msgid "Type"
-msgstr "Type"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:953
 msgid "setting.music.lyrics_translate.help"
 msgstr "Type a language name, such as Spanish or French, and each lyric line also shows in that language under the original, translated on this computer. Leave it empty to show the original only."
@@ -29805,19 +28961,9 @@ msgid "Unlock"
 msgstr "Unlock"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:64
-msgid "Unlock on the Styles page first to choose all ages."
-msgstr "Unlock on the Styles page first to choose all ages."
-
-#. js-lingui-explicit-id
 #: src/shell/library/LibraryItems.tsx:58
 msgid "Unlocked"
 msgstr "Unlocked"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:17
-msgid "Unlocked on this page only. It locks again when you leave or after 2 minutes without a touch."
-msgstr "Unlocked on this page only. It locks again when you leave or after 2 minutes without a touch."
 
 #. js-lingui-explicit-id
 #: src/shell/sessionLockContext.tsx:128
@@ -30482,7 +29628,6 @@ msgid "videos"
 msgstr "videos"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:148
 #: src/shell/activityRows.tsx:33
 #: src/shell/pages/settings/MediaCardViews.tsx:67
 msgid "Videos"
@@ -30507,11 +29652,6 @@ msgstr "Videos"
 #: src/lib/settingCopy.generated.ts:1277
 msgid "setting.resources.strict.video.label"
 msgstr "Videos always go first"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:138
-msgid "Videos at Standard and Boost cannot use avoid words. Say the opposite instead."
-msgstr "Videos at Standard and Boost cannot use avoid words. Say the opposite instead."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1633
@@ -30797,11 +29937,6 @@ msgid "Waiting"
 msgstr "Waiting"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:50
-msgid "Waiting for an admin to say what it is made for"
-msgstr "Waiting for an admin to say what it is made for"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:34
 #: src/apps/settings/RobotBody.tsx:181
 msgid "Waiting for first report"
@@ -30912,12 +30047,6 @@ msgstr "Wake word"
 #: src/apps/code/NewSession.tsx:49
 msgid "Walk me through how this project is laid out and where to start."
 msgstr "Walk me through how this project is laid out and where to start."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:100
-#: src/apps/settings/styles/StyleEditor.tsx:166
-msgid "Wan"
-msgstr "Wan"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:72
@@ -31127,11 +30256,6 @@ msgid "What it can do"
 msgstr "What it can do"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:85
-msgid "What it does"
-msgstr "What it does"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:22
 msgid "What it sends:"
 msgstr "What it sends:"
@@ -31186,12 +30310,6 @@ msgstr "What to add"
 #: src/shell/pages/musicComposerMode.ts:140
 msgid "What to do"
 msgstr "What to do"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:97
-#: src/apps/settings/styles/StyleEditor.tsx:163
-msgid "What was this style made for?"
-msgstr "What was this style made for?"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:98
@@ -31339,11 +30457,6 @@ msgid "When you make or share something with Home, please respect other people a
 msgstr "When you make or share something with Home, please respect other people and their privacy. Make sure you have permission to use someone’s image, video, or voice, and the rights to any material you include. Be mindful of copyright and consent, follow the law, and use what you create kindly—don’t use it to bully, tease, embarrass, or hurt someone."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:22
-msgid "When you search or install, this computer contacts civitai.com. It sends what you typed and your key, nothing about your family."
-msgstr "When you search or install, this computer contacts civitai.com. It sends what you typed and your key, nothing about your family."
-
-#. js-lingui-explicit-id
 #: src/shell/pages/PrivacyPage.tsx:21
 msgid "When:"
 msgstr "When:"
@@ -31357,11 +30470,6 @@ msgstr "Where"
 #: src/lib/settingCopy.generated.ts:1515
 msgid "setting.search.source_mode.help"
 msgstr "Where MaiPai looks for answers: Internet first, Library only, or Library first (the recommended choice). Library only turns off just the live Wikipedia-style lookup; web search stays on unless web search is itself set to Library only. Children and teens keep their current protections in every mode, and this choice never widens what they can reach."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:18
-msgid "Where styles come from"
-msgstr "Where styles come from"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:696
@@ -31379,11 +30487,6 @@ msgstr "Where the engine runs"
 #: src/lib/settingCopy.generated.ts:1189
 msgid "setting.reference.library_dir.help"
 msgstr "Where the household's offline knowledge archives live: a local folder, an external drive, or a NAS mount. Empty uses Home's own data folder. Moving this later moves the files and updates the library records."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:129
-msgid "Where the words go"
-msgstr "Where the words go"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:754
@@ -31542,11 +30645,6 @@ msgid "Who can trigger this command"
 msgstr "Who can trigger this command"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StylesTab.tsx:127
-msgid "Who can use {name}"
-msgstr "Who can use {name}"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:81
 msgid "Who can use {tier}"
 msgstr "Who can use {tier}"
@@ -31569,7 +30667,6 @@ msgstr "Who can use each level"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:80
-#: src/apps/settings/styles/StyleEditor.tsx:101
 msgid "Who can use it"
 msgstr "Who can use it"
 
@@ -31577,11 +30674,6 @@ msgstr "Who can use it"
 #: src/apps/settings/FeatureAccess.tsx:66
 msgid "Who can use this feature"
 msgstr "Who can use this feature"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:105
-msgid "Who can use this style"
-msgstr "Who can use this style"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionAudienceDialog.tsx:50
@@ -31717,11 +30809,6 @@ msgid "Word meanings, origins and translations."
 msgstr "Word meanings, origins and translations."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleEditor.tsx:124
-msgid "Words that switch it on"
-msgstr "Words that switch it on"
-
-#. js-lingui-explicit-id
 #: src/apps/chat/chatToolUis.tsx:508
 msgid "Worked for {minutes, plural, one {# minute} other {# minutes}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
 msgstr "Worked for {minutes, plural, one {# minute} other {# minutes}}, {steps, plural, one {# step} other {# steps}}{sites, plural, =0 {} one {, # site} other {, # sites}}"
@@ -31764,11 +30851,6 @@ msgstr "Working on the picture"
 #: src/shell/library/TranscriptFindReplace.tsx:60
 msgid "Working…"
 msgstr "Working…"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/stylesShared.tsx:47
-msgid "Works at Standard, Boost and Max"
-msgstr "Works at Standard, Boost and Max"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:984
@@ -31945,12 +31027,6 @@ msgid "Yes"
 msgstr "Yes"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleAddFile.tsx:61
-#: src/apps/settings/styles/StyleConfirm.tsx:125
-msgid "Yes, adults only"
-msgstr "Yes, adults only"
-
-#. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:216
 msgid "Yes, cancel install"
 msgstr "Yes, cancel install"
@@ -32026,16 +31102,6 @@ msgstr "you"
 #: src/apps/settings/VoiceBrowserSection.tsx:91
 msgid "You"
 msgstr "You"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleConfirm.tsx:131
-msgid "You already have this as {name}."
-msgstr "You already have this as {name}."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/styles/StyleBrowser.tsx:176
-msgid "You already have this style. Press to open it."
-msgstr "You already have this style. Press to open it."
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/apiErrorCopy.ts:109

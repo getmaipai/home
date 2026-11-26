@@ -29,6 +29,9 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
     const json = (body: unknown) => Promise.resolve(Response.json(body));
     if (path.endsWith("/api/engine-link/credentials")) return json({ paired: false });
     if (path.endsWith("/api/devices/discover-robots")) return json([]);
+    // STACK-LORAS-01: the Styles tab is the shared Styles page over Home's pass-through; an empty library and no sources are enough here.
+    if (path === "/api/loras/stack") return json({ loras: [], trash_days: 30 });
+    if (path === "/api/loras/stack/sources") return json({ sources: [] });
     if (path.endsWith("/api/plugins/stats")) return json({ total: 0, fallthroughRate: null, byCommand: [] });
     return settingsFetch(input, init);
   }) as typeof fetch;

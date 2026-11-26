@@ -55,7 +55,7 @@ describe("the words of Media", () => {
 
   test("the Styles tab's own strings use no Quick, Detailed, Wan or resource word", () => {
     const sources = sourceOf("src/apps/settings/styles", () => true);
-    expect(sources.length).toBeGreaterThan(5);
+    expect(sources.length).toBeGreaterThan(0); // the tab is one file now: the shared Styles page draws the rest
     for (const { text } of sources) {
       // Strings only: identifiers such as the API's `base_model: "wan"` stay in code; person-facing text sits in JSX and quoted sentences.
       const sentences = [...withoutComments(text).matchAll(/"([^"\n]{12,})"|`([^`\n]{12,})`|>([^<>{}\n]{12,})</g)].map((m) => m[1] ?? m[2] ?? m[3] ?? "");
