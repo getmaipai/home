@@ -8,7 +8,7 @@ STACK_ROOT=/opt/maipai-stack
 STACK_STORE=/data/stack/engines
 PAIR_FILE="${MAIPAI_ENGINE_PAIR_FILE:-/var/lib/maipai-stack/paired-home.json}"
 AUTH_KEYS="${MAIPAI_ENGINE_AUTH_KEYS:-$STACK_HOME/.ssh/authorized_keys}"
-STACK_TAG="8b10483665291922366b518978a2788b8dd13929"
+STACK_TAG="4ca23a1913c55c91a9b4228f69350195d43b6bd7"
 STACK_REPO=getmaipai/stack
 DRY_RUN=no
 # The scratch folder update() builds in. A global on purpose: a trap that names a function's local variable
@@ -833,6 +833,7 @@ commons_archive_sha256() {
     ui-v0.5.753) printf '%s\n' "dd716720e922819d8309095bc625114e96abcd476db2bb820ddbefa12c7b2c99" ;;
     spec-v0.1.484) printf '%s\n' "61ad55931a2402322b40f13e276330c6eb538216a42f816657f6532a9955c4fd" ;;
     ui-v0.5.754) printf '%s\n' "1221372a57dc54c03fc2978d2b801bf21db2dcc2340e218c8f949c8a98de080e" ;;
+    spec-v0.1.486) printf '%s\n' "3aa9164fd108f31ceb92a44b2846739e47a46954f09436be2485b12246353bd7" ;;
     *) return 1 ;;
   esac
 }
