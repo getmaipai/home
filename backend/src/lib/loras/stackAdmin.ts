@@ -5,10 +5,10 @@
 import { and, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
-import { speakerAgeBand } from "@/lib/ageBand";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { issueTicket, lockItemOfProvenance, peekTicket } from "@/lib/adultLock";
 import { logMark, setItemLock } from "@/lib/adultMarks";
+import { isAdult } from "@/lib/loras/access";
 import { getLoraRecord, callStack, LorasStackError, refreshLoras, setLoraPeople, type Lora } from "@/lib/loras/stackLibrary";
 import { clipsUsingStyle } from "@/lib/loras/usage";
 import type { PersonRow } from "@/types";
@@ -33,7 +33,7 @@ function present(id: string): Lora {
 function notAdults(ids: readonly string[]): string[] {
   if (ids.length === 0) return [];
   const rows = db.select().from(people).where(inArray(people.id, [...ids])).all() as PersonRow[];
-  const adults = new Set(rows.filter((p) => p.role !== "guest" && speakerAgeBand(p, new Date()) === "adult").map((p) => p.id));
+  const adults = new Set(rows.filter(isAdult).map((p) => p.id));
   return ids.filter((id) => !adults.has(id));
 }
 const patchStack = async (id: string, body: Record<string, unknown>): Promise<void> => { await callStack("PATCH", `/stack/v1/loras/${encodeURIComponent(id)}`, body); };
