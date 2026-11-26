@@ -1,5 +1,20 @@
 # LoRA records and access (backend)
 
+> **Slice 4 of STACK-LORAS-01 (2026-11-26, [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md)): the Stack owns the library.** Home keeps no `loras` table
+> copy. `backend/src/lib/loras/stackLibrary.ts` reads `GET /stack/v1/loras` (live and trash) over the paired link into a snapshot in memory, three seconds fresh and
+> unread after fifteen, never written to disk, and maps each Stack record to the spec `Lora` (the Stack's `classification`, name, words, strength, trash and drive are
+> the truth; what only Home sent comes from the record's `home` part; a native record is admins-only with nothing added). Every async path that decides something about a
+> style calls `refreshLoras()` first; the sync readers (`getLoraRecord`, `listLoraRecords`, `readLoras`) only see the snapshot. **Fail closed:** a Stack that cannot be read gives
+> an empty snapshot, so nothing is listed or used and an id counts as adult-only (`videos/adultStyle.ts`). A `drive_missing` record is not usable (`loraUsable`).
+>
+> - Writes go to the Stack through `lib/loras/stackAdmin.ts` (`patchLoraOnStack`, `markAdultOnly`, `lowerToAllAges`, `removeLora`, `restoreLora`, `purgeLora`); each re-checks the admin and writes the audit row in `adult_mark_log`. Home-only fields (add-ins, trigger position, suggesting, strength range) ride in the Stack PATCH's `home_patch`; `availability.who` in `availability_who`.
+> - The named adults of `availability.people` live in Home's table `lora_people` (keyed by the Stack's id, `setLoraPeople`); the Stack never sees names. `saveLora` no longer exists on the new path: a minor is refused in `patchLoraOnStack`.
+> - The Styles tab is the kit's `StackLorasPage` over `/api/loras/stack/*` (`routes/lorasSources.ts`, client `frontend/src/lib/stackLorasClient.ts`). The route redacts: an adult-only style is one `{ locked: true }` tile unless the person's own unlock proof is valid; a teen, child, guest or shared screen gets no adult-only name, id or count.
+> - Lowering adult-only to all-ages: the Stack refuses it without Home's single-use ticket and asks Home to use it up at `POST /api/stack/adult-ticket/consume` (paired key in `x-maipai-home-token`, body `{ ticket, item }`, answers `{ ok }`; `routes/stackCallbacks.ts`, `consumeTicketForStack`). Home checks the person, session and style first (`peekTicket`) and, when the source did not call the style adult, issues the ticket itself because the admin's unlock is enough. The Stack finds Home through `STACK_HOME_CALLBACK_URL` (loopback only), which Home's installer does not set yet.
+> - Still in place and unused by new flows (slice 6 deletes them): `store.ts`, `sync.ts`, `install.ts`, `source.ts`, `adultCheck.ts`, `admin.ts`. Tests build the library in a fake Stack (`backend/tests/helpers/fakeLoraStack.ts`, `putLora` in `tests/fixtures/lora.ts`).
+>
+> The sections below describe the earlier design where they do not conflict with this note.
+
 Built 2026-11-02 for VIDEO-LORA-03. The design is [video-loras-2026-11-02.md](../design/video-loras-2026-11-02.md) sections 4, 6.4 and 7. No Settings screen
 uses the new routes yet (VIDEO-LORA-08); the old Settings page keeps working over the same records.
 

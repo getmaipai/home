@@ -4,8 +4,7 @@
 // locked surface uses, so there is one rule. Video styles read through `lib/loras/access.ts`.
 import { lockState, requestProof, type AdultProof } from "@/lib/adultLock";
 import { loraAccess } from "@/lib/loras/access";
-import { getLoraRecord } from "@/lib/loras/store";
-import { syncLoras } from "@/lib/loras/sync";
+import { getLoraRecord, refreshLoras } from "@/lib/loras/stackLibrary";
 import { allAdapters } from "@/lib/pictures/adapters";
 import type { PersonRow } from "@/types";
 
@@ -27,7 +26,7 @@ export function styleOfComponent(componentId: string): { media: "picture" | "vid
  * from them. A style Home cannot place (no record, not in the Stack's list) counts as locked: fail closed. */
 export async function styleAccessResolver(actor: PersonRow, proof: AdultProof = requestProof()): Promise<(componentId: string) => StyleAccess> {
   const pictures = new Map((await allAdapters()).map((a) => [a.id, a.classification]));
-  await syncLoras().catch(() => undefined);
+  await refreshLoras().catch(() => undefined);
   return (componentId) => {
     const style = styleOfComponent(componentId);
     if (!style) return "open";

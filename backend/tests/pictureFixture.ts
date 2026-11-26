@@ -2,6 +2,7 @@
 // (generation submit, job status with rising progress, the PNG files, cancel, engine status, the style library)
 // and records every request body so a test can assert what Home sent, and that a refused request sent nothing.
 import sharp from "sharp";
+import { registerLegacyLoras } from "./helpers/fakeLoraStack";
 import { __resetJobsCatalogForTests, __setPicturesFetchForTests, type StackLora } from "@/lib/pictures/stack";
 import type { StackJobsCatalogRead } from "@/lib/stack/jobsCatalogShape";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
@@ -75,7 +76,7 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
   const fake: FakeImageStack = {
     jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, catalog: { adult: null, minor: null }, serveCatalog(parts) { fake.catalog.adult = fakeJobsCatalog("adult", parts); fake.catalog.minor = fakeJobsCatalog("minor", parts); }, makes: [], cannotSpell: new Set(), loras: TEST_LORAS.map((l) => ({ ...l, trigger_words: [...l.trigger_words] })), loraAdds: [], loraRefusal: null,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
-    restore() { __resetJobsCatalogForTests(); __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
+    restore() { registerLegacyLoras("picture", null); __resetJobsCatalogForTests(); __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
   };
   __setPictureStatusForTests(readyStatusForTests());
   __resetAdapterCacheForTests();
@@ -184,6 +185,7 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
     return json({ error: `The fake picture engine has no route ${method} ${path}.`, code: "not_found" }, 404);
   }) as typeof fetch;
   fake.handler = handler;
+  registerLegacyLoras("picture", () => fake.loras);
   __setPicturesFetchForTests(handler);
   return fake;
 }

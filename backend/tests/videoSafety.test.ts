@@ -476,7 +476,7 @@ describe("the routes", () => {
     const res = await owner.client.postForm("/api/videos/adapters", form);
     expect(res.status).toBe(200);
     const added = await res.json() as { id: string; classification: string; enabled: boolean; needs_confirmation: boolean };
-    expect(added).toMatchObject({ classification: "adult-only", enabled: false, needs_confirmation: true });
+    expect(added).toMatchObject({ classification: "adult-only", enabled: false, needs_confirmation: false }); // the one licence accept at the Stack replaced the per-style confirmation
     // Usable by admins only, unconfirmed, and adult-only (so locked): an owner without an unlock proof does not get it either.
     expect((await videoAdaptersFor(audience(owner.actor), { includeLocked: false })).map((a) => a.id)).not.toContain(added.id);
     // An adult-only style is one locked tile to its own admin too: confirming it needs the unlock proof (a locked style answers like a missing one).

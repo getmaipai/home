@@ -110,6 +110,25 @@ export function consumeTicket(ticket: string | null | undefined, personId: strin
   return held.expiresAt > clock() && held.personId === personId && held.sessionKey === sessionKey && held.item === item;
 }
 
+/** Whether this ticket would be accepted now for this person, session and item, WITHOUT using it up. Home's check before it forwards a request whose ticket the Stack then consumes. */
+export function peekTicket(ticket: string | null | undefined, personId: string, sessionKey: string | null | undefined, item: string): boolean {
+  if (!ticket || !sessionKey) return false;
+  const held = tickets.get(ticket);
+  return !!held && held.expiresAt > clock() && held.personId === personId && held.sessionKey === sessionKey && held.item === item;
+}
+
+/**
+ * STACK-LORAS-01: the Stack asks Home (with the paired token) to use up a ticket when someone lowers an adult-only style to all-ages. The ticket is single use and
+ * bound to one item, so the Stack names the item; the person and session were checked by Home's own route (`peekTicket`) before the request was forwarded.
+ */
+export function consumeTicketForStack(ticket: string | null | undefined, item: string): boolean {
+  if (!ticket) return false;
+  const held = tickets.get(ticket);
+  if (!held) return false;
+  tickets.delete(ticket);
+  return held.expiresAt > clock() && held.item === item;
+}
+
 // ---- The request's proof -------------------------------------------------------------------------------------------------------------------------
 
 /** What a request carries: the proof header and the browser session key (a hash of the session cookie). A paired device, a bearer token or an API key

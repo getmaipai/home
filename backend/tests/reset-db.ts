@@ -1,5 +1,5 @@
 import { __resetMusicJobsForTests } from "@/lib/music/store";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
+import { installFakeLoraStack } from "./helpers/fakeLoraStack";
 import { savedTemplates, musicJobs } from "@/db/schema";
 import { tmpdir } from "node:os";
 import { db } from "@/db";
@@ -67,6 +67,7 @@ import {
   creations,
   adultMarkLog,
   loras,
+  loraPeople,
   mediaCollections,
   mediaSubjects,
   activityDismissals,
@@ -253,7 +254,8 @@ export function resetDb(): void {
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(videoAdapterPrefs).run();
   db.delete(loras).run(); // VIDEO-LORA-03: the library records (no foreign keys)
-  __resetLoraSyncForTests();
+  db.delete(loraPeople).run(); // STACK-LORAS-01: the named adults of a style
+  installFakeLoraStack(); // STACK-LORAS-01: the Stack holds the library; every test starts with an empty fake one
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
   db.delete(mediaProgress).run();
   db.delete(mediaWatchSessions).run();

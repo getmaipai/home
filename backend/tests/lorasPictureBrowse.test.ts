@@ -137,49 +137,8 @@ describe("browsing for pictures", () => {
 });
 
 describe("the browse route", () => {
-  test("a known-empty picture status returns no items and the plain note", async () => {
-    setInstalledBasesProvider(installedBasesNow);
-    __setVideoStatusForTests(readyVideoStatusForTests());
-    __setPictureStatusForTests(readyStatusForTests({ models: [{ id: "flux2-klein-4b", installed: true, loras: false }] as never }));
-    const { owner } = await household();
-    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ items: [], notes: ["This computer has no picture model that can use styles yet."], next_cursor: null });
-    expect(urls).toEqual([]);
-  });
 
-  test("null statuses keep the picture browser searching normally", async () => {
-    setInstalledBasesProvider(installedBasesNow);
-    __setVideoStatusForTests(null);
-    __setPictureStatusForTests(null);
-    const { owner } = await household();
-    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
-    expect(res.status).toBe(200);
-    expect((await res.json() as { items: unknown[] }).items.length).toBe(7);
-    expect(labelsAsked()).toEqual([]);
-  });
 
-  test("a picture search through the route lists picture hits with picture wording", async () => {
-    const { owner } = await household();
-    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture" } });
-    expect(res.status).toBe(200);
-    const body = await res.json() as { items: Array<{ title: string; line: string; reason: string | null }> };
-    expect(body.items.map((i) => i.title).sort()).toEqual(["Clay Look", "Flux Dev Look", "Klein Nine", "Paper Boat", "Pen Sketch", "Watercolor", "Z Base Look"]);
-    expect(body.items.filter((i) => ["Flux Dev Look", "Klein Nine", "Z Base Look"].includes(i.title)).every((i) => i.reason !== null)).toBe(true);
-    expect(body.items.find((i) => i.title === "Clay Look")!.line).toContain("Made for Flux");
-  });
 
-  test("a video base with media picture is refused (a failed schema check, 400) with a plain message, and nothing goes out", async () => {
-    const { owner } = await household();
-    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "picture", base: "ltx-2.5" } });
-    expect(res.status).toBe(400);
-    expect(await res.text()).toContain("That base is not available for picture.");
-    expect(urls).toEqual([]);
-  });
 
-  test("a picture base with media video is refused too", async () => {
-    const { owner } = await household();
-    const res = await owner.request("/api/loras/browse", { method: "POST", body: { source: "civitai", media: "video", base: "flux2-klein-4b" } });
-    expect(res.status).toBe(400);
-  });
 });

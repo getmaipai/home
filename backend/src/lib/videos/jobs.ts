@@ -16,7 +16,7 @@ import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouse
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { plainMakingLine } from "@/lib/pictures/plainLine";
 import type { PersonRow } from "@/types";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord, refreshLoras } from "@/lib/loras/stackLibrary";
 import { usesAdultOnlyStyle } from "./adultStyle";
 import { wireLoras } from "./loraWire";
 import { markFields, newItemMark } from "@/lib/adultLock";
@@ -768,7 +768,7 @@ async function settleClip(job: VideoJob, actor: PersonRow, video: Uint8Array, po
   // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
   // An edit is adult-only when any clip it is made from is (`request.adultOnly`, set when the edit starts), never lower than its sources.
   const startedAdult = job.request.adultOnly === true;
-  const adult = startedAdult || await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => getLoraRecord(id)?.audience);
+  const adult = startedAdult || await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => { await refreshLoras(); return getLoraRecord(id)?.audience; });
   const keyframes = await extractKeyframes(video, clip.seconds ?? job.request.seconds);
   // An edit has no poster from the Stack: frame 0 of the new clip is its poster, and a clip no frame can be taken from is not stored.
   const poster = posterIn ?? keyframes?.[0] ?? null;

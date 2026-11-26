@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { resetDb } from "./reset-db";
 import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { household, unlock, unlockHeader } from "./fixtures/adultLock";

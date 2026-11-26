@@ -1478,6 +1478,13 @@
       "when": 1795636800000,
       "tag": "0211_remove_home_licence_ack",
       "breakpoints": true
+    },
+    {
+      "idx": 212,
+      "version": "6",
+      "when": 1795678075088,
+      "tag": "0212_bright_shriek",
+      "breakpoints": true
     }
   ]
 }

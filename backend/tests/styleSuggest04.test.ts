@@ -3,7 +3,7 @@ import { resetDb } from "./reset-db";
 import { household, unlock, unlockHeader } from "./fixtures/adultLock";
 import { putLora } from "./fixtures/lora";
 import { suggestStyles } from "@/lib/loras/suggest";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { __resetAdultLockForTests, issueProof, type AdultProof } from "@/lib/adultLock";
 import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { installFakeVideoStack } from "./videoFixture";

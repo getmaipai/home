@@ -261,13 +261,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
-| `frontend/src/apps/settings/styles/FreshConfirm.tsx` | useFreshConfirm |
-| `frontend/src/apps/settings/styles/StyleAddFile.tsx` | StyleAddFile |
-| `frontend/src/apps/settings/styles/StyleBrowser.tsx` | browseProblem, StyleBrowser |
-| `frontend/src/apps/settings/styles/StyleConfirm.tsx` | StyleConfirm, licenceIsOpen |
-| `frontend/src/apps/settings/styles/StyleEditor.tsx` | tryStyleState, StyleEditor |
 | `frontend/src/apps/settings/styles/StylesTab.tsx` | StylesTab |
-| `frontend/src/apps/settings/styles/stylesShared.tsx` | STYLES_COPY_DEFAULTS, stylesCopy, messageOf, sizeWords, whatItIs, adultCheckLine |
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
 | `frontend/src/apps/setup/CloseAppsStep.tsx` | openStarterApps, useCloseAppsQuestion, CloseAppsStep |
@@ -836,6 +830,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/loras/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
 | `backend/src/lib/loras/readiness.ts` | installedBasesNow |
 | `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
+| `backend/src/lib/loras/stackAdmin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, MINOR_IN_PEOPLE_LINE, NOT_EDITABLE_LINE, TRASH_DAYS, patchLoraOnStack |
+| `backend/src/lib/loras/stackLibrary.ts` | LorasStackError, __setLorasFetchForTests, FRESH_MS, MAX_AGE_MS, dropLoraSnapshot, __resetLoraSnapshotForTests |
 | `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
 | `backend/src/lib/loras/suggest.ts` | suggestStyles |
 | `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
@@ -1058,7 +1054,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/persona.ts` | personaFromManifest, PERSONAS, reloadPersonas, __reloadPersonasForTests, PERSONA_IDS, DEFAULT_PERSONA_ID |
 | `backend/src/lib/personaIds.ts` | LIVE_PERSONA_IDS |
 | `backend/src/lib/personaJudge.ts` | judgePersonaConsistency |
-| `backend/src/lib/pictures/adapters.ts` | __resetAdapterCacheForTests, dropAdapterCache, allAdapters, adaptersFor, setAdapterEnabled, updatePictureRecord |
+| `backend/src/lib/pictures/adapters.ts` | __resetAdapterCacheForTests, dropAdapterCache, allAdapters, adaptersFor, setAdapterEnabled, forgetAdapterPref |
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/carouselPlan.ts` | CAROUSEL_MIN, CAROUSEL_MAX, CAROUSEL_DEFAULT, CAROUSEL_PROMPT_MAX, CAROUSEL_UNAVAILABLE_LINE, CAROUSEL_BAD_PLAN_LINE |
@@ -1492,7 +1488,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/studioPlan.ts` | STUDIO_VIDEO_PIECES, STUDIO_AUDIO_PIECES, STUDIO_FILM_S, STUDIO_MIN_PIECE_S, studioPlanSchema, STUDIO_PLAN_LINE |
 | `backend/src/lib/videos/studioVoices.ts` | VOICE_TTL_MS, VOICES_PER_PERSON, estimatedSpeechSeconds, putStudioVoice, getStudioVoice, VOICE_REF_PREFIX |
 | `backend/src/lib/videos/styleChoice.ts` | STYLE_GONE_LINE, STYLE_MIXED_LEVELS_LINE, STYLE_NOT_AT_LEVEL_LINE, strengthWord, styleNamesOf, resolveStyles |
-| `backend/src/lib/videos/styleToolSpec.ts` | withStyleList |
+| `backend/src/lib/videos/styleToolSpec.ts` | withStyleList, warmStyleList |
 | `backend/src/lib/videos/swapReferences.ts` | swapReferencePhotos |
 | `backend/src/lib/videos/swapStart.ts` | SWAP_NO_CLIP, SWAP_NO_CAST, SWAP_ONE_PERSON, startSwap |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId, runGenerateVideo |

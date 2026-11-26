@@ -7,7 +7,7 @@ import { getPictureJob, pictureJobIdsByTurn, pictureJobsForTurn, type PictureJob
 import { outcomeOf, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 import type { Adapter } from "@/lib/pictures/adapters";
-import type { Lora } from "@/lib/loras/store";
+import type { Lora } from "@/lib/loras/stackLibrary";
 
 /** The shared adult-only picture style decision. Missing adapters fail closed when requested by job creation. */
 export function isAdultPictureStyle(adapter: Pick<Adapter, "classification"> | null | undefined, record?: Pick<Lora, "audience"> | null, missingAdapterIsAdult = false): boolean {

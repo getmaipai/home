@@ -16,7 +16,7 @@ import { adultStateOf } from "@/lib/adultMarks";
 import { DEFAULT_VIDEO_VOICES, VIDEO_LOOKS, VIDEO_RECIPES, VIDEO_VOICES, videoLookFor, videoRecipeFor } from "@/lib/videos/recipes";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { styleChips, type StyleTier } from "@/lib/videos/createStyles";
-import { syncLoras } from "@/lib/loras/sync";
+import { refreshLoras } from "@/lib/loras/stackLibrary";
 import { allowedQuality, maxOffered } from "@/lib/tiers";
 import { QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, h3EndPictureReady, h3VideoReady, ltx25EndPictureReady, ltx25MaxReady, ltx25VideoReady, maxSecondsFor } from "@/lib/videos/quality";
 import { peekVideoEngineStatus, videoEngineStatus, videoMaxNotReadyReason, videoStatusReady } from "@/lib/videos/ready";
@@ -28,7 +28,7 @@ import { registerAppPageFill, registerAppPageWarm } from "@/lib/apps";
 import { readCreationByFile } from "@/lib/creations/store";
 import { backfillCreationForFile } from "@/lib/creations/backfill";
 import { getVideoJobByFileFor, getVideoJobFor } from "@/lib/videos/jobs";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { listFragments, listTemplates, templateBlanks, videoTemplateSettings } from "@/lib/media/templates";
 import { templateCoverUrl } from "@/lib/templateCovers";
 import { packageAssetFile } from "@/lib/packageAssets";
@@ -129,7 +129,7 @@ function findNode(nodes: unknown, type: string): Record<string, unknown> | undef
  * left Max out of the segment until a reload. The page awaits one real read first, for at most this long, so a slow Stack costs the page a moment, never the page. */
 export const VIDEO_STATUS_WARM_MS = 1500;
 registerAppPageWarm("video", "create", async () => {
-  await Promise.race([Promise.all([videoEngineStatus(), syncLoras()]).then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, VIDEO_STATUS_WARM_MS))]);
+  await Promise.race([Promise.all([videoEngineStatus(), refreshLoras()]).then(() => undefined), new Promise<void>((resolve) => setTimeout(resolve, VIDEO_STATUS_WARM_MS))]);
 });
 
 /** The time under Generate, in plain words per level (docs/design/video-tiers-2026-11-02.md section 3: Standard 10 s about 43 s, Boost 5 s 42 to 74 s,

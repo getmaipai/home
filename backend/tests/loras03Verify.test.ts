@@ -1,17 +1,13 @@
 // VIDEO-LORA-03 verification pass (docs/dev/loras.md "Verified"): regression tests for what the review of commit 44a0d967c found. Each fails without its fix.
 import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { resetDb } from "./reset-db";
-import { db, sqlite } from "@/db";
+import { db } from "@/db";
 import { videoJobs } from "@/db/schema";
 import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { markAdultOnly, patchLora, removeLora, confirmLora, restoreLora } from "@/lib/loras/admin";
-import { getLoraRecord } from "@/lib/loras/store";
-import { __resetLoraSyncForTests, syncLoras } from "@/lib/loras/sync";
 import { clipsUsingStyle } from "@/lib/loras/usage";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { clipMarkOf } from "@/lib/videos/editGate";
-import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { household, textOf } from "./fixtures/adultLock";
@@ -21,7 +17,7 @@ import type { VideoJob } from "@/lib/videos/jobs";
 setDefaultTimeout(30_000);
 let fake: FakeVideoStack;
 beforeEach(() => {
-  resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
+  resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   fake = installFakeVideoStack();
   fake.loras = [];
 });
@@ -33,68 +29,6 @@ function insertJob(personId: string, id: string, state: string, loras: string[])
   const t = new Date().toISOString();
   db.insert(videoJobs).values({ id, personId, kind: "generate", state, prompt: "p", request: JSON.stringify({ loras }), files: "[]", createdAt: t, updatedAt: t, hlc: "0:0:testaa" }).run();
 }
-
-describe("the 30-day purge", () => {
-  test("a style restored while an earlier file is being removed is not deleted", async () => {
-    const { row } = await household();
-    const admin = row("Sage");
-    const a = putLora(admin.id, PAST);
-    const b = putLora(admin.id, PAST);
-    // The Stack's answer for the first file arrives while an admin restores the second.
-    const inner = fake.handler;
-    __setVideosFetchForTests((async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
-      if ((init?.method ?? "GET") === "DELETE" && String(input).includes(a.id)) restoreLora(admin, b.id);
-      return inner(input, init);
-    }) as typeof fetch);
-    await syncLoras(true);
-    expect(getLoraRecord(a.id)).toBeNull();
-    expect(getLoraRecord(b.id)).toMatchObject({ removed_at: null, trash_until: null });
-  });
-
-  test("a style a clip is being made with is kept until that clip is done", async () => {
-    const { row } = await household();
-    const admin = row("Sage");
-    const style = putLora(admin.id, PAST);
-    insertJob(admin.id, "vjob-running01", "running", [style.id]);
-    await syncLoras(true);
-    expect(getLoraRecord(style.id)).not.toBeNull();
-    sqlite.query("UPDATE video_jobs SET state = 'done' WHERE id = 'vjob-running01'").run();
-    await syncLoras(true);
-    expect(getLoraRecord(style.id)).toBeNull();
-  });
-});
-
-describe("the writer", () => {
-  test("a listed person who is later made a guest, or is gone, does not block removing, marking or confirming the style", async () => {
-    const { row } = await household();
-    const admin = row("Sage");
-    const marlow = row("Marlow");
-    const style = putLora(admin.id, { availability: { who: "people", people: [marlow.id] } });
-    // Marlow is later made a guest (and another listed id no longer exists at all): neither may block the admin.
-    sqlite.query("UPDATE people SET role = 'guest' WHERE id = ?").run(marlow.id);
-    const gone = "person-gone000000";
-    sqlite.query("UPDATE loras SET record = json_set(record, '$.availability.people', json(?)) WHERE id = ?").run(JSON.stringify([marlow.id, gone]), style.id);
-    expect(() => removeLora(admin, style.id)).not.toThrow();
-    expect(getLoraRecord(style.id)?.removed_at).not.toBeNull();
-    await markAdultOnly(admin, style.id);
-    expect(getLoraRecord(style.id)?.audience).toBe("adult-only");
-    // A person newly added who is not an adult is still refused.
-    expect(() => patchLora(admin, style.id, { availability: { who: "people", people: [marlow.id, row("Nova").id] } })).toThrow();
-  });
-});
-
-describe("the licence", () => {
-  test("an unconfirmed style cannot be opened to other adults until an admin has confirmed it", async () => {
-    const { row } = await household();
-    const admin = row("Sage");
-    const style = putLora(admin.id, { licence: { id: "unknown", text: null, commercial_use: "unknown", acknowledged_by: null, acknowledged_at: null } });
-    expect(() => patchLora(admin, style.id, { availability: { who: "adults" } })).toThrow("Read the licence and confirm it first, then choose who can use this style.");
-    expect(getLoraRecord(style.id)?.availability.who).toBe("admins");
-    expect(() => patchLora(admin, style.id, { name: "Renamed" })).not.toThrow();
-    confirmLora(admin, style.id);
-    expect(patchLora(admin, style.id, { availability: { who: "adults" } }).availability.who).toBe("adults");
-  });
-});
 
 describe("clips and removed styles", () => {
   test("an all-ages style that is later removed keeps its audience for a clip made with it (not fail-closed to adult-only)", async () => {

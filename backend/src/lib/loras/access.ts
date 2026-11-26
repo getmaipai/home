@@ -13,7 +13,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { lockState, lockedView, requestProof, type AdultProof } from "@/lib/adultLock";
 import { adultStylesAllowed } from "@/lib/pictures/policy";
-import { getLoraRecord, listLoraRecords, type Lora } from "@/lib/loras/store";
+import { getLoraRecord, listLoraRecords, type Lora } from "@/lib/loras/stackLibrary";
 import type { PersonRow } from "@/types";
 
 /** Where the person is: their own written screen, or somewhere shared or spoken (a glance screen, a TV, a robot, a speaker, a paired device). */
@@ -66,7 +66,8 @@ export function untestedLine(lora: Lora): string | null {
  * LTX-2.3 file the bench marked `tested` on 2.5 (LTXD-18B). This is the one offer rule: the picker, the chat tool and suggestions all read it.
  */
 export function loraUsable(lora: Lora): boolean {
-  return lora.removed_at === null && lora.base_model !== "unknown" && !isUnofferedOldBase(lora) && lora.compatible_with.length > 0;
+  // A style whose drive is not connected (`drive_missing`), or whose file is not ready, is unavailable until the Stack says otherwise.
+  return lora.removed_at === null && (lora.status ?? "ready") === "ready" && lora.base_model !== "unknown" && !isUnofferedOldBase(lora) && lora.compatible_with.length > 0;
 }
 
 export interface LoraList { items: Lora[]; /** One tile: some LoRAs are locked for this person. Never a count. */ locked: boolean }

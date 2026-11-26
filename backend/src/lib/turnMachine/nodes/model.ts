@@ -1,6 +1,6 @@
 import { RESEARCH_SEARCHES_MAX } from "@/lib/researchBudget";
 import { editPictureSpec, generateImageSchema } from "@/lib/mediaOps/chatSchema";
-import { withStyleList } from "@/lib/videos/styleToolSpec";
+import { warmStyleList, withStyleList } from "@/lib/videos/styleToolSpec";
 import { LEDGER_INSTRUCTION, NOTES_WAIT_MS, settledNotes } from "../pageNotes";
 import { anchorBlock, pinEntity } from "../entityPin";
 import { backboneBlock, pickBackbone, readMoreSections, type Backbone } from "../backbone";
@@ -1203,6 +1203,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     tools = [];
     tool_choice = undefined;
   } else {
+    await warmStyleList(state.budget.tools_offered);
     tools = state.budget.tools_offered
       .slice()
       .sort()

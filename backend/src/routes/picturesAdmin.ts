@@ -5,8 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled, updatePictureRecord } from "@/lib/pictures/adapters";
-import { adoptPictureLoras } from "@/lib/loras/sync";
+import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
 import { addLoraFile, addLoraUrl, getStackJob, imageStatus, installPictureModel, patchLora, removeLora, StackPicturesError } from "@/lib/pictures/stack";
 import { adultStylesAllowed, householdAllowsAdults, householdPictureQuality } from "@/lib/pictures/policy";
 import { CHILD_CONTENT_LINE, kidsDailyPictures, kidsDailyVideos, kidsHomeOn } from "@/lib/pictures/lane";
@@ -138,7 +137,6 @@ picturesAdminRoutes.openapi(jobRoute, async (c) => {
       const lora = job.result?.lora;
       let adapter = null;
       if (lora) {
-        await adoptPictureLoras([lora], adminId);
         dropAdapterCache();
         const found = (await allAdapters()).find((a) => a.id === lora.id);
         adapter = found ? present(found) : null;
@@ -190,7 +188,6 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       stack.append("trigger_words", JSON.stringify(trigger));
       stack.append("added_by", adminId);
       const lora = await addLoraFile(stack);
-      await adoptPictureLoras([lora], adminId);
       dropAdapterCache();
       const found = (await allAdapters()).find((a) => a.id === lora.id);
       return c.json({ adapter: present(found ?? { ...lora, enabled: false, needs_confirmation: true }) }, 200) as never;
@@ -217,9 +214,8 @@ picturesAdminRoutes.openapi(patchRoute, async (c) => {
     if (body.classification !== undefined || body.name !== undefined || body.trigger_words !== undefined) {
       const patch = { ...(body.classification ? { classification: body.classification } : {}), ...(body.name ? { name: body.name } : {}), ...(body.trigger_words ? { trigger_words: body.trigger_words } : {}) };
       await patchLora(id, patch);
-      updatePictureRecord(id, patch, adminId);
     }
-    if (body.enabled !== undefined) setAdapterEnabled(id, body.enabled, adminId);
+    if (body.enabled !== undefined) await setAdapterEnabled(id, body.enabled, adminId);
     dropAdapterCache();
     const found = (await allAdapters()).find((a) => a.id === id);
     if (!found) return c.json({ error: "That style isn't in the library.", code: "unknown_lora" }, 404) as never;

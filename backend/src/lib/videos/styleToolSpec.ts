@@ -3,6 +3,7 @@
 // or unknown-audience style is never listed, so the model cannot name one it was never told (the person's own typed name is how it is found, in styleChoice.ts).
 // Where the person may use no style, or the screen is spoken or shared, or the person is a minor, the `styles` and `strength` arguments are not offered at all.
 import type { ToolSpec } from "@/lib/llm";
+import { refreshLoras } from "@/lib/loras/stackLibrary";
 import { listableStyleNames } from "./styleChoice";
 import { videoAudienceOf } from "./tool";
 import { EDIT_VIDEO_TOOL_ID } from "./editTool";
@@ -23,4 +24,9 @@ export function withStyleList(spec: ToolSpec, state: SpecState | undefined): Too
     properties.styles = { ...properties.styles!, description: `${properties.styles!.description ?? ""} Styles this person can use: ${names.join(", ")}.`.trim() };
   }
   return { ...spec, args: { ...args, properties } };
+}
+
+/** The style list is built from the Stack's library, read into a short snapshot. A turn that offers a video tool reads it first (a read under three seconds old is reused; a Stack that cannot be read lists none). */
+export async function warmStyleList(toolIds: readonly string[]): Promise<void> {
+  if (toolIds.includes(GENERATE_VIDEO_TOOL_ID) || toolIds.includes(EDIT_VIDEO_TOOL_ID)) await refreshLoras().catch(() => undefined);
 }

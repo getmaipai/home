@@ -92041,6 +92041,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80
+                  },
+                  "ticket": {
+                    "type": "string",
+                    "maxLength": 200
                   }
                 }
               }
@@ -93069,334 +93073,33 @@
         }
       }
     },
-    "/api/loras/browse": {
-      "post": {
-        "tags": [
-          "LoRAs"
-        ],
-        "summary": "Search the style sources (owner or admin)",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "source": {
-                    "type": "string",
-                    "enum": [
-                      "huggingface",
-                      "civitai",
-                      "both"
-                    ],
-                    "default": "huggingface"
-                  },
-                  "q": {
-                    "type": "string",
-                    "maxLength": 200,
-                    "default": ""
-                  },
-                  "media": {
-                    "type": "string",
-                    "enum": [
-                      "video",
-                      "picture"
-                    ],
-                    "default": "video"
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "any",
-                      "style",
-                      "character"
-                    ],
-                    "default": "any"
-                  },
-                  "base": {
-                    "type": "string",
-                    "enum": [
-                      "default",
-                      "ltx-2.5",
-                      "flux2-klein-4b",
-                      "z-image-turbo",
-                      "ernie-image-turbo",
-                      "all"
-                    ],
-                    "default": "all"
-                  },
-                  "installed": {
-                    "type": "string",
-                    "enum": [
-                      "any",
-                      "not_installed",
-                      "installed"
-                    ],
-                    "default": "any"
-                  },
-                  "sort": {
-                    "type": "string",
-                    "enum": [
-                      "downloads",
-                      "rating",
-                      "newest"
-                    ],
-                    "default": "downloads"
-                  },
-                  "cursor": {
-                    "type": "string",
-                    "nullable": true,
-                    "maxLength": 2000,
-                    "default": null
-                  },
-                  "adult": {
-                    "type": "boolean",
-                    "default": false
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Adult and unknown hits are not in `items`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": {
-                          "nullable": true
-                        }
-                      }
-                    },
-                    "locked": {
-                      "type": "boolean",
-                      "description": "One tile for every hit that is adult or unknown: no title, picture, id or count."
-                    },
-                    "next_cursor": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "notes": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "bases": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "label"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "items",
-                    "locked",
-                    "next_cursor",
-                    "notes",
-                    "bases"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only, or Civitai is off",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many searches this hour",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The source did not answer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The source asked us to slow down",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/loras/bases": {
+    "/api/loras/stack": {
       "get": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "The bases this install can use styles for (the Made for choices)",
+        "summary": "The Stack's styles as this person may read them",
         "parameters": [
           {
             "schema": {
               "type": "string",
               "enum": [
-                "video",
-                "picture"
-              ],
-              "default": "video"
-            },
-            "required": false,
-            "name": "media",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "One entry per base; never needs the sources.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "bases": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "label"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "bases"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/loras/browse/{source}/{id}": {
-      "get": {
-        "tags": [
-          "LoRAs"
-        ],
-        "summary": "One style from a source, with its file facts",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "huggingface",
-                "civitai"
+                "true",
+                "false"
               ]
             },
-            "required": true,
-            "name": "source",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "maxLength": 40
-            },
             "required": false,
-            "name": "version",
+            "name": "removed",
             "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "A hit the caller may see.",
+            "description": "An adult-only style the person may not open is one `{ locked: true }` tile.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {},
                   "additionalProperties": {
                     "nullable": true
                   }
@@ -93415,7 +93118,7 @@
             }
           },
           "403": {
-            "description": "Admins only, or Civitai is off",
+            "description": "Adult owners and admins only",
             "content": {
               "application/json": {
                 "schema": {
@@ -93425,276 +93128,7 @@
             }
           },
           "404": {
-            "description": "Not there, or locked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The source did not answer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Slow down",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/loras/browse/{source}/{id}/preview": {
-      "get": {
-        "tags": [
-          "LoRAs"
-        ],
-        "summary": "A style's picture, fetched once by the hub",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "huggingface",
-                "civitai"
-              ]
-            },
-            "required": true,
-            "name": "source",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "maxLength": 40
-            },
-            "required": false,
-            "name": "version",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The picture.",
-            "content": {
-              "image/*": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not there, or locked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The source did not answer",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Slow down",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/loras/install": {
-      "post": {
-        "tags": [
-          "LoRAs"
-        ],
-        "summary": "Download a style into the library (an admin's click, after the licence step)",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "source": {
-                    "type": "string",
-                    "enum": [
-                      "huggingface",
-                      "civitai"
-                    ]
-                  },
-                  "remote_id": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "version_id": {
-                    "type": "string",
-                    "nullable": true,
-                    "maxLength": 200
-                  },
-                  "url": {
-                    "type": "string",
-                    "maxLength": 2048
-                  },
-                  "file": {
-                    "type": "string",
-                    "nullable": true,
-                    "maxLength": 500
-                  },
-                  "name": {
-                    "type": "string",
-                    "maxLength": 80
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": [
-                      "style",
-                      "character"
-                    ]
-                  },
-                  "audience": {
-                    "type": "string",
-                    "enum": [
-                      "all-ages",
-                      "adult-only"
-                    ]
-                  },
-                  "licence_confirmed": {
-                    "type": "boolean"
-                  },
-                  "media": {
-                    "type": "string",
-                    "enum": [
-                      "video",
-                      "picture"
-                    ],
-                    "default": "video"
-                  },
-                  "base_model": {
-                    "type": "string",
-                    "enum": [
-                      "ltx-2.5",
-                      "ltx-2.3",
-                      "wan2.2-ti2v-5b",
-                      "flux2-klein-4b",
-                      "z-image-turbo",
-                      "ernie-image-turbo"
-                    ]
-                  },
-                  "confirm_ticket": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "as_separate": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "source",
-                  "audience",
-                  "licence_confirmed"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "A download job started; it shows in the job list as \"Downloading a style\".",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "job": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "job"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only, own screen only, Civitai off, or an unlock is needed to choose All ages",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not there",
+            "description": "No such style",
             "content": {
               "application/json": {
                 "schema": {
@@ -93704,7 +93138,7 @@
             }
           },
           "409": {
-            "description": "Already installed (duplicate) or the source changed the file (changed_file)",
+            "description": "Not allowed right now",
             "content": {
               "application/json": {
                 "schema": {
@@ -93714,7 +93148,7 @@
             }
           },
           "422": {
-            "description": "The licence step is missing, or the style cannot be used here",
+            "description": "A value is not allowed",
             "content": {
               "application/json": {
                 "schema": {
@@ -93724,17 +93158,7 @@
             }
           },
           "429": {
-            "description": "Slow down",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "The source did not answer",
+            "description": "Too many searches",
             "content": {
               "application/json": {
                 "schema": {
@@ -93744,7 +93168,159 @@
             }
           },
           "503": {
-            "description": "Another download is running, or the source is busy",
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/stack/{id}": {
+      "patch": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Edit a style (lowering to all-ages carries the adult-lock ticket)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "classification": {
+                    "type": "string",
+                    "enum": [
+                      "all-ages",
+                      "adult-only"
+                    ]
+                  },
+                  "strength_default": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2
+                  },
+                  "trigger_words": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "maxItems": 12
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 2048
+                  },
+                  "ticket": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The style as it stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {
@@ -93755,50 +93331,45 @@
           }
         }
       },
-      "get": {
+      "delete": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "Style downloads, running and finished (no names)",
+        "summary": "Move a style to the 30-day trash, or delete it for good with purge=true",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "purge",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Names are never listed, so an adult-only style is not named.",
+            "description": "Done.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "job": {
-                            "type": "string"
-                          },
-                          "state": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "percent": {
-                            "type": "number",
-                            "nullable": true
-                          }
-                        },
-                        "required": [
-                          "job",
-                          "state",
-                          "title",
-                          "percent"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "items"
-                  ]
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               }
             }
@@ -93814,7 +93385,57 @@
             }
           },
           "403": {
-            "description": "Admins only",
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {
@@ -93826,58 +93447,34 @@
         }
       }
     },
-    "/api/loras/sources": {
-      "get": {
+    "/api/loras/stack/{id}/restore": {
+      "post": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "Where styles come from",
+        "summary": "Bring a style back from the trash",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "description": "Restored.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "huggingface": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "token_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "token_saved"
-                      ]
-                    },
-                    "civitai": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean"
-                        },
-                        "key_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "key_saved"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "huggingface",
-                    "civitai"
-                  ]
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               }
             }
@@ -93893,7 +93490,57 @@
             }
           },
           "403": {
-            "description": "Admins only",
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {
@@ -93905,24 +93552,39 @@
         }
       }
     },
-    "/api/loras/sources/civitai": {
-      "put": {
+    "/api/loras/stack/{id}/move": {
+      "post": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "Turn Civitai on or off (off by default)",
+        "summary": "Move a style's file to another drive (a Stack job)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "on": {
-                    "type": "boolean"
+                  "disk_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   }
                 },
                 "required": [
-                  "on"
+                  "disk_id"
                 ]
               }
             }
@@ -93930,60 +93592,14 @@
         },
         "responses": {
           "200": {
-            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "description": "A `lora.move` job started.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "huggingface": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "token_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "token_saved"
-                      ]
-                    },
-                    "civitai": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean"
-                        },
-                        "key_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "key_saved"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "huggingface",
-                    "civitai"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Not saved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               }
             }
@@ -93999,7 +93615,57 @@
             }
           },
           "403": {
-            "description": "Admins only",
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {
@@ -94011,13 +93677,298 @@
         }
       }
     },
-    "/api/loras/sources/civitai-key": {
+    "/api/loras/stack/install": {
       "post": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "Save the Civitai key (write only)",
+        "summary": "Download a style from Hugging Face or Civitai (a Stack job)",
         "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "media": {
+                    "type": "string",
+                    "enum": [
+                      "picture",
+                      "video"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "huggingface",
+                      "civitai"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "licence": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "audience": {
+                    "type": "string",
+                    "enum": [
+                      "all-ages",
+                      "adult-only"
+                    ]
+                  },
+                  "strength_default": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 2
+                  },
+                  "trigger_words": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 80
+                    },
+                    "maxItems": 12
+                  },
+                  "disk_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 120
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "base_model": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "media",
+                  "source",
+                  "url",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A download job started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/stack/sources": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "The two sources and whether a key is saved (never the key)",
+        "responses": {
+          "200": {
+            "description": "Sources.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/stack/sources/{site}/key": {
+      "put": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "Save a Hugging Face token or Civitai key at the Stack (null removes it)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "huggingface",
+                "civitai"
+              ]
+            },
+            "required": true,
+            "name": "site",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -94025,8 +93976,8 @@
                 "properties": {
                   "key": {
                     "type": "string",
-                    "minLength": 8,
-                    "maxLength": 512
+                    "nullable": true,
+                    "maxLength": 400
                   }
                 },
                 "required": [
@@ -94038,60 +93989,14 @@
         },
         "responses": {
           "200": {
-            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "description": "Saved. The key is never returned.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "huggingface": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "token_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "token_saved"
-                      ]
-                    },
-                    "civitai": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean"
-                        },
-                        "key_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "key_saved"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "huggingface",
-                    "civitai"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Not saved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               }
             }
@@ -94107,7 +94012,57 @@
             }
           },
           "403": {
-            "description": "Admins only",
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {
@@ -94119,68 +94074,45 @@
         }
       }
     },
-    "/api/loras/sources/civitai-key/remove": {
-      "post": {
+    "/api/loras/stack/sources/{site}/search": {
+      "get": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "Remove the saved Civitai key",
+        "summary": "Search a source (an adult hit is shown only with the Adult lock open)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "huggingface",
+                "civitai"
+              ]
+            },
+            "required": true,
+            "name": "site",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "description": "Hits.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "huggingface": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "token_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "token_saved"
-                      ]
-                    },
-                    "civitai": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean"
-                        },
-                        "key_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "key_saved"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "huggingface",
-                    "civitai"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Not saved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               }
             }
@@ -94196,7 +94128,57 @@
             }
           },
           "403": {
-            "description": "Admins only",
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {
@@ -94208,26 +94190,240 @@
         }
       }
     },
-    "/api/loras/sources/huggingface-token": {
-      "post": {
+    "/api/loras/stack/jobs/{id}": {
+      "get": {
         "tags": [
           "LoRAs"
         ],
-        "summary": "Save the Hugging Face token (write only)",
+        "summary": "Progress of a style install or move",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job's state and progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/loras/stack/{id}/preview": {
+      "get": {
+        "tags": [
+          "LoRAs"
+        ],
+        "summary": "A style's preview picture (404 for a hidden, locked or missing style)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The picture.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Adult owners and admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not allowed right now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many searches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stack/adult-ticket/consume": {
+      "post": {
+        "tags": [
+          "Stack callbacks"
+        ],
+        "summary": "The Stack uses up an adult-lock ticket (paired token only)",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "token": {
+                  "ticket": {
                     "type": "string",
-                    "minLength": 8,
-                    "maxLength": 512
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "item": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   }
                 },
                 "required": [
-                  "token"
+                  "ticket",
+                  "item"
                 ]
               }
             }
@@ -94235,165 +94431,25 @@
         },
         "responses": {
           "200": {
-            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
+            "description": "True once, for a live ticket made for this item.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "huggingface": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "token_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "token_saved"
-                      ]
-                    },
-                    "civitai": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean"
-                        },
-                        "key_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "key_saved"
-                      ]
+                    "ok": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "huggingface",
-                    "civitai"
+                    "ok"
                   ]
                 }
               }
             }
           },
-          "400": {
-            "description": "Not saved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
           "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/loras/sources/huggingface-token/remove": {
-      "post": {
-        "tags": [
-          "LoRAs"
-        ],
-        "summary": "Remove the saved Hugging Face token",
-        "responses": {
-          "200": {
-            "description": "Which sources are on and whether a key is saved. The key itself is never returned.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "huggingface": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "token_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "token_saved"
-                      ]
-                    },
-                    "civitai": {
-                      "type": "object",
-                      "properties": {
-                        "on": {
-                          "type": "boolean"
-                        },
-                        "key_saved": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "on",
-                        "key_saved"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "huggingface",
-                    "civitai"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Not saved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Admins only",
+            "description": "The paired key is missing or wrong",
             "content": {
               "application/json": {
                 "schema": {

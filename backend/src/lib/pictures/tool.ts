@@ -10,7 +10,7 @@ import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract
 import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter } from "./adapters";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { isAdultPictureStyle } from "@/lib/pictures/lock";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
 import { startPictureJob, plainFailure } from "./jobs";

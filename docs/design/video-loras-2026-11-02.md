@@ -269,6 +269,8 @@ One record kind, `media` says what it is for (`video` now, `picture` when VIDEO-
 
 ### 4.2 Where each part lives (one definition, one store)
 
+> Superseded by [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md).
+
 - Stack: the file bytes (`data/video/loras/lora-<16 hex>.safetensors`), the facts read from them, a mirror of `classification` that Home writes (the second lock, `lora_not_allowed`).
 - Home: the `Lora` records (new table `loras`, replacing `video_adapter_prefs`), availability, add-ins, previews, the unmark rows `adult_marks` and `adult_mark_log`, and the Civitai or Hugging Face token (4.4).
 - Migration: every existing Stack video LoRA gets a Home record with `availability.who = admins` (the owner's new rule; a LoRA that was on for chat yesterday is admin-only today) and `audience` from the Stack's `classification`. `needs_confirmation` rows keep their pending state until an admin opens them.
@@ -278,6 +280,8 @@ One record kind, `media` says what it is for (`video` now, `picture` when VIDEO-
 Remove moves the file to the Stack's `data/video/loras/.trash/` for 30 days and sets `removed_at`; the Settings row "Recently removed" restores it (one tap, no passcode for an all-ages LoRA, behind the lock for an adult-only one). After 30 days the file is deleted and the record is dropped. A clip made with a removed LoRA keeps the LoRA's name and hash in its record; Another take says "That style was removed" and runs without it.
 
 ### 4.4 The source token
+
+> Superseded by [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md).
 
 A Civitai personal API key (and a Hugging Face token for gated Lightricks files) is stored in Home through `lib/secrets` (AES-256-GCM, key in `data/keys`), per CREDENTIALS.md; admin only; never shown after saving (replaceable, removable); sent to the Stack in the body of one install job and never stored there, never logged, never put in a URL (the Bearer header only, and stripped on a cross-host redirect, as legacy did). It is used only for the host it belongs to.
 
@@ -289,6 +293,8 @@ Settings, Home settings, Pictures and videos, **Styles** (a settings area declar
 
 ### 5.2 Browsing (outbound, admin-initiated)
 
+> Superseded by [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md).
+
 All outbound traffic of the browser goes through one module, `lib/loras/source.ts`, with one limiter per host (THIRD-PARTY-SERVICES: a person's pace, only what the admin asked for, back off on the first signal, honest client headers, cache like a client):
 
 - Hugging Face: `GET /api/models?filter=lora&search=...` and `?blobs=true` for size and LFS sha256. Always sends the token when one is saved.
@@ -298,6 +304,8 @@ All outbound traffic of the browser goes through one module, `lib/loras/source.t
 - Privacy: the hub (not a person's browser) makes these requests, so the family's browsers never contact a LoRA site and see no remote images (previews are fetched once by the hub and served from `/api/...`). The request carries a search string typed by an admin and a token the admin saved; nothing about the household, the people or the prompts.
 
 ### 5.3 Install: an admin-initiated download job through the Stack
+
+> Step 1 is superseded by [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md).
 
 1. The admin picks a result and sees one confirm panel: name, source link, size, base model (and what the source says), licence (the card text, the commercial-use list), and the audience question, **"Adults only?"**, pre-set to Yes when the source says adult (Civitai `nsfw`, Hugging Face `not-for-all-audiences`) and also Yes when unknown. Choosing All ages is an explicit click; the source can never set it.
 2. Install calls `POST /stack/v1/video/loras/install { source, url, sha256_expected?, token?, audience, added_by }` (VIDEO-LORA-06). The Stack runs a `video.lora.install` job: only an allow-listed host (`huggingface.co` and its CDN, `civitai.com` and its download host), HTTPS, `Range` resume into a `.part` file, rename on completion, a 4 GB cap (the Max-sized community files reach 2.6 GB), safetensors header read before acceptance, the sha256 computed on receipt and compared with the source's published hash when it has one, base detection from tensors and the source's field (a conflict is refused with `wrong_base_model`), `lora_refused` and likeness checks as built, a duplicate by hash answers the existing record. A pickle or any non-safetensors file is refused; there is no converter.
@@ -505,6 +513,8 @@ Owner rulings (chat, 2026-11-02): the LoRA browser threw away what the Loki Doki
 
 ### 15.1 The three states (the `adult_check`)
 
+> Superseded by [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md).
+
 `adult_check` records what the source said, once, at browse or install time. It is evidence, never an access decision. The access decision stays the existing `audience` (`all-ages` or `adult-only`, default `adult-only`, `audience_set_by` for an explicit choice).
 
 | State | Meaning | Treated as |
@@ -533,6 +543,8 @@ The check runs on the version the install will fetch (the version's previews), n
 **In the browse results** (the one place hits are drawn before an install): an `adult` or `unknown` hit is a locked entry only, drawn by the kit as the one lock tile per list (3.8), with no title, creator, thumbnail, counts or reason line. Without an unlock proof the hub requests Civitai with `nsfw=false`, still classifies every returned model, and collapses the locked ones into the single tile (shown only when at least one exists, with no number; its place does not reveal a rank). With a proof and the **Show adult results** switch (off at each visit, the only thing that sends `nsfw=true`, 5.2) the full hit arrives. The hub fetches a hit's preview only for a hit it may show, and serves it from `/api/...` with the proof; without one the answer is 404 like a missing file. The 5-minute cache holds classified hits in hub memory only; redaction happens when a response is built, so a cache entry never leaks across a lock. Loki Doki blurred adult thumbnails (`LoraManager.tsx` 236 and 450, `blur-xl`); a blurred picture still leaks and is not kept.
 
 ### 15.2 Spec impact (spec first, then Home)
+
+> Superseded by [stack-owns-loras-2026-11-25.md](../plans/stack-owns-loras-2026-11-25.md).
 
 The `Lora` record in commons `spec` gets one additive optional field, **`adult_check`**: `{ state: "normal" | "unknown" | "adult", basis: "source_flag" | "source_levels" | "source_tag" | "none", flag: boolean | null, levels_seen: integer, adult_levels: integer, checked_at: date-time }`. Absent reads as `{ state: "unknown", basis: "none" }`, so every existing record validates unchanged. `audience` stays two-valued: `unknown` is a check state, not an audience, so Stack's `classification` mirror and every existing reader are untouched (one definition, one store). `validateLora` already requires `audience_set_by` for every `all-ages` record; 02b extends that one rule to require `audience_set_at` as well, and rewords the `audience` description (the admin's Install click is the explicit choice when the check says `normal`). The Stack is never sent a full `Lora` record carrying `adult_check` while pinned to an older spec. Whether an unlock proof backed a lowering is checked by the Home writer, since the record holds no proofs. The browse hit itself is a Home-internal shape in `lib/loras/source.ts`, not a spec record. Order: commons spec change and tag, then `bash scripts/pin.sh commons spec-vX.Y.Z` in Home.
 

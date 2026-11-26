@@ -4,8 +4,7 @@
 // person may use right now, so the model never gets an id it must not use, and `allVideoAdapters` (no filtering) is for internal lookups of a LoRA's own
 // facts (never a route's answer).
 import { loraAccess, loraUsable, type LoraSurface } from "@/lib/loras/access";
-import { deleteLoraRecord, listLoraRecords, type Lora } from "@/lib/loras/store";
-import { dropLoraSyncCache, syncLoras } from "@/lib/loras/sync";
+import { dropLoraSnapshot, listLoraRecords, refreshLoras, type Lora } from "@/lib/loras/stackLibrary";
 import { videosAllowed, type VideoAudience } from "./policy";
 import type { StackVideoLora } from "./stack";
 
@@ -18,8 +17,8 @@ export interface VideoAdapter extends StackVideoLora {
   lora: Lora;
 }
 
-export function __resetVideoAdapterCacheForTests(): void { dropLoraSyncCache(); }
-export function dropVideoAdapterCache(): void { dropLoraSyncCache(); }
+export function __resetVideoAdapterCacheForTests(): void { dropLoraSnapshot(); }
+export function dropVideoAdapterCache(): void { dropLoraSnapshot(); }
 
 export function adapterOfLora(lora: Lora): VideoAdapter {
   return {
@@ -31,7 +30,7 @@ export function adapterOfLora(lora: Lora): VideoAdapter {
 
 /** Every live video LoRA in the library, with no access filtering. Internal lookups only (a LoRA's own audience, hash, strength); a route never returns this. */
 export async function allVideoAdapters(): Promise<VideoAdapter[]> {
-  await syncLoras();
+  await refreshLoras();
   return listLoraRecords().filter((l) => l.media === "video" && l.removed_at === null).sort((a, b) => a.added_at.localeCompare(b.added_at) || a.id.localeCompare(b.id)).map(adapterOfLora);
 }
 
@@ -48,7 +47,7 @@ export function loraSurfaceOf(audience: VideoAudience): LoraSurface {
  */
 export async function videoAdaptersFor(audience: VideoAudience, opts: { includeLocked?: boolean } = {}): Promise<VideoAdapter[]> {
   if (!videosAllowed(audience)) return [];
-  await syncLoras();
+  await refreshLoras();
   const surface = loraSurfaceOf(audience);
   const wanted: Array<"open" | "locked"> = opts.includeLocked ? ["open", "locked"] : ["open"];
   return listLoraRecords()
@@ -56,10 +55,9 @@ export async function videoAdaptersFor(audience: VideoAudience, opts: { includeL
     .sort((a, b) => a.added_at.localeCompare(b.added_at) || a.id.localeCompare(b.id)).map(adapterOfLora);
 }
 
-/** A style leaves the household library with its file (the Models and storage uninstall): its record goes too. */
-export function forgetVideoAdapter(id: string): void {
-  deleteLoraRecord(id);
-  dropLoraSyncCache();
+/** A style leaves the library with its file (the Models and storage uninstall): the Stack holds the record and removes it with the file, so Home only forgets what it read. */
+export function forgetVideoAdapter(_id: string): void {
+  dropLoraSnapshot();
 }
 
 function norm(text: string): string {

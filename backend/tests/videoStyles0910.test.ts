@@ -19,7 +19,7 @@ import { household, unlock, unlockHeader } from "./fixtures/adultLock";
 import { putLora, secretLora } from "./fixtures/lora";
 import { editVideoArgs } from "@/lib/videos/editTool";
 import type { StackVideoLora } from "@/lib/videos/stack";
-import type { Lora } from "@/lib/loras/store";
+import type { Lora } from "@/lib/loras/stackLibrary";
 import type { PersonRow } from "@/types";
 
 setDefaultTimeout(30_000);

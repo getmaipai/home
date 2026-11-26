@@ -13,7 +13,7 @@ import { SPELLING_PHASE } from "@/lib/pictures/jobStore";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor } from "@/lib/pictures/adapters";
 import { buildPromptPlan } from "@/lib/loras/promptPlan";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { allowedQuality, jobTier, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseQuality, detailedReady, isPictureQuality, plainPrompt, REMOVED_MODEL_LINE } from "@/lib/pictures/quality";

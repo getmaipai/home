@@ -42,7 +42,6 @@ import { runMaintenance, repairWronglyArchivedDurables, drainPendingEmbeddings }
 import { embedPendingEpisodes } from "@/lib/episodes";
 import { roleHealth } from "@/lib/roleHealth";
 import { pollActiveStackImageJobs } from "@/lib/jobProducers";
-import { reconcileLoraInstalls } from "@/lib/loras/install";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { makeMissingWhisperSamples } from "@/lib/whisperSample";
 import { runRetention } from "@/lib/conversationHistory";
@@ -441,8 +440,8 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "stack.image_jobs": async () => {
     const polled = await pollActiveStackImageJobs();
-    const reconciled = await reconcileLoraInstalls();
-    return polled === 0 && reconciled === 0 ? IDLE : undefined;
+    // Style installs are Stack jobs now (STACK-LORAS-01): Home reconciles none of them.
+    return polled === 0 ? IDLE : undefined;
   },
   // WHISPER-01: every household voice gets its whisper sample as soon as the recorded engine is installed, so nobody waits for the first whisper.
   "voice.whisper_samples": async () => {

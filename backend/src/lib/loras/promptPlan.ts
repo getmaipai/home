@@ -3,7 +3,7 @@
 // input is the person's words, the chosen style records and the engine's report, the output is the final prompt, the negative text (only for an engine that
 // reports NAG), the strengths and what was added, or one plain line saying why the styles cannot be applied. A style that cannot be applied fails the job
 // with that line; it is never dropped silently (design 5.5).
-import type { Lora } from "@/lib/loras/store";
+import type { Lora } from "@/lib/loras/stackLibrary";
 
 /** What the person sees: Less, Normal or More (design 6.1.7). */
 export type StyleStrength = "less" | "normal" | "more";

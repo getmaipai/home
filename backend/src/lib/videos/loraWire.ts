@@ -2,7 +2,7 @@
 // records; the Stack names a file by id. Sending is behind the Stack's own report: LTX-2.5 (Standard, Boost, Max) takes a LoRA only when
 // `qualities.ltx25.loras.supported` (or `ltx25max` for Max) is true, which lands with VIDEO-LORA-05. Until then nothing is sent to it and a clip that asked for
 // one fails with a plain line before anything starts; it is never dropped silently (note 5.5). Quick (Wan) sends `{ id, strength }` as reported by its engine.
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord, refreshLoras } from "@/lib/loras/stackLibrary";
 import { LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
 import { videoEngineStatus } from "./ready";
 import type { StackVideoStatus } from "./stack";
@@ -24,6 +24,7 @@ export async function wireLoras(loras: ReadonlyArray<{ id: string; strength: num
   if (!loras || loras.length === 0) return { ok: true, loras: loras ? [] : undefined };
   const ltx25 = model === LTX25_MODEL || model === LTX25_MAX_MODEL;
   if (ltx25 && !ltx25LorasSupported(await videoEngineStatus(), model!)) return { ok: false, line: LORAS_UNSUPPORTED_LINE };
+  await refreshLoras();
   const wired: WiredLora[] = [];
   for (const l of loras) {
     const record = getLoraRecord(l.id);

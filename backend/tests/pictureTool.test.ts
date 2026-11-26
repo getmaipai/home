@@ -16,7 +16,8 @@ import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversati
 import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { db } from "@/db";
-import { getLoraRecord, saveLora } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
+import { patchLoraOnStack } from "@/lib/loras/stackAdmin";
 import { adaptersFor } from "@/lib/pictures/adapters";
 import { attachments, people as peopleTable } from "@/db/schema";
 import { cancelPictureJob, getPictureJob, startPictureJob, __setPicturePollMsForTests, __setPictureTurnWaitForTests, PICTURE_FAILED_PREFIX } from "@/lib/pictures/jobs";
@@ -223,8 +224,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
 
   test("a style the person named is matched in the library, with its trigger word added by Home", async () => {
     await adaptersFor(["all-ages"]);
-    const record = getLoraRecord("lora-aaaaaaaaaaaaaaaa")!;
-    saveLora({ ...record, positive_addins: ["soft pastel shading"] }, people.owner.id);
+    await patchLoraOnStack(people.owner, "lora-aaaaaaaaaaaaaaaa", { positive_addins: ["soft pastel shading"] });
     const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a castle on a hill", style: "my pixel style" }) };
     await withStub(script(call), async () => {
       await streamValue(people.owner, "a castle on a hill in my pixel style");

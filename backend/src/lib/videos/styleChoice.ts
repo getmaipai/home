@@ -5,7 +5,7 @@
 import { unlockedFor } from "@/lib/adultLock";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { isUnofferedOldBase, loraAccess } from "@/lib/loras/access";
-import { listLoraRecords } from "@/lib/loras/store";
+import { listLoraRecords } from "@/lib/loras/stackLibrary";
 import { matchVideoAdapter, loraSurfaceOf, videoAdaptersFor, type VideoAdapter } from "./adapters";
 import type { VideoAudience } from "./policy";
 import { MAX_STYLES, STYLE_STRENGTHS, type StyleStrength } from "@/lib/loras/promptPlan";

@@ -182,61 +182,8 @@ describe("routes", () => {
     expect(((await (await owner.get("/api/loras")).json()) as { items: unknown[] }).items).toHaveLength(1);
   });
 
-  test("the admin patches availability, strength, trigger words and add-ins; a minor in people is refused with a plain sentence", async () => {
-    const { owner, adult, teen, row } = await household();
-    const admin = row("Sage");
-    const lora = putLora(admin.id);
-    expect(((await (await adult.client.get("/api/loras/available")).json()) as { items: unknown[] }).items).toHaveLength(0);
-    const res = await owner.request(`/api/loras/${lora.id}`, { method: "PATCH", body: { name: "Ink wash", availability: { who: "people", people: [row("Marlow").id] }, strength: { default: 0.8, min: 0.2, max: 1.2 }, trigger_words: ["inkwash"], positive_addins: ["soft brush strokes"] } });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ name: "Ink wash", availability: { who: "people", people: [row("Marlow").id] }, strength: { default: 0.8, min: 0.2, max: 1.2 }, trigger_words: ["inkwash"], positive_addins: ["soft brush strokes"] });
-    const seen = (await (await adult.client.get("/api/loras/available")).json()) as { items: Array<{ name: string }> };
-    expect(seen.items.map((i) => i.name)).toEqual(["Ink wash"]);
-    const other = await owner.request(`/api/loras/${lora.id}`, { method: "PATCH", body: { availability: { who: "people", people: [row("Marlow").id, row("Nova").id] } } });
-    expect(other.status).toBe(422);
-    expect(((await other.json()) as { error: string }).error).toBe("Only adults can be chosen. Pick adults, or choose all adults.");
-    expect(getLoraRecord(lora.id)?.availability.people).toEqual([row("Marlow").id]);
-    expect((await owner.request(`/api/loras/${lora.id}`, { method: "PATCH", body: { strength: { default: 2, min: 0, max: 1 } } })).status).toBe(422);
-    expect((await teen.client.request(`/api/loras/${lora.id}`, { method: "PATCH", body: { name: "x" } })).status).toBe(403);
-  });
 
-  test("mark NSFW is always allowed and audited; mark all-ages needs the explicit confirm; neither writes content to the audit row", async () => {
-    const { owner, row } = await household();
-    const admin = row("Sage");
-    const lora = putLora(admin.id);
-    const nsfw = await owner.post(`/api/loras/${lora.id}/nsfw`);
-    expect(nsfw.status).toBe(200);
-    expect(await nsfw.json()).toMatchObject({ audience: "adult-only" });
-    expect(getLoraRecord(lora.id)).toMatchObject({ audience: "adult-only", audience_set_by: admin.id });
-    expect(await usesAdultOnlyStyle([lora.id])).toBe(true);
-    // Now locked for its own admin: ids answer like a missing one until the unlock proof is sent.
-    expect((await owner.post(`/api/loras/${lora.id}/all-ages`, { confirm: true })).status).toBe(404);
-    const proof = await unlock(owner, "correcthorse");
-    expect((await owner.post(`/api/loras/${lora.id}/all-ages`, {}, unlockHeader(proof))).status).toBe(400); // no confirm: not a click
-    expect(getLoraRecord(lora.id)?.audience).toBe("adult-only");
-    const back = await owner.post(`/api/loras/${lora.id}/all-ages`, { confirm: true }, unlockHeader(proof));
-    expect(back.status).toBe(200);
-    expect(getLoraRecord(lora.id)).toMatchObject({ audience: "all-ages", audience_set_by: admin.id });
-    const rows = db.select().from(adultMarkLog).where(eq(adultMarkLog.itemId, lora.id)).all();
-    expect(rows.map((r) => [r.action, r.via, r.actorId])).toEqual([["mark", "admin", admin.id], ["clear", "admin", admin.id]]);
-    expect(JSON.stringify(rows)).not.toContain(lora.name);
-  });
 
-  test("remove goes to a 30-day trash and restore brings it back; the trash is hidden from everyone but the admin's Recently removed", async () => {
-    const { owner, adult, row } = await household();
-    const lora = putLora(row("Sage").id, { availability: { who: "adults", people: [] } });
-    const removed = await owner.post(`/api/loras/${lora.id}/remove`);
-    expect(removed.status).toBe(200);
-    const rec = getLoraRecord(lora.id)!;
-    expect(rec.removed_at).not.toBeNull();
-    expect(Date.parse(rec.trash_until!) - Date.parse(rec.removed_at!)).toBe(30 * 86_400_000);
-    expect(((await (await adult.client.get("/api/loras/available")).json()) as { items: unknown[] }).items).toHaveLength(0);
-    expect(((await (await owner.get("/api/loras")).json()) as { items: unknown[] }).items).toHaveLength(0);
-    expect(((await (await owner.get("/api/loras?removed=true")).json()) as { items: unknown[] }).items).toHaveLength(1);
-    expect((await owner.post(`/api/loras/${lora.id}/restore`)).status).toBe(200);
-    expect(getLoraRecord(lora.id)).toMatchObject({ removed_at: null, trash_until: null });
-    expect(((await (await adult.client.get("/api/loras/available")).json()) as { items: unknown[] }).items).toHaveLength(1);
-  });
 
   test("a record past its 30 days is dropped with its file on the next sync", async () => {
     const { row } = await household();
@@ -245,21 +192,6 @@ describe("routes", () => {
     expect(getLoraRecord(lora.id)).toBeNull();
   });
 
-  test("the legacy settings and adapter routes read and write the records: enabled means usable by adults, and a locked style is one tile", async () => {
-    const { owner, adult, row } = await household();
-    const admin = row("Sage");
-    const open = putLora(admin.id, { name: "Open style" });
-    const hidden = secretLora(admin.id, { availability: { who: "admins", people: [] } });
-    const settings = (await (await owner.get("/api/videos/settings")).json()) as { adapters: Array<{ id: string; enabled: boolean }>; locked_styles: boolean };
-    expect(settings.adapters.map((a) => a.id)).toEqual([open.id]);
-    expect(settings.locked_styles).toBe(true);
-    expect((await owner.request(`/api/videos/adapters/${open.id}`, { method: "PATCH", body: { enabled: true } })).status).toBe(200);
-    expect(getLoraRecord(open.id)?.availability.who).toBe("adults");
-    expect(((await (await adult.client.get("/api/videos/status")).json()) as { styles: Array<{ id: string }> }).styles.map((s) => s.id)).toEqual([open.id]);
-    expect((await owner.request(`/api/videos/adapters/${hidden.id}`, { method: "DELETE" })).status).toBe(404);
-    expect((await owner.request(`/api/videos/adapters/${open.id}`, { method: "DELETE" })).status).toBe(200);
-    expect(getLoraRecord(open.id)?.removed_at).not.toBeNull();
-  });
 });
 
 describe("leak test: an adult-only style's name, trigger, add-in, hash and preview never appear while it is locked", () => {

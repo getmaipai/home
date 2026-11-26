@@ -19,7 +19,7 @@ import { laneOf } from "@/lib/pictures/lane";
 import { isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { videoJobLockState } from "./lock";
 import { readVideoFile, type VideoJob } from "./jobs";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord, refreshLoras } from "@/lib/loras/stackLibrary";
 import { videoRefusalFor, type VideoCallRefusal } from "./tool";
 import type { VideoAudience } from "./policy";
 import type { EditFile } from "./stackEdit";
@@ -74,7 +74,7 @@ export function clipMarkNow(job: VideoJob): MarkSource | null {
 export async function clipMarkOf(job: VideoJob): Promise<MarkSource> {
   const now = clipMarkNow(job);
   if (now) return now;
-  if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => getLoraRecord(id)?.audience)) return { madeAudience: "adult-only", lock: "off" };
+  if (job.request.adultOnly === undefined && await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => { await refreshLoras(); return getLoraRecord(id)?.audience; })) return { madeAudience: "adult-only", lock: "off" };
   return { madeAudience: "all-ages", lock: "off" };
 }
 

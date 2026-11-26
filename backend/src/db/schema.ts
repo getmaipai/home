@@ -2147,6 +2147,16 @@ export const adultMarkLog = sqliteTable(
   (table) => [index("adult_mark_log_item_idx").on(table.itemId, table.at), index("adult_mark_log_actor_idx").on(table.actorId, table.at)],
 );
 
+// STACK-LORAS-01 (docs/plans/stack-owns-loras-2026-11-25.md, Open item 1): the named adults who may use one style (`availability.people`), keyed by the Stack's
+// LoRA id. The Stack holds the library and `availability.who`; who is NAMED stays in Home (people are Home's), like `adult_mark_log`. No style data here.
+export const loraPeople = sqliteTable("lora_people", {
+  loraId: text("lora_id").primaryKey(),
+  people: text("people").notNull(), // JSON array of adult person ids
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+  provenance: text("provenance").notNull(),
+});
+
 // VIDEO-GEN-04: the household's switch on one video LoRA in the Stack's library. LEGACY since VIDEO-LORA-03: the `loras` table is the one store now;
 // lib/loras/sync.ts reads these rows once, turns each into a `Lora` record and deletes it. Nothing writes here any more.
 export const videoAdapterPrefs = sqliteTable("video_adapter_prefs", {

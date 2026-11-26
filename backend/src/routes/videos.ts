@@ -28,9 +28,8 @@ import { videoEngineStatus, videoStatusReady, videoNotReadyReason, videoMaxNotRe
 import { animatedCopyOf, animatedFileName, hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, StackVideoError } from "@/lib/videos/stack";
 import { loraAccess, readLora, readLoras } from "@/lib/loras/access";
-import { confirmLora, markAdultOnly, markAllAges, patchLora, removeLora } from "@/lib/loras/admin";
-import { LoraWriteError, getLoraRecord, saveLora, type Lora } from "@/lib/loras/store";
-import { recordFromStack, syncLoras } from "@/lib/loras/sync";
+import { lowerToAllAges, markAdultOnly, patchLoraOnStack, removeLora } from "@/lib/loras/stackAdmin";
+import { getLoraRecord, LorasStackError, refreshLoras, type Lora } from "@/lib/loras/stackLibrary";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { anotherTakeFor, makeVideoFor } from "@/lib/videos/make";
@@ -692,7 +691,7 @@ videosRoutes.openapi(settingsRoute, async (c) => {
   const engine = await videoEngineStatus();
   // VIDEO-LORA-03: the library as this admin may read it now (lib/loras/access.ts): adult-only styles are one locked tile until their own unlock proof is valid.
   let list: ReturnType<typeof readLoras> = { items: [], locked: false };
-  try { await syncLoras(); list = readLoras(c.get("person"), "own_written"); } catch { list = { items: [], locked: false }; }
+  try { await refreshLoras(); list = readLoras(c.get("person"), "own_written"); } catch { list = { items: [], locked: false }; }
   const adapters = list.items.map(adapterOfLora);
   return c.json({
     state: engine?.state ?? "unavailable", available: engine?.available === true, reason: engine?.reason ?? (engine ? null : "Videos are not ready yet. Try again in a few minutes."), tier: engine?.tier ?? null,
@@ -713,27 +712,24 @@ const NOT_IN_LIBRARY_LINE = "That style isn't in the library.";
 const adapterWire = (a: ReturnType<typeof adapterOfLora>) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at });
 const patchAdapterRoute = createRoute({
   method: "patch", path: "/adapters/{id}", tags: ["Videos"], summary: "Mark a video LoRA usable by adults (or admins only), change its class or name (kept for the Settings page; see /api/loras)", middleware: [requireAuth, requireRole("owner", "admin")] as const,
-  request: { params: adapterIdParams, body: { content: { "application/json": { schema: z.object({ enabled: z.boolean().optional(), classification: z.enum(["all-ages", "adult-only"]).optional(), name: z.string().trim().min(1).max(80).optional() }) } } } },
+  request: { params: adapterIdParams, body: { content: { "application/json": { schema: z.object({ enabled: z.boolean().optional(), classification: z.enum(["all-ages", "adult-only"]).optional(), name: z.string().trim().min(1).max(80).optional(), ticket: z.string().max(200).optional() }) } } } },
   responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Updated." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such LoRA", 422: "A value is out of range" }) },
 });
 videosRoutes.openapi(patchAdapterRoute, async (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
-  await syncLoras();
+  await refreshLoras();
   // A style the admin cannot read (missing, or locked behind the Adult lock) answers like a missing one.
   const found = readLora(actor, id, "own_written");
   if (!found || found.state !== "open") return c.json({ error: NOT_IN_LIBRARY_LINE }, 404) as never;
   try {
-    if (body.name) patchLora(actor, id, { name: body.name });
+    if (body.name) await patchLoraOnStack(actor, id, { name: body.name });
     if (body.classification === "adult-only") await markAdultOnly(actor, id);
-    if (body.classification === "all-ages") await markAllAges(actor, id);
-    if (typeof body.enabled === "boolean") {
-      if (body.enabled) confirmLora(actor, id);
-      patchLora(actor, id, { availability: { who: body.enabled ? "adults" : "admins" } });
-    }
+    if (body.classification === "all-ages") await lowerToAllAges(actor, id, sessionKeyOf(getCookie(c, "session")), body.ticket);
+    if (typeof body.enabled === "boolean") await patchLoraOnStack(actor, id, { availability: { who: body.enabled ? "adults" : "admins" } });
   } catch (error) {
-    if (error instanceof LoraWriteError) return c.json({ error: error.message }, 422) as never;
+    if (error instanceof LorasStackError) return c.json({ error: error.message, code: error.code }, ([403, 404, 409, 422].includes(error.status) ? error.status : 503) as 403 | 404 | 409 | 422 | 503) as never;
     throw error;
   }
   const after = getLoraRecord(id);
@@ -748,10 +744,13 @@ const deleteAdapterRoute = createRoute({
 videosRoutes.openapi(deleteAdapterRoute, async (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
-  await syncLoras();
+  await refreshLoras();
   const found = readLora(actor, id, "own_written");
   if (!found || found.state !== "open") return c.json({ error: NOT_IN_LIBRARY_LINE }, 404) as never;
-  removeLora(actor, id);
+  try { await removeLora(actor, id); } catch (error) {
+    if (error instanceof LorasStackError) return c.json({ error: error.message, code: error.code }, ([403, 404, 409, 422].includes(error.status) ? error.status : 503) as 403 | 404 | 409 | 422 | 503) as never;
+    throw error;
+  }
   return c.json({ ok: true as const }, 200);
 });
 
@@ -779,12 +778,9 @@ videosRoutes.openapi(addAdapterRoute, async (c) => {
   out.set("added_by", "household");
   try {
     const lora = await addVideoLora(out);
-    // A new style is usable by admins only (the default of every record) and waits, unconfirmed, until an admin has read its fingerprint and licence.
-    const made = recordFromStack(lora, { enabled: false, updatedBy: "pending" }, adder.id);
-    if (made) {
-      try { saveLora({ ...made, added_by: adder.id, provenance: { origin: "file", job_id: null } }, adder.id); } catch { /* a record that cannot be saved stays unlisted and unusable: fail closed */ }
-    }
+    // The Stack holds the new style's record (usable by admins only, the default). Home reads it back; nothing is copied here.
     dropVideoAdapterCache();
+    await refreshLoras(true);
     const record = getLoraRecord(lora.id);
     // An adult-only style is not described to an admin whose unlock proof is not valid (the id stays, so the page can refresh its list): no name, words, hash or link.
     const shown = record && adultOnlyHidden(adder, record) ? { ...adapterWire(adapterOfLora(record)), name: LOCKED_STYLE_NAME, trigger_words: [], sha256: "", source_url: null } : null;

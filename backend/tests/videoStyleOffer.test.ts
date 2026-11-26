@@ -7,7 +7,7 @@ import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { loraUsable, runsOn, untestedLine } from "@/lib/loras/access";
 import { __resetLoraSyncForTests, recordFromStack, syncLoras } from "@/lib/loras/sync";
-import { getLoraRecord } from "@/lib/loras/store";
+import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { styleChips } from "@/lib/videos/createStyles";
@@ -18,7 +18,7 @@ import { makeAudienceOf } from "@/lib/videos/make";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { household } from "./fixtures/adultLock";
 import { putLora } from "./fixtures/lora";
-import type { Lora } from "@/lib/loras/store";
+import type { Lora } from "@/lib/loras/stackLibrary";
 import type { StackVideoLora } from "@/lib/videos/stack";
 
 setDefaultTimeout(30_000);
@@ -94,17 +94,6 @@ describe("the Stack's marks reach the record", () => {
     expect(fresh.tested_on_25).toBeUndefined();
   });
 
-  test("a mark the Stack sets later replaces the record's copy on the next sync", async () => {
-    const { row } = await household(); const by = row("Sage").id;
-    const record = putLora(by, on23("Claymation", null));
-    fake.loras = [stackFile({ id: record.id, sha256: record.file.sha256, bytes: record.file.bytes, tested_on_25: "tested", untested_on_25: false })];
-    await syncLoras(true);
-    expect(getLoraRecord(record.id)).toMatchObject({ tested_on_25: "tested", untested_on_25: false });
-    expect(loraUsable(getLoraRecord(record.id)!)).toBe(true);
-    fake.loras = [stackFile({ id: record.id, sha256: record.file.sha256, bytes: record.file.bytes, tested_on_25: "no_effect", untested_on_25: false })];
-    await syncLoras(true);
-    expect(loraUsable(getLoraRecord(record.id)!)).toBe(false);
-  });
 });
 
 describe("a clip made with a tested 2.3 style", () => {

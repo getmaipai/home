@@ -4,7 +4,7 @@
 // the lock changes, and this runs again with the proof). The words each card adds come from `buildPromptPlan`, the same function that builds the prompt.
 import { readLoras } from "@/lib/loras/access";
 import { loraUsable, runsOn } from "@/lib/loras/access";
-import type { Lora } from "@/lib/loras/store";
+import type { Lora } from "@/lib/loras/stackLibrary";
 import { MAX_NEEDS_ADMIN_LINE } from "@/lib/tiers";
 import { LTX25_MAX_MODEL, LTX25_MODEL } from "./quality";
 import { ltx25LorasSupported } from "./loraWire";

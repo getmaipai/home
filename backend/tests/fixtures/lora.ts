@@ -1,5 +1,6 @@
 // VIDEO-LORA-03: a valid `Lora` record for tests, with the unusual strings the leak tests look for.
-import { saveLora, type Lora } from "@/lib/loras/store";
+import { setLoraPeople, type Lora } from "@/lib/loras/stackLibrary";
+import { fakeLoraStack } from "../helpers/fakeLoraStack";
 
 export const SECRET_NAME = "Zebraquill Cabaret Lace";
 export const SECRET_TRIGGER = "zqlacewear";
@@ -27,9 +28,14 @@ export function loraRecord(by: string, over: Partial<Lora> = {}): Lora {
   return { ...base, ...over };
 }
 
-/** Save one into the store as `by`. */
+/** Put one into the fake Stack (the library lives there now) as `by`, and make Home's snapshot match. Named people go to Home's own table. */
 export function putLora(by: string, over: Partial<Lora> = {}): Lora {
-  return saveLora(loraRecord(by, over), by);
+  const lora = loraRecord(by, over);
+  const fake = fakeLoraStack();
+  fake.put(lora);
+  if (lora.availability.who === "people") setLoraPeople(lora.id, lora.availability.people, by);
+  fake.sync();
+  return lora;
 }
 
 /** An adult-only record carrying the strings that must never appear while it is locked. */

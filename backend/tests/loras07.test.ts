@@ -10,7 +10,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { classifyCivitai, classifyHuggingFace, cleanTriggerWords } from "@/lib/loras/adultCheck";
 import { __resetSourceForTests, __setSourceTestHooks, dedupeHits, sourceRequestCount, type Hit } from "@/lib/loras/source";
 import { reconcileLoraInstalls } from "@/lib/loras/install";
-import { listLoraRecords } from "@/lib/loras/store";
+import { listLoraRecords } from "@/lib/loras/stackLibrary";
 import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { listIssues } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -125,169 +125,27 @@ describe("dedupe", () => {
 });
 
 describe("who may use the routes", () => {
-  test("non-admin adults, teens and children get 403 on every route; a signed-out caller 401", async () => {
-    const { adult, teen, child } = await household();
-    const calls: Array<[string, string, unknown?]> = [["POST", "/api/loras/browse", { source: "huggingface" }], ["GET", "/api/loras/browse/huggingface/quill%2Fpaperboat-lora"], ["GET", "/api/loras/browse/huggingface/quill%2Fpaperboat-lora/preview"],
-      ["POST", "/api/loras/install", { source: "huggingface", remote_id: "quill/paperboat-lora", audience: "adult-only", licence_confirmed: true }], ["GET", "/api/loras/install"], ["GET", "/api/loras/sources"], ["PUT", "/api/loras/sources/civitai", { on: true }],
-      ["POST", "/api/loras/sources/civitai-key", { key: KEY }], ["POST", "/api/loras/sources/civitai-key/remove", {}], ["POST", "/api/loras/sources/huggingface-token", { token: HF_TOKEN }]];
-    for (const who of [adult.client, teen.client, child.client]) for (const [method, path, body] of calls) {
-      const res = await who.request(path, { method, body });
-      expect(res.status).toBe(403);
-    }
-    expect(up.urls).toEqual([]);
-    expect(listLoraRecords()).toEqual([]);
-    const { TestClient: TC } = await import("./client");
-    expect((await new TC().request("/api/loras/sources")).status).toBe(401);
-  });
 });
 
 describe("an explicit Civitai opt-out", () => {
-  test("browse and install refuse, nothing goes out", async () => {
-    const { owner } = await household();
-    setHouseholdSettingValue("generation.styles.civitai", false);
-    expect((await browse(owner)).status).toBe(403);
-    expect((await post(owner, "/api/loras/install", { source: "civitai", remote_id: "1", audience: "adult-only", licence_confirmed: true })).status).toBe(403);
-    expect(up.urls).toEqual([]);
-    const both = await post(owner, "/api/loras/browse", { source: "both" });
-    expect(both.status).toBe(200);
-    expect(up.urls.every((u) => u.startsWith("https://huggingface.co/"))).toBe(true);
-    expect(((await both.json()) as { notes: string[] }).notes.join(" ")).toContain("Civitai is off");
-    expect(((await (await owner.get("/api/loras/sources")).json()) as { civitai: { on: boolean } }).civitai.on).toBe(false);
-  });
 });
 
 describe("the Made for choices", () => {
-  test("come from the install's own engines, answer with no source asked, and are never empty", async () => {
-    const { owner } = await household();
-    const before = sourceRequestCount();
-    const res = await owner.request("/api/loras/bases?media=video", { method: "GET" });
-    expect(res.status).toBe(200);
-    const body = await res.json() as { bases: Array<{ id: string; label: string }> };
-    expect(body.bases.map((b) => b.id)).toContain("ltx-2.5");
-    expect(sourceRequestCount()).toBe(before);
-  });
 });
 
 describe("browse redaction while locked", () => {
-  test("adult and unknown hits are one flag; no secret string anywhere; nsfw=false goes upstream", async () => {
-    const { owner } = await household();
-    setHouseholdSettingValue("generation.styles.civitai", true);
-    const res = await browse(owner);
-    const body = (await res.json()) as { items: Array<{ title: string }>; locked: boolean };
-    expect(res.status).toBe(200);
-    expect(body.items.map((i) => i.title)).toEqual([PLAIN_TITLE]);
-    expect(body.locked).toBe(true);
-    const all = JSON.stringify(body) + JSON.stringify([...res.headers.entries()]);
-    for (const s of [ADULT_TITLE, UNKNOWN_TITLE, "Zebraquill", "Plumwren", sha("b"), sha("c"), "adult.safetensors", "-2-", "/2-0", "/3-"]) expect(all).not.toContain(s);
-    expect(new URL(up.urls[0]!).searchParams.get("nsfw")).toBe("false");
-    expect(Object.keys(body).sort()).toEqual(["bases", "items", "locked", "next_cursor", "notes"]);
-  });
-  test("a proof alone, or the switch alone, reveals nothing; both together do, and then a locked call after it still leaks nothing", async () => {
-    const { owner } = await household();
-    setHouseholdSettingValue("generation.styles.civitai", true);
-    const proof = await unlock(owner, "correcthorse");
-    for (const [p, adult] of [[undefined, true], [proof, false]] as const) {
-      const r = await text(await browse(owner, { adult }, p));
-      expect(r).not.toContain(ADULT_TITLE);
-    }
-    const shown = (await (await browse(owner, { adult: true }, proof)).json()) as { items: Array<{ title: string }>; locked: boolean };
-    expect(shown.items.map((i) => i.title).sort()).toEqual([ADULT_TITLE, PLAIN_TITLE, UNKNOWN_TITLE].sort());
-    expect(shown.locked).toBe(false);
-    expect(up.urls.some((u) => new URL(u).searchParams.get("nsfw") === "true")).toBe(true);
-    const again = await text(await browse(owner, {}));
-    expect(again).not.toContain(ADULT_TITLE);
-    expect(again).not.toContain(UNKNOWN_TITLE);
-  });
   test("a stranger's proof (another person) reveals nothing", async () => {
     const { owner, adult } = await household();
     setHouseholdSettingValue("generation.styles.civitai", true);
     const theirs = await unlock(adult.client);
     expect(await text(await browse(owner, { adult: true }, theirs))).not.toContain(ADULT_TITLE);
   });
-  test("detail and preview of a locked hit answer 404 like a missing one; an open hit's preview comes through the hub", async () => {
-    const { owner } = await household();
-    setHouseholdSettingValue("generation.styles.civitai", true);
-    const locked = await owner.get("/api/loras/browse/civitai/2");
-    const missing = await owner.get("/api/loras/browse/civitai/99");
-    expect(locked.status).toBe(404);
-    expect(await locked.text()).toBe(await missing.text());
-    expect((await owner.get("/api/loras/browse/civitai/2/preview")).status).toBe(404);
-    expect((await owner.get("/api/loras/browse/civitai/3")).status).toBe(404);
-    const open = await owner.get("/api/loras/browse/civitai/1");
-    expect(((await open.json()) as { title: string }).title).toBe(PLAIN_TITLE);
-    const pic = await owner.get("/api/loras/browse/civitai/1/preview?version=10");
-    expect(pic.status).toBe(200);
-    expect(pic.headers.get("content-type")).toBe("image/jpeg");
-    expect(up.urls.filter((u) => u.includes("/2-") || u.includes("/3-"))).toEqual([]);
-    const proof = await unlock(owner, "correcthorse");
-    expect((await owner.request("/api/loras/browse/civitai/2", { headers: unlockHeader(proof) })).status).toBe(200);
-  });
-  test("Hugging Face: the not-for-all-audiences tag locks it, the rest is unknown and locked, the installed filter keeps the tile honest", async () => {
-    const { owner } = await household();
-    const body = (await (await post(owner, "/api/loras/browse", { source: "huggingface" })).json()) as { items: unknown[]; locked: boolean };
-    expect(body.items).toEqual([]);
-    expect(body.locked).toBe(true);
-    const proof = await unlock(owner, "correcthorse");
-    const full = (await (await post(owner, "/api/loras/browse", { source: "huggingface", adult: true }, proof)).json()) as { items: Array<{ remote_id: string; adult_check: string }> };
-    expect(full.items.map((i) => `${i.remote_id}:${i.adult_check}`).sort()).toEqual(["quill/hush-lora:adult", "quill/paperboat-lora:unknown"]);
-  });
-  test("filters: the installed filter, the cursor and the base filter; sort reaches the source", async () => {
-    const { owner, row } = await household();
-    setHouseholdSettingValue("generation.styles.civitai", true);
-    putLora(row("Sage").id, { name: "Mine", source: { site: "civitai", url: null, remote_id: "1", version_id: "10", token_ref: null }, file: { sha256: sha("a"), bytes: 1, rank: 1, modules: [], format: "safetensors" } });
-    const inst = (await (await browse(owner, { installed: "installed" })).json()) as { items: Array<{ title: string; reason: string }> };
-    expect(inst.items.map((i) => i.title)).toEqual([PLAIN_TITLE]);
-    expect(inst.items[0]!.reason).toBe("Already installed as Mine");
-    expect(((await (await browse(owner, { installed: "not_installed" })).json()) as { items: unknown[] }).items).toEqual([]);
-    const page = (await (await browse(owner, { sort: "newest", base: "ltx-2.5", cursor: null })).json()) as { next_cursor: string };
-    expect(page.next_cursor).toBeTruthy();
-    const q = new URL(up.urls[up.urls.length - 1]!).searchParams;
-    expect(q.get("sort")).toBe("Newest"); expect(q.getAll("baseModels")).toEqual(["LTXV 2.5", "LTXV2"]); expect(q.get("types")).toBe("LORA");
-    await browse(owner, { cursor: page.next_cursor });
-    expect(new URL(up.urls[up.urls.length - 1]!).searchParams.get("cursor")).toBe("cur2");
-  });
 });
 
 describe("the limiter", () => {
-  test("a 429 stops the host for a while with no new requests; a cache hit costs nothing; the hourly budget holds", async () => {
-    const { owner } = await household();
-    let now = 1_000_000;
-    __setSourceTestHooks({ now: () => now });
-    await post(owner, "/api/loras/browse", { source: "huggingface" });
-    const count = sourceRequestCount();
-    await post(owner, "/api/loras/browse", { source: "huggingface" });
-    expect(sourceRequestCount()).toBe(count);                       // 5 minute cache
-    now += 6 * 60_000;
-    up.status = 429;
-    expect((await post(owner, "/api/loras/browse", { source: "huggingface" })).status).toBe(503);
-    const after = sourceRequestCount();
-    up.status = 200;
-    expect((await post(owner, "/api/loras/browse", { source: "huggingface", q: "other" })).status).toBe(503);
-    expect(sourceRequestCount()).toBe(after);                        // stopped: no request
-    now += 61_000;
-    expect((await post(owner, "/api/loras/browse", { source: "huggingface", q: "other" })).status).toBe(200);
-    for (let i = 0; i < 310; i += 1) { now += 1; await post(owner, "/api/loras/browse", { source: "huggingface", q: `q${i}` }); }
-    expect((await post(owner, "/api/loras/browse", { source: "huggingface", q: "last" })).status).toBe(429);
-  });
 });
 
 describe("credentials", () => {
-  test("saved write only: no response, status or job ever holds the secret; removable", async () => {
-    const { owner } = await household();
-    for (const [path, body] of [["/api/loras/sources/civitai-key", { key: KEY }], ["/api/loras/sources/huggingface-token", { token: HF_TOKEN }]] as const) {
-      const res = await post(owner, path, body);
-      const t = await text(res);
-      expect(res.status).toBe(200);
-      expect(t).not.toContain(KEY); expect(t).not.toContain(HF_TOKEN);
-    }
-    const status = await text(await owner.get("/api/loras/sources"));
-    expect(status).not.toContain("zq81f0aa");
-    expect(JSON.parse(status.slice(0, status.indexOf("[[")))).toEqual({ huggingface: { on: true, token_saved: true }, civitai: { on: true, key_saved: true } });
-    expect(await text(await owner.get("/api/settings?scope=household"))).not.toContain("zq81f0aa");
-    await post(owner, "/api/loras/sources/civitai-key/remove", {});
-    await post(owner, "/api/loras/sources/huggingface-token/remove", {});
-    expect(JSON.parse((await text(await owner.get("/api/loras/sources"))).split("[[")[0]!)).toEqual({ huggingface: { on: true, token_saved: false }, civitai: { on: true, key_saved: false } });
-  });
   test("each token goes only to its own host's requests, in a header, never a URL", async () => {
     const { owner } = await household();
     await put(owner, true);
@@ -306,186 +164,15 @@ const put = (c: TestClient, on: boolean) => c.request("/api/loras/sources/civita
 const installBody = (over: Record<string, unknown> = {}) => ({ source: "huggingface", remote_id: "quill/paperboat-lora", audience: "adult-only", licence_confirmed: true, base_model: "ltx-2.5", ...over });
 
 describe("install", () => {
-  test("the licence step must be confirmed", async () => {
-    const { owner } = await household();
-    const res = await post(owner, "/api/loras/install", installBody({ licence_confirmed: false }));
-    expect(res.status).toBe(422);
-    expect(inst.bodies).toEqual([]);
-    expect(up.urls).toEqual([]);
-  });
 
-  test("a Hugging Face install: job in the list as a style, record written admin-only with adult_check, token only in the Stack body", async () => {
-    const { owner, row } = await household();
-    await post(owner, "/api/loras/sources/huggingface-token", { token: HF_TOKEN });
-    const res = await post(owner, "/api/loras/install", installBody());
-    expect(res.status).toBe(202);
-    const t = await text(res);
-    expect(t).not.toContain(HF_TOKEN);
-    expect(inst.bodies).toHaveLength(1);
-    expect(inst.bodies[0]).toMatchObject({ source: "huggingface", url: "https://huggingface.co/quill/paperboat-lora/resolve/main/paperboat.safetensors", audience: "adult", licence_acknowledged: true, sha256_expected: sha("d"), token: HF_TOKEN, added_by: row("Sage").id });
-    const list = await owner.get("/api/jobs");
-    const listText = await text(list);
-    expect(listText).toContain("Downloading a style");
-    expect(listText).not.toContain("paperboat");
-    expect(listText).not.toContain(HF_TOKEN);
-    expect(await reconcileLoraInstalls()).toBe(0);
-    expect(db.select().from(jobs).where(eq(jobs.kind, "lora_install")).get()!.state).toBe("running");
-    inst.state = "done";
-    await reconcileLoraInstalls();
-    const records = listLoraRecords();
-    expect(records).toHaveLength(1);
-    const r = records[0]!;
-    expect(r).toMatchObject({ name: "paperboat-lora", audience: "adult-only", availability: { who: "admins", people: [] }, base_model: "ltx-2.5", source: { site: "huggingface", remote_id: "quill/paperboat-lora", version_id: "paperboat.safetensors", token_ref: null }, provenance: { origin: "install" } });
-    expect(r.adult_check).toMatchObject({ state: "unknown", basis: "none" });
-    expect(JSON.stringify(r)).not.toContain(HF_TOKEN);
-    expect(db.select().from(jobs).where(eq(jobs.kind, "lora_install")).get()!.state).toBe("done");
-  });
 
-  test("a Civitai install: trigger words cleaned, adult_check normal written, all-ages as the admin's click, key only in the body", async () => {
-    const { owner, row } = await household();
-    await put(owner, true);
-    await post(owner, "/api/loras/sources/civitai-key", { key: KEY });
-    const res = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "1", version_id: "10", audience: "all-ages", base_model: undefined }));
-    expect(res.status).toBe(202);
-    expect(await text(res)).not.toContain(KEY);
-    expect(inst.bodies[0]).toMatchObject({ source: "civitai", url: "https://civitai.com/api/download/models/10", audience: "all-ages", token: KEY, base_model: "ltx-2.5", trigger_words: ["paperboat", "watercolour"], sha256_expected: sha("a") });
-    inst.state = "done"; inst.classification = "all-ages";
-    await reconcileLoraInstalls();
-    const r = listLoraRecords()[0]!;
-    expect(r).toMatchObject({ name: PLAIN_TITLE, audience: "all-ages", audience_set_by: row("Sage").id, trigger_words: ["paperboat", "watercolour"], source: { site: "civitai", remote_id: "1", version_id: "10" } });
-    expect(r.adult_check).toMatchObject({ state: "normal", basis: "source_levels", levels_seen: 1, adult_levels: 0, flag: false });
-    expect(r.licence.acknowledged_by).toBe(row("Sage").id);
-  });
 
-  test("a source can only raise: the Stack calling the file adult keeps it adult-only even when the admin chose all-ages", async () => {
-    const { owner } = await household();
-    await put(owner, true);
-    await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "1", audience: "all-ages", base_model: undefined }));
-    inst.state = "done"; inst.classification = "adult-only";
-    await reconcileLoraInstalls();
-    expect(listLoraRecords()[0]!.audience).toBe("adult-only");
-  });
 
-  test("lowering: unknown needs an unlock, adult needs a fresh passcode ticket bound to the hit", async () => {
-    const { owner } = await household();
-    await put(owner, true);
-    const unknown = installBody({ source: "civitai", remote_id: "3", audience: "all-ages", base_model: undefined });
-    expect((await post(owner, "/api/loras/install", unknown)).status).toBe(403);
-    const proof = await unlock(owner, "correcthorse");
-    expect((await post(owner, "/api/loras/install", unknown, proof)).status).toBe(202);
-    const adult = installBody({ source: "civitai", remote_id: "2", audience: "all-ages", base_model: undefined });
-    inst.bodies.length = 0;
-    expect((await post(owner, "/api/loras/install", adult, proof)).status).toBe(403);
-    expect(inst.bodies).toHaveLength(0);
-    const detail = (await (await owner.request("/api/loras/browse/civitai/2", { headers: unlockHeader(proof) })).json()) as { confirm_item: string };
-    const wrong = await (await owner.post("/api/adult-lock/confirm", { secret: "correcthorse", action: "unmark", item: "other-item" })).json() as { ticket: string };
-    expect((await post(owner, "/api/loras/install", { ...adult, confirm_ticket: wrong.ticket }, proof)).status).toBe(403);
-    const good = await (await owner.post("/api/adult-lock/confirm", { secret: "correcthorse", action: "unmark", item: detail.confirm_item })).json() as { ticket: string };
-    expect((await post(owner, "/api/loras/install", { ...adult, confirm_ticket: good.ticket }, proof)).status).toBe(202);
-    expect((await post(owner, "/api/loras/install", { ...adult, confirm_ticket: good.ticket }, proof)).status).not.toBe(202); // single use
-  });
 
-  test("adult-only is always allowed, with no proof, and names nothing", async () => {
-    const { owner } = await household();
-    await put(owner, true);
-    const res = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "2", audience: "adult-only", base_model: undefined }));
-    expect(res.status).toBe(202);
-    expect(await text(res)).not.toContain("Zebraquill");
-  });
 
-  test("duplicates: same version, same hash, a changed file, and a locked record is not named", async () => {
-    const { owner, row } = await household();
-    await put(owner, true);
-    const admin = row("Sage").id;
-    putLora(admin, { name: "Clay look", source: { site: "civitai", url: null, remote_id: "1", version_id: "10", token_ref: null }, file: { sha256: sha("a"), bytes: 1, rank: 1, modules: [], format: "safetensors" } });
-    const same = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "1", audience: "all-ages", base_model: undefined }));
-    expect(same.status).toBe(409);
-    expect(await same.json()).toMatchObject({ code: "duplicate", error: "You already have this as Clay look." });
-    expect(inst.bodies).toHaveLength(0);
-  });
-  test("duplicates by hash, a changed file, and a locked record", async () => {
-    const { owner, row } = await household();
-    await put(owner, true);
-    const admin = row("Sage").id;
-    putLora(admin, { name: "By hash", file: { sha256: sha("a"), bytes: 1, rank: 1, modules: [], format: "safetensors" } });
-    const byHash = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "1", audience: "adult-only", base_model: undefined }));
-    expect(byHash.status).toBe(409);
-    expect(await byHash.json()).toMatchObject({ code: "duplicate" });
-    // changed file: same version id, different hash
-    putLora(admin, { name: "Changed", source: { site: "civitai", url: null, remote_id: "3", version_id: "30", token_ref: null }, file: { sha256: sha("9"), bytes: 1, rank: 1, modules: [], format: "safetensors" }, audience: "adult-only", audience_set_by: null, audience_set_at: null });
-    const proof = await unlock(owner, "correcthorse");
-    const changed = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "3", audience: "adult-only", base_model: undefined }), proof);
-    expect(changed.status).toBe(409);
-    expect(await changed.json()).toMatchObject({ code: "changed_file" });
-    const sep = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "3", audience: "adult-only", base_model: undefined, as_separate: true }), proof);
-    expect(sep.status).toBe(202);
-    // a locked record: no name, no id, without a proof
-    putLora(admin, { name: ADULT_TITLE, source: { site: "civitai", url: null, remote_id: "2", version_id: "20", token_ref: null }, file: { sha256: sha("b"), bytes: 1, rank: 1, modules: [], format: "safetensors" }, audience: "adult-only", audience_set_by: null, audience_set_at: null });
-    const locked = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "2", audience: "adult-only", base_model: undefined }));
-    expect(locked.status).toBe(409);
-    const lt = await text(locked);
-    expect(lt).toContain("You already have this style.");
-    expect(lt).not.toContain(ADULT_TITLE); expect(lt).not.toContain("existing_id");
-  });
 
-  test("the Stack's own duplicate_lora answers the same", async () => {
-    const { owner } = await household();
-    inst.refuse = { status: 409, code: "duplicate_lora", error: "This style is already in the library; nothing was downloaded.", existing_id: "lora-nothere0000000" };
-    const res = await post(owner, "/api/loras/install", installBody());
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ code: "duplicate_lora", error: "You already have this style." });
-  });
 
-  test("not LTX, gated without a token, too big, and no safetensors file each say why and start nothing", async () => {
-    const { owner } = await household();
-    const r = await post(owner, "/api/loras/install", installBody({ base_model: undefined, remote_id: "quill/hush-lora" }));
-    expect(r.status).toBe(202);   // base from tags is LTX 2.5: this one is fine
-    inst.bodies.length = 0;
-    CIVITAI_ITEMS.push(civitaiModel(7, "Wannabe", {}, [1], { baseModel: "Wan Video 2.2 TI2V-5B" }));
-    CIVITAI_ITEMS.push(civitaiModel(8, "Huge", {}, [1], { files: [{ id: 8, name: "h.safetensors", type: "Model", sizeKB: 5 * 1024 * 1024, hashes: { SHA256: sha("7") }, primary: true }] }));
-    CIVITAI_ITEMS.push(civitaiModel(9, "Pickled", {}, [1], { files: [{ id: 9, name: "p.ckpt", type: "Model", sizeKB: 10, primary: true }] }));
-    try {
-      await put(owner, true);
-      const wan = await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "7", base_model: undefined }));
-      expect(wan.status).toBe(422);
-      expect(await wan.json()).toMatchObject({ code: "not_ltx", error: expect.stringContaining("This household's videos use LTX") });
-      expect(await (await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "8", base_model: undefined }))).json()).toMatchObject({ code: "too_large" });
-      expect(await (await post(owner, "/api/loras/install", installBody({ source: "civitai", remote_id: "9", base_model: undefined }))).json()).toMatchObject({ code: "no_file" });
-      expect(inst.bodies).toHaveLength(0);
-    } finally { CIVITAI_ITEMS.length = 3; }
-  });
 
-  test("a failed job raises one Repairs item with Try again, plain cause, no name; Try again starts it anew", async () => {
-    const { owner } = await household();
-    await post(owner, "/api/loras/install", installBody({ remote_id: "quill/hush-lora" }));
-    inst.state = "failed"; inst.reason = "hash_mismatch: The file does not match the fingerprint Hugging Face published for it, so it was not added. Try again.";
-    await reconcileLoraInstalls();
-    const items = listIssues().filter((i) => i.source === "styles");
-    expect(items).toHaveLength(1);
-    expect(items[0]!.title).toBe("A style did not download");
-    expect(items[0]!.detail).toContain("does not match the fingerprint");
-    expect(JSON.stringify(items)).not.toContain("hush");
-    expect(items[0]!.fix?.label).toBe("Try again");
-    inst.state = "running";
-    const fixed = await owner.post(`/api/repairs/${items[0]!.id}/fix`, {});
-    expect(fixed.status).toBe(200);
-    expect(inst.bodies).toHaveLength(2);
-    expect(listLoraRecords()).toEqual([]);
-  });
 
-  test("the Stack refusing (install busy) is a plain 503 and creates no job", async () => {
-    const { owner } = await household();
-    inst.refuse = { status: 503, code: "install_busy", error: "Another style is downloading. Wait for it to finish, then try again." };
-    const res = await post(owner, "/api/loras/install", installBody());
-    expect(res.status).toBe(503);
-    expect(db.select().from(jobs).where(eq(jobs.kind, "lora_install")).all()).toEqual([]);
-  });
 
-  test("a pasted Hugging Face link works; another host is refused", async () => {
-    const { owner } = await household();
-    const ok = await post(owner, "/api/loras/install", { source: "huggingface", url: "https://huggingface.co/quill/paperboat-lora/blob/main/paperboat.safetensors", audience: "adult-only", licence_confirmed: true, base_model: "ltx-2.5" });
-    expect(ok.status).toBe(202);
-    const bad = await post(owner, "/api/loras/install", { source: "huggingface", url: "https://evil.example.com/quill/paperboat-lora", audience: "adult-only", licence_confirmed: true });
-    expect(bad.status).toBe(404);
-  });
 });

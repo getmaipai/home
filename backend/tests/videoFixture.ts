@@ -1,6 +1,7 @@
 // VIDEO-GEN-05: a fake Stack video engine for tests. It answers the routes lib/videos/stack.ts calls (submit, job status
 // with rising progress and phases, the mp4 and the poster, cancel, engine status, the LoRA library) and records every
 // request body so a test can assert what Home sent, and that a refused request sent nothing.
+import { registerLegacyLoras } from "./helpers/fakeLoraStack";
 import { __setVideosFetchForTests, type StackVideoLora } from "@/lib/videos/stack";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
@@ -96,7 +97,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
   const fake: FakeVideoStack = {
     jobs: [], submitted: [], receipt: null, door: process.env.MAIPAI_TEST_DOOR === "1", keepsTakeRecords: true, takeRecords: new Set<string>(), makeRequests: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, queuedPolls: 1, failWith: null, pausedForMemory: false, memoryCancels: 0, memoryStopState: "cancelled", refusalsAfterCancel: 0, memoryRefusals: 0, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), quickMissing: false, ltx25: undefined, ltx25max: undefined, ltx25maxSeconds: undefined, ltx25Picture: false, silent: false, ltx25maxPicture: false,
     handler: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
-    restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
+    restore() { registerLegacyLoras("video", null); __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests({ ltx25: "ready" }));
   __resetVideoAdapterCacheForTests();
@@ -169,6 +170,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     return json({ error: `The fake video engine has no route ${method} ${path}.`, code: "not_found" }, 404);
   }) as typeof fetch;
   fake.handler = handler;
+  registerLegacyLoras("video", () => fake.loras);
   __setVideosFetchForTests(handler);
   return fake;
 }
