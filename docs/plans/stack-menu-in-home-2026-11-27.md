@@ -89,3 +89,7 @@ Order across repos: spec tag, then Stack, then Home. Estimate: slices 0 to 2 abo
 ## Questions only Jesse can answer
 
 None blocking. Open choice for later: the hosted-screen route (4a) versus kit moves for the nine admin-only screens; this note proceeds with kit moves.
+
+## Update 2026-11-27: built as 5 grouped tabs (Jesse's answer)
+
+The settings spec caps a page at 5 tabs and the home list at 9 pages, so the 14-tab layout above was not built. Jesse chose 5 groups, the same in the Stack admin menu and Home: General (Home-native), Models (AI and models, Modes, Engines), Styles, Monitor (Overview, Health, Resources), Maintain (Updates, Settings, Tools, Helper). The Stack page replaces the old AI and models page in Home; Styles moved out of Media. The shared definition is `commons/spec/stack/screens.json` (`spec-v0.1.487`); the Stack admin menu (Stack `69636558`) and Home's tabs (Home `7847fb7e1`) are built from it, with drift tests. Drives, Licences and Connections have no screens of their own yet (Connections lands with its kit page). Open: a shared Stack-down card on every tab (only General has it).
