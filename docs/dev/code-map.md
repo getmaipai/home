@@ -261,6 +261,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
+| `frontend/src/apps/settings/stack/StackDown.tsx` | STACK_GENERAL_KEY, readStackGeneral, stackDownProps, withStackDown |
 | `frontend/src/apps/settings/stack/StackGeneral.tsx` | StackGeneral |
 | `frontend/src/apps/settings/stack/StackScreenStubs.tsx` | StackScreenStubs |
 | `frontend/src/apps/settings/stack/StackTabs.tsx` | StackMonitor, StackMaintain |
