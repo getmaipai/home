@@ -26,7 +26,8 @@ function makePerformance(overrides: Partial<Performance> = {}): Performance {
 
 function mockPerformanceFetch(data: Performance | { status: number }) {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = mock(() => {
+  globalThis.fetch = mock((input: RequestInfo | URL) => {
+    if (String(input).includes("/performance/waterfall")) return Promise.resolve(Response.json({ recent: [], median: { context_end_ms: null, prefill_end_ms: null, first_token_ms: null, first_sentence_ms: null, first_audio_ms: null, total_ms: null }, turns: 0 }));
     if ("status" in data) return Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: data.status }));
     return Promise.resolve(Response.json(data));
   }) as unknown as typeof fetch;
@@ -157,6 +158,20 @@ describe("PerformancePage", () => {
       expect(document.body.textContent).toContain("Try again");
     } finally {
       restore();
+    }
+  });
+
+  test("the waterfall card renders the viewer's recent turns from numbers alone", async () => {
+    const off = { context_end_ms: 60, prefill_end_ms: 250, first_token_ms: 300, first_sentence_ms: 500, first_audio_ms: 650, total_ms: 900 };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => Promise.resolve(Response.json(String(input).includes("/performance/waterfall") ? { recent: [off], median: off, turns: 12 } : makePerformance()))) as unknown as typeof fetch;
+    try {
+      renderWithQueryClient(<MemoryRouter><PerformancePage /></MemoryRouter>);
+      await waitFor(() => expect(document.querySelectorAll("[data-slot='trace-waterfall']").length).toBe(2));
+      expect(document.body.textContent).toContain("First audio");
+      expect(document.body.textContent).toContain("Your reply 1 back");
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 });

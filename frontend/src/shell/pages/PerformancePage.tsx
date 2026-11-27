@@ -15,6 +15,7 @@ import { QueuesBody } from "@/shell/pages/performance/QueuesBody";
 import { LabelsBody } from "@/shell/pages/performance/LabelsBody";
 import { EnginesHealthBody } from "@/shell/pages/performance/EnginesHealthBody";
 import { DiskHardwareBody } from "@/shell/pages/performance/DiskHardwareBody";
+import { WaterfallBody } from "@/shell/pages/performance/WaterfallBody";
 import { errorLine } from "@/lib/hubReachability";
 
 const icons = {
@@ -78,6 +79,19 @@ export function PerformancePage() {
                   {data.turns.by_day.some((day) => day.median_ttft_ms != null || day.median_total_ms != null)
                     ? <TurnsChartBody byDay={data.turns.by_day} />
                     : <Empty><EmptyDescription>{i18n._({ id: "No replies timed yet.", message: "No replies timed yet." })}</EmptyDescription></Empty>}
+                </CardContent>
+              </Card>
+            </div>
+            <div className="col-span-12">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <icons.gauge size={16} className="mr-2 inline text-muted-foreground" />
+                    {i18n._({ id: "Where a reply's time goes", message: "Where a reply's time goes" })}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <WaterfallBody />
                 </CardContent>
               </Card>
             </div>

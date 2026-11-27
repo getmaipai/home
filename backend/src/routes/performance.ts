@@ -9,6 +9,8 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getPerformance } from "@/lib/performance";
 import { getPerfSnapshot } from "@/lib/perfWatch";
+import { turnWaterfall } from "@/lib/turnWaterfall";
+import type { PersonRow } from "@/types";
 
 export const performanceRoutes = apiRouter();
 
@@ -121,3 +123,15 @@ performanceRoutes.openapi(getRoute, async (c) => {
   const days = raw ? Number.parseInt(raw, 10) : undefined;
   return c.json(await getPerformance(days), 200);
 });
+
+const OffsetsSchema = z.object({
+  context_end_ms: z.number().nullable(), prefill_end_ms: z.number().nullable(), first_token_ms: z.number().nullable(),
+  first_sentence_ms: z.number().nullable(), first_audio_ms: z.number().nullable(), total_ms: z.number().nullable(),
+});
+const waterfallRoute = createRoute({
+  method: "get", path: "/waterfall", tags: ["Performance"], summary: "Where a reply's time went: the viewer's own recent turns and household medians",
+  description: "Numbers only (ms from turn start). No turn id, person id, date or text beside a timing (rule 6a).",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ recent: z.array(OffsetsSchema), median: OffsetsSchema, turns: z.number().int() }) } }, description: "Offsets per stage." }, ...errorResponses({ 403: "Not owner/admin" }) },
+});
+performanceRoutes.openapi(waterfallRoute, (c) => c.json(turnWaterfall((c.get("person") as PersonRow).id), 200));

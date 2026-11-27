@@ -274,6 +274,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 export type { TurnErrorDetail };
 /** MODEL-SWITCH-01: where the choice of one catalog chat model stands. */
 export type ChatModelChoice = { modelId: string; status: "none" | "downloading" | "loading" | "ready" | "failed"; reason?: string; jobs?: string[] };
+export interface WaterfallOffsets { context_end_ms: number | null; prefill_end_ms: number | null; first_token_ms: number | null; first_sentence_ms: number | null; first_audio_ms: number | null; total_ms: number | null }
 export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, StackVoice, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurns, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };
@@ -1514,6 +1515,7 @@ export const api = {
   // aggregate read of turn stats, queues, the label harvest, engine
   // health and hardware. `days` defaults to 30 on the backend when
   // omitted.
+  performanceWaterfall: () => request<{ recent: WaterfallOffsets[]; median: WaterfallOffsets; turns: number }>("/api/performance/waterfall"),
   performance: (days?: number) => request<Performance>(`/api/performance${days ? `?days=${days}` : ""}`),
   // GET /api/turn-error-detail/:id (THIN-1E): owner/admin only, the stored raw detail of a failed turn.
   turnErrorDetail: (turnId: string) => request<TurnErrorDetail>(`/api/turn-error-detail/${encodeURIComponent(turnId)}`),
