@@ -527,6 +527,11 @@ msgid "{greeting}. Here is your household today."
 msgstr "{greeting}. Here is your household today."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:46
+msgid "{held} of {budget} in use"
+msgstr "{held} of {budget} in use"
+
+#. js-lingui-explicit-id
 #: src/apps/reminders/ComingUpRow.tsx:35
 #: src/apps/reminders/ComingUpRow.tsx:36
 msgid "{hourMinute} {dayPeriod}, once, {text}"
@@ -1186,6 +1191,11 @@ msgstr "{room} access for {person}"
 #: src/apps/settings/PerformanceCustomize.tsx:121
 msgid "{row}: {category}"
 msgstr "{row}: {category}"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:66
+msgid "{running} running, {waiting} waiting"
+msgstr "{running} running, {waiting} waiting"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:202
@@ -3043,7 +3053,7 @@ msgid "setting.engines.stack.where.option_label.another_computer"
 msgstr "Another Computer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:28
+#: src/apps/settings/stack/StackGeneral.tsx:29
 msgid "Another computer, over your home network or tailnet"
 msgstr "Another computer, over your home network or tailnet"
 
@@ -5018,8 +5028,8 @@ msgid "Check my computers again"
 msgstr "Check my computers again"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackDown.tsx:30
-#: src/apps/settings/stack/StackGeneral.tsx:54
+#: src/apps/settings/stack/StackDown.tsx:31
+#: src/apps/settings/stack/StackGeneral.tsx:56
 msgid "Check now"
 msgstr "Check now"
 
@@ -13286,6 +13296,11 @@ msgid "jobs"
 msgstr "jobs"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:62
+msgid "Jobs"
+msgstr "Jobs"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:635
 msgid "setting.engines.judge.choice.label"
 msgstr "Judge model choice"
@@ -14666,6 +14681,11 @@ msgid "Loaded"
 msgstr "Loaded"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:52
+msgid "Loaded now"
+msgstr "Loaded now"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:138
 #: src/shell/music/MusicPendingBar.tsx:14
 msgid "Loading"
@@ -15891,7 +15911,7 @@ msgid "area.Manage"
 msgstr "Manage"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:50
+#: src/apps/settings/stack/StackGeneral.tsx:52
 msgid "Manage"
 msgstr "Manage"
 
@@ -16135,6 +16155,11 @@ msgstr "Memory in use by chat and voice: {gb} GB"
 #: src/shell/pages/performance/QueuesBody.tsx:12
 msgid "Memory judge"
 msgstr "Memory judge"
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:38
+msgid "Memory the Stack may use"
+msgstr "Memory the Stack may use"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:146
@@ -17943,7 +17968,7 @@ msgid "Not installed"
 msgstr "Not installed"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:46
+#: src/apps/settings/stack/StackGeneral.tsx:47
 msgid "Not known while it is not answering"
 msgstr "Not known while it is not answering"
 
@@ -18116,9 +18141,19 @@ msgid "Nothing in the pictures or the personality would scare or confuse a young
 msgstr "Nothing in the pictures or the personality would scare or confuse a young child."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:55
+msgid "Nothing is loaded."
+msgstr "Nothing is loaded."
+
+#. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:161
 msgid "Nothing is queued after this song."
 msgstr "Nothing is queued after this song."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:65
+msgid "Nothing is running or waiting."
+msgstr "Nothing is running or waiting."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:338
@@ -19078,7 +19113,7 @@ msgid "setting.news.reader_open.option.site"
 msgstr "Open the publisher's website."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:34
+#: src/apps/settings/stack/StackGeneral.tsx:35
 msgid "Open the Stack admin to see them."
 msgstr "Open the Stack admin to see them."
 
@@ -24922,7 +24957,7 @@ msgid "Stack contract:"
 msgstr "Stack contract:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:45
+#: src/apps/settings/stack/StackGeneral.tsx:46
 msgid "Stack version"
 msgstr "Stack version"
 
@@ -27524,17 +27559,17 @@ msgid "The sound is longer than asked: this computer has no audio tool to cut it
 msgstr "The sound is longer than asked: this computer has no audio tool to cut it. Install ffmpeg, then make it again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackDown.tsx:28
+#: src/apps/settings/stack/StackDown.tsx:29
 msgid "The Stack is not answering"
 msgstr "The Stack is not answering"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:35
+#: src/apps/settings/stack/StackGeneral.tsx:36
 msgid "The Stack is running"
 msgstr "The Stack is running"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:34
+#: src/apps/settings/stack/StackGeneral.tsx:35
 msgid "The Stack is running and lists {count} to look at"
 msgstr "The Stack is running and lists {count} to look at"
 
@@ -27893,7 +27928,7 @@ msgstr "This child can make cartoon pictures and videos"
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:234
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
-#: src/apps/settings/stack/StackGeneral.tsx:27
+#: src/apps/settings/stack/StackGeneral.tsx:28
 msgid "This computer"
 msgstr "This computer"
 
@@ -29432,6 +29467,12 @@ msgid "Use Max"
 msgstr "Use Max"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:40
+#: src/apps/settings/stack/StackUsage.tsx:41
+msgid "Use right now"
+msgstr "Use right now"
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:110
 msgid "Use SearXNG"
 msgstr "Use SearXNG"
@@ -30614,7 +30655,7 @@ msgid "Where"
 msgstr "Where"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:39
+#: src/apps/settings/stack/StackGeneral.tsx:40
 msgid "Where it runs"
 msgstr "Where it runs"
 
