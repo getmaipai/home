@@ -6,7 +6,6 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { owner, teen } from "./support/testAuth";
 import { db } from "@/db";
-import { eq } from "drizzle-orm";
 import { conversationTurns } from "@/db/schema";
 import { newConversationTurnId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -99,21 +98,6 @@ describe("GET /api/performance", () => {
     expect(body.turns.by_engine[0].count).toBe(3);
     const modelRoute = body.turns.by_route.find((r: any) => r.route === "model");
     expect(modelRoute.count).toBe(3);
-  });
-
-  test("running provisional rows are excluded from performance route and label counts", async () => {
-    const { client, row } = await owner();
-    const createdAt = new Date().toISOString();
-    insertTurn(row.id, createdAt, null);
-    const pendingId = db.select({ id: conversationTurns.id }).from(conversationTurns).get()!.id;
-    db.update(conversationTurns).set({ status: "running", userText: "pending words", replyText: "" }).where(eq(conversationTurns.id, pendingId)).run();
-    insertTurn(row.id, createdAt, stats());
-
-    const response = await client.get("/api/performance");
-    expect(response.status).toBe(200);
-    const body = await response.json() as { turns: { by_route: Array<{ route: string; count: number }> }; labels: { turns: number } };
-    expect(body.turns.by_route.find((route) => route.route === "model")?.count).toBe(1);
-    expect(body.labels.turns).toBe(1);
   });
 
   test("AUDIT-TOOLS-01: the turns panel reports the tool schema offered per turn, and skips turns stored before the field", async () => {

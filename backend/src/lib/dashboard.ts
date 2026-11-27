@@ -60,7 +60,7 @@ function recentActivity(targetIds: readonly string[], namesById: ReadonlyMap<str
   if (targetIds.length === 0) return [];
   const placeholders = targetIds.map(() => "?").join(", ");
   const rows = sqlite
-    .query(`SELECT id, person_id, created_at, surface, source FROM conversation_turns WHERE person_id IN (${placeholders}) AND status != 'running' ORDER BY created_at DESC LIMIT ?`)
+    .query(`SELECT id, person_id, created_at, surface, source FROM conversation_turns WHERE person_id IN (${placeholders}) ORDER BY created_at DESC LIMIT ?`)
     .all(...targetIds, RECENT_ACTIVITY_LIMIT) as Array<{ id: string; person_id: string; created_at: string; surface: string; source: string }>;
   return rows.map((r) => ({
     turn_id: r.id,
@@ -86,7 +86,7 @@ function turnsPerDay(targetIds: readonly string[], days: number): DashboardTurns
     since.setUTCHours(0, 0, 0, 0);
     const placeholders = targetIds.map(() => "?").join(", ");
     const rows = sqlite
-      .query(`SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count FROM conversation_turns WHERE person_id IN (${placeholders}) AND created_at >= ? AND status != 'running' GROUP BY day`)
+      .query(`SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count FROM conversation_turns WHERE person_id IN (${placeholders}) AND created_at >= ? GROUP BY day`)
       .all(...targetIds, since.toISOString()) as Array<{ day: string; count: number }>;
     for (const row of rows) countByDay.set(row.day, row.count);
   }
