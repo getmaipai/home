@@ -730,6 +730,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/house/cache.ts` | peekHouseRegistry, warmHouseRegistry, loadHouseRegistry, peekHouseRegistries, warmHouseRegistries, loadHouseRegistries |
 | `backend/src/lib/house/connectHooks.ts` | onHouseConnected, emitHouseConnected, __clearHouseConnectHooksForTests, onScheduleRecheck, emitScheduleRecheck, __clearScheduleRechecksForTests |
 | `backend/src/lib/house/connection.ts` | houseLanFetch, houseInstanceLanFetch, houseAnyConnected |
+| `backend/src/lib/house/floor.ts` | houseFloor |
 | `backend/src/lib/house/ids.ts` | HOUSE_TOOL_ID |
 | `backend/src/lib/house/registry.ts` | classify, fetchHouseRegistry |
 | `backend/src/lib/house/scheduleTool.ts` | SCHEDULE_ACTIONS, isScheduleAction, SCHEDULE_DO, whenShape, canUseSchedules, describeWhen |
