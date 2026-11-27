@@ -18544,76 +18544,6 @@ msgid "off"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1180
-msgid "setting.podcasts.skip.ad.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1186
-msgid "setting.podcasts.skip.ad.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1194
-msgid "setting.podcasts.skip.bumper.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1200
-msgid "setting.podcasts.skip.bumper.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1210
-msgid "setting.podcasts.skip.intro.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1216
-msgid "setting.podcasts.skip.intro.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1224
-msgid "setting.podcasts.skip.outro.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1230
-msgid "setting.podcasts.skip.outro.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1238
-msgid "setting.podcasts.skip.recap.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1244
-msgid "setting.podcasts.skip.recap.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1252
-msgid "setting.podcasts.skip.selfpromo.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1258
-msgid "setting.podcasts.skip.selfpromo.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1266
-msgid "setting.podcasts.skip.sponsor.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1272
-msgid "setting.podcasts.skip.sponsor.default.option_label.off"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/clock/AlarmRecordRow.tsx:50
 #: src/apps/settings/CloseAppsSettings.tsx:96
 #: src/apps/settings/CloseAppsSettings.tsx:97
@@ -18706,6 +18636,76 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1165
 msgid "setting.podcasts.auto_download.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1180
+msgid "setting.podcasts.skip.ad.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1186
+msgid "setting.podcasts.skip.ad.default.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1194
+msgid "setting.podcasts.skip.bumper.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1200
+msgid "setting.podcasts.skip.bumper.default.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1210
+msgid "setting.podcasts.skip.intro.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1216
+msgid "setting.podcasts.skip.intro.default.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1224
+msgid "setting.podcasts.skip.outro.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1230
+msgid "setting.podcasts.skip.outro.default.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1238
+msgid "setting.podcasts.skip.recap.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1244
+msgid "setting.podcasts.skip.recap.default.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1252
+msgid "setting.podcasts.skip.selfpromo.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1258
+msgid "setting.podcasts.skip.selfpromo.default.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1266
+msgid "setting.podcasts.skip.sponsor.option_label.off"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1272
+msgid "setting.podcasts.skip.sponsor.default.option_label.off"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24670,6 +24670,11 @@ msgid "Skills added to this home"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/dashboard/GettingStarted.tsx:32
+msgid "Skip"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1178
 msgid "setting.podcasts.skip.ad.option_label.skip"
 msgstr ""
@@ -24737,11 +24742,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1270
 msgid "setting.podcasts.skip.sponsor.default.option_label.skip"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/dashboard/GettingStarted.tsx:32
-msgid "Skip"
 msgstr ""
 
 #. js-lingui-explicit-id
