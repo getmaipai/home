@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { loraPeople, loras } from "@/db/schema";
+import { loraPeople } from "@/db/schema";
 import { __resetAdultLockForTests, consumeTicket, issueTicket, peekTicket } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { getLoraRecord, listLoraRecords, refreshLoras, loraLibraryReadable } from "@/lib/loras/stackLibrary";
@@ -113,12 +113,6 @@ describe("a Stack that cannot be read", () => {
     expect(getLoraRecord(plain.id)).not.toBeNull();
   });
 
-  test("Home keeps no copy: nothing is written to the loras table", async () => {
-    const { row } = await household();
-    putLora(row("Sage").id);
-    await refreshLoras(true);
-    expect(db.select().from(loras).all()).toEqual([]);
-  });
 });
 
 describe("a style whose drive is not connected", () => {

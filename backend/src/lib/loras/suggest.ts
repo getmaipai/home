@@ -3,7 +3,7 @@ import { loraUsable, readLoras } from "@/lib/loras/access";
 import { MAX_STYLES } from "@/lib/loras/promptPlan";
 import type { AdultProof } from "@/lib/adultLock";
 import type { PersonRow } from "@/types";
-import type { Lora } from "./store";
+import type { Lora } from "./stackLibrary";
 
 const words = (text: string): Set<string> => new Set(text.toLowerCase().split(/[^a-z]+/).filter((word) => word.length >= 3));
 

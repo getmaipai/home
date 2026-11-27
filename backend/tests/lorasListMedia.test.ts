@@ -4,10 +4,9 @@ import { beforeEach, expect, setDefaultTimeout, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { household } from "./fixtures/adultLock";
 import { putLora } from "./fixtures/lora";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 
 setDefaultTimeout(30_000);
-beforeEach(() => { resetDb(); __resetLoraSyncForTests(); });
+beforeEach(() => { resetDb(); });
 
 const names = async (response: Response): Promise<string[]> => ((await response.json()) as { items: Array<{ name: string }> }).items.map((item) => item.name).sort();
 

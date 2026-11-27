@@ -28,7 +28,6 @@ export { compareHlc };
 export const HLC_BEARING_TABLES = [
   "people",
   "added_models",
-  "loras",
   "lora_people",
   "api_keys",
   "git_connections",

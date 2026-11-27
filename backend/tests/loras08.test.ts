@@ -5,7 +5,6 @@ import { resetDb } from "./reset-db";
 import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { getLoraRecord } from "@/lib/loras/stackLibrary";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { household, unlock, unlockHeader } from "./fixtures/adultLock";
 import { putLora } from "./fixtures/lora";
@@ -14,7 +13,7 @@ import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 setDefaultTimeout(30_000);
 let fake: FakeVideoStack;
 beforeEach(() => {
-  resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
+  resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   fake = installFakeVideoStack();
   fake.loras = [];
 });

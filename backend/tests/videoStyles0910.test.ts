@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from
 import { resetDb } from "./reset-db";
 import { __resetAdultLockForTests, __unlockedForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { LORAS_UNSUPPORTED_LINE } from "@/lib/videos/loraWire";
 import { LOCKED_START_LINE } from "@/lib/videos/lock";
@@ -25,7 +24,7 @@ import type { PersonRow } from "@/types";
 setDefaultTimeout(30_000);
 let fake: FakeVideoStack;
 beforeEach(() => {
-  resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
+  resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   fake = installFakeVideoStack();
   fake.loras = [];
 });

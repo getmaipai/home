@@ -44,7 +44,6 @@ import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startConversationTitleSweep } from "@/lib/conversationTitle";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
-import { registerLoraInstallFixes } from "@/lib/loras/install";
 import { setInstalledBasesProvider } from "@/lib/loras/baseFamilies";
 import { installedBasesNow } from "@/lib/loras/readiness";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, registerRenewFixHandler } from "@/lib/householdCa";
@@ -457,8 +456,8 @@ ensureCoreJob("package_cache.sweep", "every:1d");
 // boot, costs nothing (Map.set on the same key is a no-op re-add) and
 // closes that gap.
 registerRenewFixHandler();
-registerLoraInstallFixes();
 setInstalledBasesProvider(installedBasesNow);
+void import("@/lib/loras/legacyDropRun").then((m) => m.startLegacyLoraDrop()); // STACK-LORAS-01 slice 6: archive then drop the old LoRA tables, only when the Stack lists every id
 
 // TLS is enabled only when this install already has its own household
 // leaf. Before the first mint, HTTP serves all interfaces. After a mint,

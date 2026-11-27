@@ -44,7 +44,6 @@
   "backend/src/lib/listActions.ts": 2,
   "backend/src/lib/lists.ts": 1,
   "backend/src/lib/loras/access.ts": 1,
-  "backend/src/lib/loras/store.ts": 1,
   "backend/src/lib/media/access.ts": 1,
   "backend/src/lib/media/appHost.ts": 4,
   "backend/src/lib/media/band.ts": 1,

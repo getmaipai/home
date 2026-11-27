@@ -405,8 +405,7 @@ describe("the routes", () => {
     const owner = await signedIn("Sage", "owner");
     const res = await owner.client.request("/api/videos/adapters/lora-ffffffffffffffff", { method: "PATCH", body: { enabled: false } });
     expect(res.status).toBe(404);
-    const { loras } = await import("@/db/schema");
-    expect(db.select().from(loras).all().map((r) => r.id)).not.toContain("lora-ffffffffffffffff");
+    expect(fake.loras.map((l) => l.id)).not.toContain("lora-ffffffffffffffff");
   });
 
   test("a clip streams with Range for its owner only; a missing job and a stranger's job read the same", async () => {

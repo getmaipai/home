@@ -4,8 +4,8 @@
 //
 // Install goes through the Stack's existing LoRA install route (POST /stack/v1/video/loras/install: a Hugging Face file link, the person's Hugging Face token in that one
 // body, the name below, all-ages, base ltx-2.5). Its Hugging Face page asks the person to accept the LTX-2.x Community License there; the Stack checks its own global
-// acceptance when the install starts. The adapter is an engine part, not a style: it is never offered in the Styles library (loras/sync.ts).
-import { tokenFor } from "@/lib/loras/source";
+// acceptance when the install starts. The adapter is an engine part, not a style: it is never offered in the Styles library (loras/stackLibrary.ts).
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { getStackInstallJob, installStackLora, listVideoLoras, removeVideoLora, StackInstallRefused, StackVideoError } from "@/lib/videos/stack";
 
 export const INGREDIENTS_NAME = "Video-from-pictures adapter";
@@ -64,9 +64,12 @@ export async function ingredientsState(): Promise<IngredientsState> {
       else percent = running.percent;
     } catch { /* the job read is progress only; the library listing above is the truth */ }
   }
-  const blockedReason = !tokenFor("huggingface") ? INGREDIENTS_NO_TOKEN_LINE : null;
+  const blockedReason = !huggingFaceToken() ? INGREDIENTS_NO_TOKEN_LINE : null;
   return { reachable: true, installed: false, libraryId: null, installing: job !== null, percent, failure: job ? null : failure, blockedReason };
 }
+
+/** The person's Hugging Face token, saved in Settings (the Stack installs the file with it; Home never fetches it). */
+const huggingFaceToken = (): string | null => { const v = getHouseholdSettingValue("voice.hf_token"); return typeof v === "string" && v.trim() ? v.trim() : null; };
 
 export type IngredientsInstall = { ok: true; job: string } | { ok: false; status: 409 | 503; error: string; code: string };
 
@@ -76,7 +79,7 @@ export async function installIngredients(addedBy: string): Promise<IngredientsIn
   if (!state.reachable) return { ok: false, status: 503, code: "stack_unreachable", error: INGREDIENTS_STACK_DOWN_LINE };
   if (state.installed) return { ok: false, status: 409, code: "already_installed", error: "The video-from-pictures adapter is already installed." };
   if (state.installing) return { ok: false, status: 409, code: "installing", error: "The adapter is still downloading." };
-  const token = tokenFor("huggingface");
+  const token = huggingFaceToken();
   if (!token) return { ok: false, status: 409, code: "no_token", error: INGREDIENTS_NO_TOKEN_LINE };
   try {
     const started = await installStackLora("video", {

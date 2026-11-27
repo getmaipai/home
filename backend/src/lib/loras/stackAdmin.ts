@@ -1,7 +1,7 @@
 // STACK-LORAS-01 slice 4: what an owner or admin may change on a style, now done AT THE STACK. Each function re-checks the admin (a route is not the only gate),
 // sends one change to `/stack/v1/loras`, writes the audit row Home keeps (`adult_mark_log`, no content), then reads the library again so the answer is what the
 // Stack now says. Home stores nothing about the style: the named adults of `availability.people` go to Home's small `lora_people` table (E5), and nothing else.
-// Replaces lib/loras/admin.ts for every new flow (that file goes in slice 6).
+// Replaced the old Home-side admin writer (removed in slice 6).
 import { and, eq, inArray, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";

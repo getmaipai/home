@@ -6,7 +6,6 @@ import { resetDb } from "./reset-db";
 import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { loraUsable, runsOn, untestedLine } from "@/lib/loras/access";
-import { __resetLoraSyncForTests, recordFromStack, syncLoras } from "@/lib/loras/sync";
 import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
@@ -24,7 +23,7 @@ import type { StackVideoLora } from "@/lib/videos/stack";
 setDefaultTimeout(30_000);
 let fake: FakeVideoStack;
 beforeEach(() => {
-  resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
+  resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   fake = installFakeVideoStack();
   fake.loras = [];
 });
@@ -82,18 +81,6 @@ describe("the offer rule", () => {
     expect(await resolveStyles({ audience, names: ["Dusty look"] })).toMatchObject({ ok: false, code: "style_gone" });
     expect(await resolveStyles({ audience, ids: [untested.id] })).toMatchObject({ ok: false, code: "style_gone" });
   });
-});
-
-describe("the Stack's marks reach the record", () => {
-  const stackFile = (over: Partial<StackVideoLora>): StackVideoLora => ({ id: "claymation", name: "Claymation", sha256: "d".repeat(64), bytes: 1000, base_model: "ltx-2.3", licence: "MIT", source_url: null, classification: "all-ages", strength_default: 1, trigger_words: [], added_at: "2026-11-06T00:00:00.000Z", ...over });
-
-  test("a new record copies the mark and untested flag of an ltx-2.3 file; an ltx-2.5 file holds none", () => {
-    expect(recordFromStack(stackFile({ tested_on_25: "tested", untested_on_25: false }), null, "person-aaaaaa1")).toMatchObject({ tested_on_25: "tested", untested_on_25: false });
-    expect(recordFromStack(stackFile({}), null, "person-aaaaaa1")).toMatchObject({ tested_on_25: null, untested_on_25: true });
-    const fresh = recordFromStack(stackFile({ base_model: "ltx-2.5" }), null, "person-aaaaaa1")!;
-    expect(fresh.tested_on_25).toBeUndefined();
-  });
-
 });
 
 describe("a clip made with a tested 2.3 style", () => {

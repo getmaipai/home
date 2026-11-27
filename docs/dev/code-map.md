@@ -823,18 +823,14 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/longform/tool.ts` | MAKE_PRODUCTION_TOOL_ID, FILM_MAX_SECONDS, isProductionCall, makeProductionArgs, runMakeProduction |
 | `backend/src/lib/lookupPackages.ts` | EMPTY_LOOKUP_MISS_PACKAGES |
 | `backend/src/lib/loras/access.ts` | isAdult, availableTo, loraAccess, runsOnBases, runsOn, isUnofferedOldBase |
-| `backend/src/lib/loras/admin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, NOT_CONFIRMED_LINE, TRASH_DAYS, patchLora, confirmLora |
-| `backend/src/lib/loras/adultCheck.ts` | CIVITAI_ADULT_LEVEL, classifyCivitai, classifyHuggingFace, cleanTriggerWords |
 | `backend/src/lib/loras/baseFamilies.ts` | BASE_FAMILIES, ALL_BASE_IDS, BROWSE_BASES, installableBaseIds, mediaOfBase, setInstalledBasesProvider |
-| `backend/src/lib/loras/install.ts` | INSTALL_KIND, INSTALL_TITLE, ISSUE_SOURCE, LICENCE_STEP_LINE, SHARED_SCREEN_LINE, NOT_LTX_LINE |
+| `backend/src/lib/loras/legacyDrop.ts` | LEGACY_TABLES, ARCHIVE_TABLE, dropLegacyLoraTables |
+| `backend/src/lib/loras/legacyDropRun.ts` | stackLoraIds, runLegacyLoraDrop, startLegacyLoraDrop |
 | `backend/src/lib/loras/promptPlan.ts` | STYLE_STRENGTHS, STRENGTH_FACTOR, STRENGTH_CEILING, MAX_STYLES, MAX_ADDED_CHARS, TWO_AT_A_TIME_LINE |
 | `backend/src/lib/loras/readiness.ts` | installedBasesNow |
-| `backend/src/lib/loras/source.ts` | CIVITAI_ENABLED_KEY, CIVITAI_KEY_KEY, HF_TOKEN_KEY, MAX_RESULTS, PAGE_SIZE, MAX_INSTALL_BYTES |
 | `backend/src/lib/loras/stackAdmin.ts` | NOT_ADMIN_LINE, NOT_HERE_LINE, MINOR_IN_PEOPLE_LINE, NOT_EDITABLE_LINE, TRASH_DAYS, patchLoraOnStack |
 | `backend/src/lib/loras/stackLibrary.ts` | LorasStackError, __setLorasFetchForTests, FRESH_MS, MAX_AGE_MS, dropLoraSnapshot, __resetLoraSnapshotForTests |
-| `backend/src/lib/loras/store.ts` | LoraWriteError, MINOR_IN_PEOPLE_LINE, DUPLICATE_FILE_LINE, listLoraRecords, getLoraRecord, saveLora |
 | `backend/src/lib/loras/suggest.ts` | suggestStyles |
-| `backend/src/lib/loras/sync.ts` | dropLoraSyncCache, __resetLoraSyncForTests, recordFromStack, syncLoras, adoptPictureLoras |
 | `backend/src/lib/loras/usage.ts` | clipsUsingStyle |
 | `backend/src/lib/maintenanceFlag.ts` | maintenanceFlagPath, maintenanceActive |
 | `backend/src/lib/maintenanceRecurrence.ts` | maintenanceOccurrence, validateMaintenanceRecurrence |

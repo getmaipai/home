@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people, pictureAdapterPrefs } from "@/db/schema";
+import { people } from "@/db/schema";
 import { allAdapters, adaptersFor, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
 import { readLoras } from "@/lib/loras/access";
 import { getLoraRecord, listLoraRecords } from "@/lib/loras/stackLibrary";
@@ -44,7 +44,7 @@ describe("pictures on the Lora record", () => {
 
 
 
-  test("turning a style on or off changes who may use it at the Stack, and nothing is written to picture_adapter_prefs", async () => {
+  test("turning a style on or off changes who may use it at the Stack", async () => {
     const { actor } = await owner();
     await allAdapters();
     await setAdapterEnabled(PIXEL, false, actor.id);
@@ -53,7 +53,6 @@ describe("pictures on the Lora record", () => {
     await setAdapterEnabled(PIXEL, true, actor.id);
     expect(getLoraRecord(PIXEL)).toMatchObject({ availability: { who: "adults" } });
     expect((await adaptersFor(["all-ages"])).map((a) => a.id)).toEqual([PIXEL]);
-    expect(db.select().from(pictureAdapterPrefs).all()).toEqual([]);
   });
 
 

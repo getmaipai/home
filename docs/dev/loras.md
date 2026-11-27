@@ -11,7 +11,7 @@
 > - The named adults of `availability.people` live in Home's table `lora_people` (keyed by the Stack's id, `setLoraPeople`); the Stack never sees names. `saveLora` no longer exists on the new path: a minor is refused in `patchLoraOnStack`.
 > - The Styles tab is the kit's `StackLorasPage` over `/api/loras/stack/*` (`routes/lorasSources.ts`, client `frontend/src/lib/stackLorasClient.ts`). The route redacts: an adult-only style is one `{ locked: true }` tile unless the person's own unlock proof is valid; a teen, child, guest or shared screen gets no adult-only name, id or count.
 > - Lowering adult-only to all-ages: the Stack holds no ticket and does not know users; it takes the nsfw tag (`classification`, with `classification_origin` `site` or `admin`) from a Stack admin or from Home's token. Home checks its own ticket first (`peekTicket` for a style the source called adult, the admin's open unlock otherwise), calls the Stack PATCH, then uses the ticket up (`consumeTicket`). The old callback route `POST /api/stack/adult-ticket/consume` and `STACK_HOME_CALLBACK_URL` were removed 2026-11-26.
-> - Still in place and unused by new flows (slice 6 deletes them): `store.ts`, `sync.ts`, `install.ts`, `source.ts`, `adultCheck.ts`, `admin.ts`. Tests build the library in a fake Stack (`backend/tests/helpers/fakeLoraStack.ts`, `putLora` in `tests/fixtures/lora.ts`).
+> - Slice 6 (2026-11-27) removed `store.ts`, `sync.ts`, `install.ts`, `source.ts`, `adultCheck.ts` and `admin.ts`, the `loras`, `video_adapter_prefs` and `picture_adapter_prefs` tables from the schema, and the old install and browse tests. The tables are archived and dropped at the next hub start only when the Stack lists every id: [loras-legacy-drop.md](loras-legacy-drop.md) (what runs, the archive, the rollback, the last manual step). Tests build the library in a fake Stack (`backend/tests/helpers/fakeLoraStack.ts`, `putLora` in `tests/fixtures/lora.ts`).
 >
 > The sections below describe the earlier design where they do not conflict with this note.
 
@@ -22,22 +22,13 @@ uses the new routes yet (VIDEO-LORA-08); the old Settings page keeps working ove
 
 | Piece | File | What it does |
 |---|---|---|
-| The store | `backend/src/lib/loras/store.ts` | The ONE writer of the `loras` table. `saveLora(record, by)` checks the zod shape and the spec's `validateLora`, refuses a minor (or an unknown person) in `availability.people`, refuses a second live record for one file, and sets `updated_at` and `hlc`. |
-| The table | `loras` (migration 0161, schema version 114) | `record` is the whole spec `Lora` JSON; `media`, `kind`, `base_model`, `audience`, `availability_who`, `sha256`, `removed_at`, `trash_until` are copies of its fields for queries, written only by the store. |
-| Sync and migration | `backend/src/lib/loras/sync.ts` | Makes a record for every Stack file that has none (at most every 10 s), keeps the file facts current, mirrors adult-only to the Stack's own classification (its second lock), and purges the trash after 30 days. |
 | Access | `backend/src/lib/loras/access.ts` | `loraAccess(person, lora, surface)` is the single read path; `readLoras` and `readLora` are what routes and producers call. |
-| Admin changes | `backend/src/lib/loras/admin.ts` | `patchLora`, `markAdultOnly`, `markAllAges`, `confirmLora`, `removeLora`, `restoreLora`. Each re-checks the admin. |
 | Routes | `backend/src/routes/loras.ts` | `/api/loras` (see below). |
 | Video side | `lib/videos/adapters.ts`, `adultStyle.ts`, `loraWire.ts` | `videoAdaptersFor(audience)` over the records; `usesAdultOnlyStyle` reads them; `wireLoras` decides what goes to the Stack. |
 
 ## One store
 
-`video_adapter_prefs` is read once by the sync (each row folded into the record of its Stack file, then deleted) and nothing writes it any more. The table
-itself stays until a later migration drops it, because a row for a file the Stack cannot list right now must not be lost.
-
-A migrated record is usable by admins only (the owner's 2026-11-02 rule), takes its audience from the Stack's classification (an all-ages one names the
-admin who last confirmed it as `audience_set_by`), and keeps a `pending` row as an unacknowledged licence (`needs_confirmation`). A row that was switched
-off is admins-only like every migrated record; the record has no separate "off" switch.
+The Stack. Home reads it (`stackLibrary.ts`) and keeps only the named adults of a style in `lora_people`. The old `loras` and preference tables are gone after the drop step in [loras-legacy-drop.md](loras-legacy-drop.md); the sections below that mention them are history.
 
 ## Who sees what (`loraAccess`)
 

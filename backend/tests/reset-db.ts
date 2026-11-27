@@ -60,13 +60,11 @@ import {
   fileReferences,
   pictureJobs,
   kidUsage,
-  pictureAdapterPrefs,
   videoJobs,
   videoFavorites,
   podcastShowRates,
   creations,
   adultMarkLog,
-  loras,
   loraPeople,
   mediaCollections,
   mediaSubjects,
@@ -90,7 +88,6 @@ import {
   newsReads,
   newsSearchRecents,
   referenceSaves,
-  videoAdapterPrefs,
   artifacts,
   conversations,
   chatFolders,
@@ -244,7 +241,6 @@ export function resetDb(): void {
   db.delete(fileContents).run();
   db.delete(kidUsage).run(); // KIDS-CREATE-01: references people
   db.delete(pictureJobs).run(); // IMGGEN-HOME-01: references people
-  db.delete(pictureAdapterPrefs).run();
   __resetMusicJobsForTests();
   db.delete(musicJobs).run();
   db.delete(videoFavorites).run(); // VIDEO-UI-06: references people
@@ -252,8 +248,6 @@ export function resetDb(): void {
   db.delete(creations).run(); // CREATOR-02: references people (creation_cast goes with it)
   db.delete(adultMarkLog).run(); // ADULT-LOCK-06
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
-  db.delete(videoAdapterPrefs).run();
-  db.delete(loras).run(); // VIDEO-LORA-03: the library records (no foreign keys)
   db.delete(loraPeople).run(); // STACK-LORAS-01: the named adults of a style
   installFakeLoraStack(); // STACK-LORAS-01: the Stack holds the library; every test starts with an empty fake one
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources

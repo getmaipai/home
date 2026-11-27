@@ -1,15 +1,12 @@
-// VIDEO-LORA-03 (docs/dev/loras.md, docs/design/video-loras-2026-11-02.md sections 4, 7 and 11): the `Lora` records, the one access function, the admin routes,
+// STACK-LORAS-01 slice 6: the access, route and leak tests of the old loras03 file, kept after the table and its writer went (the Stack holds the records; docs/dev/loras.md, docs/design/video-loras-2026-11-02.md sections 4, 7 and 11): the `Lora` records, the one access function, the admin routes,
 // the migration of the old preference rows, the auto-mark with a LoRA, the Stack wiring behind its flag, and the leak sweep while an adult-only style is locked.
 import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { adultMarkLog, loras as lorasTable, videoAdapterPrefs } from "@/db/schema";
 import { __resetAdultLockForTests, issueProof, type AdultProof } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { loraAccess, readLoras, type LoraAccess, type LoraSurface } from "@/lib/loras/access";
-import { getLoraRecord, listLoraRecords, saveLora, LoraWriteError, type Lora } from "@/lib/loras/store";
-import { __resetLoraSyncForTests, syncLoras } from "@/lib/loras/sync";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { usesAdultOnlyStyle } from "@/lib/videos/adultStyle";
 import { wireLoras, LORAS_UNSUPPORTED_LINE } from "@/lib/videos/loraWire";
@@ -25,7 +22,7 @@ import type { PersonRow } from "@/types";
 setDefaultTimeout(30_000);
 let fake: FakeVideoStack;
 beforeEach(() => {
-  resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
+  resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   fake = installFakeVideoStack();
   fake.loras = []; // the tests below make their own records unless they say otherwise
 });
@@ -80,92 +77,6 @@ describe("loraAccess: the table of section 7, cell by cell", () => {
   });
 });
 
-describe("the writer", () => {
-  test("validateLora runs on every write: an all-ages style needs an admin's choice, strength must be ordered, add-ins are capped, a minor is refused in people", async () => {
-    const { row } = await household();
-    const admin = row("Sage"); const teen = row("Nova"); const child = row("Sprout"); const marlow = row("Marlow");
-    const bad = (over: Partial<Lora>) => () => saveLora(loraRecord(admin.id, over), admin.id);
-    expect(bad({ audience: "all-ages", audience_set_by: null })).toThrow(LoraWriteError);
-    expect(bad({ strength: { default: 2, min: 0, max: 1 } })).toThrow(LoraWriteError);
-    expect(bad({ positive_addins: ["x".repeat(120), "y".repeat(120), "z".repeat(120), "w".repeat(120)] })).toThrow(LoraWriteError);
-    expect(bad({ availability: { who: "people", people: [] } })).toThrow(LoraWriteError);
-    expect(listLoraRecords()).toHaveLength(0);
-    for (const minor of [teen, child]) {
-      try { saveLora(loraRecord(admin.id, { availability: { who: "people", people: [minor.id] } }), admin.id); throw new Error("accepted"); }
-      catch (error) { expect(error).toBeInstanceOf(LoraWriteError); expect((error as LoraWriteError).code).toBe("minor_in_people"); }
-    }
-    expect(bad({ availability: { who: "people", people: ["person-nobodyxx1"] } })).toThrow(LoraWriteError);
-    const ok = saveLora(loraRecord(admin.id, { availability: { who: "people", people: [marlow.id] } }), admin.id);
-    expect(getLoraRecord(ok.id)?.availability.people).toEqual([marlow.id]);
-  });
-
-  test("updated_at and hlc advance on every change, the indexed columns follow the record, and two live records may not share a file", async () => {
-    const { row } = await household();
-    const admin = row("Sage");
-    const first = putLora(admin.id);
-    const again = saveLora({ ...first, name: "Renamed" }, admin.id);
-    expect(again.hlc).not.toBe(first.hlc);
-    expect(again.updated_at >= first.updated_at).toBe(true);
-    saveLora({ ...again, audience: "adult-only", audience_set_by: null, audience_set_at: null, availability: { who: "adults", people: [] } }, admin.id);
-    expect(db.select().from(lorasTable).where(eq(lorasTable.id, first.id)).get()).toMatchObject({ audience: "adult-only", availabilityWho: "adults", sha256: first.file.sha256 });
-    expect(() => saveLora(loraRecord(admin.id, { file: first.file }), admin.id)).toThrow(LoraWriteError);
-  });
-});
-
-describe("migration of the old preference rows (rule 4: one store)", () => {
-  test("every Stack file gets a record, admins only, audience from the Stack, the pending state kept, and the old rows are consumed", async () => {
-    const { row } = await household();
-    const admin = row("Sage");
-    fake.loras = [
-      { id: "lora-1111111111111111", name: "Old Colour Film", sha256: "1".repeat(64), bytes: 100, base_model: "wan2.2-ti2v-5b", licence: "Apache-2.0", source_url: null, classification: "all-ages", trigger_words: ["HST style"], strength_default: 1, added_at: "2026-10-17T00:00:00Z" },
-      { id: "lora-2222222222222222", name: "Boudoir Motion", sha256: "2".repeat(64), bytes: 100, base_model: "wan2.2-ti2v-5b", licence: "acknowledged", source_url: null, classification: "adult-only", trigger_words: ["boudoirmotion"], strength_default: 0.9, added_at: "2026-10-17T00:00:00Z" },
-      { id: "lora-3333333333333333", name: "Pending One", sha256: "3".repeat(64), bytes: 100, base_model: "mystery", licence: "MIT", source_url: "https://huggingface.co/x/y", classification: "all-ages", trigger_words: [], strength_default: 1, added_at: "2026-10-18T00:00:00Z" },
-    ];
-    const t = new Date().toISOString();
-    db.insert(videoAdapterPrefs).values([
-      { adapterId: "lora-1111111111111111", enabled: true, updatedAt: t, updatedBy: admin.id },
-      { adapterId: "lora-2222222222222222", enabled: false, updatedAt: t, updatedBy: admin.id },
-      { adapterId: "lora-3333333333333333", enabled: false, updatedAt: t, updatedBy: "pending" },
-      { adapterId: "lora-gone0000000000", enabled: true, updatedAt: t, updatedBy: admin.id },
-    ]).run();
-    await syncLoras(true);
-    const [film, boudoir, pending] = ["lora-1111111111111111", "lora-2222222222222222", "lora-3333333333333333"].map((id) => getLoraRecord(id)!) as [Lora, Lora, Lora];
-    for (const l of [film, boudoir, pending]) {
-      expect(l.availability).toEqual({ who: "admins", people: [] });
-      expect(l.provenance).toEqual({ origin: "migration", job_id: null });
-      expect(l.media).toBe("video");
-    }
-    expect(film).toMatchObject({ audience: "all-ages", audience_set_by: admin.id, trigger_words: ["HST style"], base_model: "wan2.2-ti2v-5b", compatible_with: ["wan2.2-ti2v-5b"] });
-    expect(boudoir).toMatchObject({ audience: "adult-only", audience_set_by: null });
-    expect(pending).toMatchObject({ base_model: "unknown", compatible_with: [], source: { site: "huggingface" }, licence: { acknowledged_by: null } });
-    expect(film.licence.acknowledged_by).toBe(admin.id);
-    // Consumed rows are gone; a row for a file the Stack no longer lists is left alone (nothing is lost on a Stack that cannot answer).
-    expect(db.select().from(videoAdapterPrefs).all().map((r) => r.adapterId)).toEqual(["lora-gone0000000000"]);
-    // A second sync adds nothing and changes nothing.
-    const before = listLoraRecords().map((l) => l.hlc).sort();
-    await syncLoras(true);
-    expect(listLoraRecords().map((l) => l.hlc).sort()).toEqual(before);
-  });
-
-  test("the Ingredients adapter is an engine part: it never becomes a style record", async () => {
-    await household();
-    fake.loras = [
-      { id: "lora-ff873a5beada3c57", name: "ltx-2.5-22b-ic-lora-ingredients-0.9", sha256: "4".repeat(64), bytes: 1_308_787_472, base_model: "ltx-2.5", licence: "ltx-2.x-community-license", source_url: "https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Ingredients", classification: "all-ages", strength_default: 1, trigger_words: [], added_at: new Date().toISOString() },
-      { id: "lora-5555555555555555", name: "Real Style", sha256: "5".repeat(64), bytes: 100, base_model: "ltx-2.5", licence: "MIT", source_url: null, classification: "all-ages", strength_default: 1, trigger_words: [], added_at: new Date().toISOString() },
-    ] as never;
-    await syncLoras(true);
-    expect(getLoraRecord("lora-ff873a5beada3c57")).toBeNull();
-    expect(getLoraRecord("lora-5555555555555555")).not.toBeNull();
-  });
-
-  test("a Stack that does not answer changes nothing", async () => {
-    await household();
-    fake.restore(); // no fake engine: the Stack is unreachable
-    await syncLoras(true);
-    expect(listLoraRecords()).toHaveLength(0);
-  });
-});
-
 describe("routes", () => {
   test("a child and a teen are never told a style exists; a guest-free household: only an owner or admin reaches the library routes", async () => {
     const { owner, adult, teen, child, row } = await household();
@@ -181,17 +92,6 @@ describe("routes", () => {
     expect(((await (await adult.client.get("/api/loras/available")).json()) as { items: unknown[] }).items).toHaveLength(1);
     expect(((await (await owner.get("/api/loras")).json()) as { items: unknown[] }).items).toHaveLength(1);
   });
-
-
-
-
-  test("a record past its 30 days is dropped with its file on the next sync", async () => {
-    const { row } = await household();
-    const lora = putLora(row("Sage").id, { removed_at: "2026-09-01T00:00:00.000Z", trash_until: "2026-10-01T00:00:00.000Z" });
-    await syncLoras(true);
-    expect(getLoraRecord(lora.id)).toBeNull();
-  });
-
 });
 
 describe("leak test: an adult-only style's name, trigger, add-in, hash and preview never appear while it is locked", () => {

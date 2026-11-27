@@ -1,5 +1,5 @@
-// VIDEO-GEN-04, rebuilt by VIDEO-LORA-03 (docs/dev/loras.md): the household's video LoRAs as chat, Create and the job code see them. The ONE store is the `loras`
-// table (lib/loras/store.ts, one spec `Lora` record each, kept in step with the Stack's files by lib/loras/sync.ts); the old `video_adapter_prefs` rows were
+// VIDEO-GEN-04, rebuilt by VIDEO-LORA-03 (docs/dev/loras.md): the household's video LoRAs as chat, Create and the job code see them. The ONE store is the Stack (not a Home table)
+// table (the Stack's library, read by lib/loras/stackLibrary.ts, one spec `Lora` record each); the old `video_adapter_prefs` rows were
 // folded into records there. Who may see or use a LoRA is `loraAccess` (lib/loras/access.ts), the single read path: `videoAdaptersFor` returns only what the
 // person may use right now, so the model never gets an id it must not use, and `allVideoAdapters` (no filtering) is for internal lookups of a LoRA's own
 // facts (never a route's answer).

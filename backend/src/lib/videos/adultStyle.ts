@@ -1,5 +1,5 @@
 // ADULT-LOCK-06, extended by VIDEO-LORA-03: the ONE answer to "does this job use an adult-only style", asked at job start (before the Stack is called) by Create,
-// chat, another take and every edit. The answer is read from the `Lora` records (lib/loras/store.ts), the one store of a style's audience; no caller keeps a copy
+// chat, another take and every edit. The answer is read from the `Lora` records (lib/loras/stackLibrary.ts, read from the Stack), the one store of a style's audience; no caller keeps a copy
 // of the rule.
 import { getLoraRecord, refreshLoras } from "@/lib/loras/stackLibrary";
 

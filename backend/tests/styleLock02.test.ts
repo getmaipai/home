@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from
 import { resetDb } from "./reset-db";
 import { __resetAdultLockForTests } from "@/lib/adultLock";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { __resetVideoAdapterCacheForTests } from "@/lib/videos/adapters";
 import { __setVideoStatusForTests } from "@/lib/videos/ready";
 import { __setComponentsFetchForTests, type StackComponent } from "@/lib/stackComponents";
@@ -33,7 +32,7 @@ const comp = (over: Partial<StackComponent>): StackComponent => ({
 });
 
 beforeEach(() => {
-  resetDb(); __resetVideoAdapterCacheForTests(); __resetLoraSyncForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
+  resetDb(); __resetVideoAdapterCacheForTests(); __resetAdultLockForTests(); __resetThrottleForTests();
   video = installFakeVideoStack(); video.loras = [];
   images = installFakeImageStack();
   images.loras.push({ id: PIC_ID, name: PIC_NAME, sha256: "d".repeat(64), bytes: 777_777, base_model: "flux2-klein-4b", licence: null, source_url: null, classification: "adult-only", trigger_words: [PIC_WORD], strength_default: 1, added_at: "2026-10-17T00:00:00Z" });

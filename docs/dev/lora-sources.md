@@ -1,5 +1,7 @@
 # LoRA sources and install (backend)
 
+> **Historical since 2026-11-27 (STACK-LORAS-01 slice 6).** The Stack browses the sites, checks the files and installs; Home's `source.ts`, `install.ts` and `adultCheck.ts` were removed. Current routes and files: [loras.md](loras.md).
+
 Built 2026-11-03 for VIDEO-LORA-07. Design: [video-loras-2026-11-02.md](../design/video-loras-2026-11-02.md) sections 5 and 15. The Styles tab (VIDEO-LORA-08, below) uses these routes. Records and access are in [loras.md](loras.md); the lock is in [adult-lock.md](adult-lock.md).
 
 ## Pieces

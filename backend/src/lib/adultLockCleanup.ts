@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from "node:path";
 import { and, eq, isNull, like, or } from "drizzle-orm";
 import { db, dbPath, sqlite } from "@/db";
-import { attachments, adultMarkLog, loras, people, pictureJobs } from "@/db/schema";
+import { attachments, adultMarkLog, people, pictureJobs } from "@/db/schema";
+import { getLoraRecord, refreshLoras } from "@/lib/loras/stackLibrary";
 import { LOCKED_WRITERS, lockItemOfProvenance } from "@/lib/adultLock";
 import { libraryProvenance } from "@/lib/libraryProvenance";
 import { fileAudience } from "@/lib/access";
@@ -25,6 +26,8 @@ export async function scanAutoLocks(): Promise<ScanResult> {
   const counts: ScanCounts = { notLocked: 0, otherKind: 0, minorOwner: 0, personSet: 0, adultStyle: 0, labelledSource: 0, notSure: 0 };
   const byKind: Record<string, number> = {};
   const candidates: CandidateItem[] = [];
+  // A style's audience is the Stack's (STACK-LORAS-01): read it fresh; when the Stack cannot be read no style resolves and each picture counts as not sure.
+  await refreshLoras(true);
   const files = db.select({ id: attachments.id, owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments)
     .where(and(isNull(attachments.deletedAt), or(...LOCKED_WRITERS.map((writer) => like(attachments.provenance, `${writer}:%`))))).all();
   for (const file of files) {
@@ -49,7 +52,7 @@ export async function scanAutoLocks(): Promise<ScanResult> {
     let style: "ok" | "adult" | "notSure" = "ok";
     for (const raw of request.loras) {
       if (typeof raw !== "string") { style = "notSure"; break; }
-      const lora = db.select({ audience: loras.audience }).from(loras).where(eq(loras.id, raw)).get();
+      const lora = getLoraRecord(raw);
       if (!lora) { style = "notSure"; break; }
       if (lora.audience === "adult-only") { style = "adult"; break; }
     }

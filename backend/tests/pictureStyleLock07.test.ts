@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { addBenchTeen, createBenchPeople } from "../scripts/bench/conversationRunner";
 import { __resetAdultLockForTests, __unlockRestOfTest } from "@/lib/adultLock";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
-import { saveLora } from "@/lib/loras/store";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
@@ -19,18 +17,17 @@ const make = (actor: PersonRow, style: string, prompt = "a quiet landscape") => 
 const outcomeText = (result: Awaited<ReturnType<typeof make>>) => (result.result?.reply as { text: string }).text;
 
 beforeEach(() => {
-  resetDb(); __resetAdultLockForTests(); __resetLoraSyncForTests();
+  resetDb(); __resetAdultLockForTests();
   const people = createBenchPeople(); owner = people.owner; child = people.child; teen = addBenchTeen(people);
   fake = installFakeImageStack();
   const adult = secretLora(owner.id, { media: "picture", name: "Zebraquill hidden look", file: { sha256: "d".repeat(64), bytes: 1000, rank: 16, modules: [], format: "safetensors" } });
   const allAges = secretLora(owner.id, { id: "lora-aaaaaaaaaaaaaaaa", media: "picture", file: { sha256: "e".repeat(64), bytes: 1000, rank: 16, modules: [], format: "safetensors" }, audience: "all-ages", audience_set_by: owner.id, audience_set_at: new Date().toISOString(), availability: { who: "adults", people: [] }, name: "Pixel Art", trigger_words: ["pixelart"] });
-  saveLora(adult, owner.id); saveLora(allAges, owner.id);
   fake.loras = [
     { id: adult.id, name: adult.name, sha256: adult.file.sha256, bytes: 1000, base_model: "minimax-h3-image", licence: "MIT", source_url: null, classification: "adult-only", trigger_words: adult.trigger_words, strength_default: 0.9, added_at: adult.added_at },
     { id: allAges.id, name: allAges.name, sha256: allAges.file.sha256, bytes: 1000, base_model: "minimax-h3-image", licence: "MIT", source_url: null, classification: "all-ages", trigger_words: allAges.trigger_words, strength_default: 0.8, added_at: allAges.added_at },
   ];
 });
-afterEach(() => { fake.restore(); __resetAdultLockForTests(); __resetLoraSyncForTests(); });
+afterEach(() => { fake.restore(); __resetAdultLockForTests(); });
 
 describe("ADULT-LOCK-07 picture style lock", () => {
   test("no proof refuses an adult style without submitting or echoing request text", async () => {

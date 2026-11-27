@@ -5,7 +5,6 @@ import { putLora } from "./fixtures/lora";
 import { suggestStyles } from "@/lib/loras/suggest";
 import { getLoraRecord } from "@/lib/loras/stackLibrary";
 import { __resetAdultLockForTests, issueProof, type AdultProof } from "@/lib/adultLock";
-import { __resetLoraSyncForTests } from "@/lib/loras/sync";
 import { installFakeVideoStack } from "./videoFixture";
 import type { PersonRow } from "@/types";
 import { TestClient } from "./client";
@@ -13,7 +12,7 @@ import { sessionKeyOf } from "@/lib/adultLock";
 import { adminLoraView } from "@/routes/loras";
 
 let fake: ReturnType<typeof installFakeVideoStack>;
-beforeEach(() => { resetDb(); __resetAdultLockForTests(); __resetLoraSyncForTests(); fake = installFakeVideoStack(); fake.loras = []; });
+beforeEach(() => { resetDb(); __resetAdultLockForTests(); fake = installFakeVideoStack(); fake.loras = []; });
 afterEach(() => fake.restore());
 const proofFor = (p: PersonRow): AdultProof => ({ token: issueProof(p.id, "test-session", "t").proof, sessionKey: "test-session" });
 
