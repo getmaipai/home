@@ -3926,7 +3926,7 @@ From two read-only audits of `origin/main` (frontend against Chat and the platfo
 
 ## Stack menu in Home
 
-- [ ] **STACK-MENU-SYNC-01: One Stack section in Home Settings that mirrors the Stack admin menu** (M, commons, stack, home; plan [stack-menu-in-home-2026-11-27.md](plans/stack-menu-in-home-2026-11-27.md), architect APPROVED 2026-11-27). Objective: a shared `spec/stack/screens.json` defines the menu; Home Settings gets a Stack item with a General tab and one tab per Stack screen, each showing the Stack's kit page or an open-in-admin stub, and the old AI and models and Styles cards redirect. Acceptance: Home tabs equal the Stack menu (drift tests green), no Stack data copied in Home, gates and previews checked.
+- [x] **STACK-MENU-SYNC-01: One Stack section in Home Settings that mirrors the Stack admin menu** (M, commons, stack, home; plan [stack-menu-in-home-2026-11-27.md](plans/stack-menu-in-home-2026-11-27.md), architect APPROVED 2026-11-27). Objective: a shared `spec/stack/screens.json` defines the menu; Home Settings gets a Stack item with a General tab and one tab per Stack screen, each showing the Stack's kit page or an open-in-admin stub, and the old AI and models and Styles cards redirect. Acceptance: Home tabs equal the Stack menu (drift tests green), no Stack data copied in Home, gates and previews checked. Landed 2026-11-27 (8389ccc).
 
 ## Stack owns LoRAs
 
