@@ -11,6 +11,7 @@ import { projectMachine } from "./machine";
 import { refusalFor } from "./steps";
 import { planSteps } from "./types";
 import { postProjectResult } from "./post";
+import { toolOutcomeUnknown } from "@/lib/toolAudit";
 import type { Project } from "./types";
 
 export type { CreateProjectInput as StartProjectInput };
@@ -126,6 +127,14 @@ export function resumeAll(): void {
   for (const project of listResumableProjects()) {
     for (const stepState of project.steps) {
       if (stepState.state === "running") {
+        // TOOL-INTENT-LINE-01: a tool step cut off after its intent row may already have happened; it is never repeated blindly.
+        const planned = planSteps(project.plan).find((s) => s.id === stepState.stepId);
+        if (planned?.kind === "tool" && toolOutcomeUnknown(project.provenance.person, planned.params.tool, `${project.id}:${planned.id}`)) {
+          stepState.state = "failed";
+          stepState.error = `the "${planned.id}" step was running when the hub stopped, so whether it finished is unknown; it was not run again. Check the result and start it again if needed.`;
+          stepState.endedAt = new Date().toISOString();
+          continue;
+        }
         stepState.state = "pending";
         stepState.startedAt = null;
       }

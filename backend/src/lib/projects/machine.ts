@@ -25,6 +25,7 @@
 import { setup, fromPromise } from "xstate";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { executeStep } from "./steps";
+import { recordToolIntent, recordToolResult } from "@/lib/toolAudit";
 import { planSteps, stepStateFor } from "./types";
 import type { Project, PlanStep } from "./types";
 
@@ -59,6 +60,9 @@ async function runOneStep(project: Project, step: PlanStep): Promise<void> {
   const state = stepStateFor(project, step.id);
   state.state = "running";
   state.startedAt = new Date().toISOString();
+  // TOOL-INTENT-LINE-01: a tool step changes something, so the intent is written first; the result row closes it.
+  const toolLine = step.kind === "tool" ? { personId: project.provenance.person, tool: step.params.tool, stepId: `${project.id}:${step.id}`, band: "project" } : null;
+  if (toolLine) recordToolIntent(toolLine);
   try {
     await withTimeout(executeStep(project, step), STEP_DEADLINE_MS, () => new Error(`the "${step.id}" step exceeded its ${STEP_DEADLINE_MS / 1000}s deadline`));
     state.state = "done";
@@ -66,6 +70,7 @@ async function runOneStep(project: Project, step: PlanStep): Promise<void> {
     state.state = "failed";
     state.error = err instanceof Error ? err.message : String(err);
   } finally {
+    if (toolLine) recordToolResult(toolLine);
     state.endedAt = new Date().toISOString();
   }
 }
