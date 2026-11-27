@@ -40,6 +40,7 @@ import { SPECULATIVE_REFUSAL_CODES, type SpeculativeOutcome } from "@/lib/voice/
 import { createVoiceTrace, type VoiceTrace } from "@/lib/voice/voiceTrace";
 import { browserFamily, createEchoGate, type EchoGate } from "@/lib/voice/echoGate";
 import { isOwnEcho, isOwnEchoTurn, normalizeOwnEchoTranscript } from "@/lib/voice/ownEcho";
+import { BARGE_IDLE, nextBargeState, type BargeEvent, type BargeState } from "@/apps/chat/voiceBargeMachine";
 
 export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
@@ -174,8 +175,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const interruptedTurnRef = useRef<string | null>(null);
   const overlapPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const falseInterruptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const overlapPausedRef = useRef(false);
-  const overlapTranscriptRef = useRef(false);
+  // VOICE-MACHINE-01: the pause/resume/stop decisions live in voiceBargeMachine.ts; this ref holds its state, `runBarge` runs its effects.
+  const bargeRef = useRef<BargeState>(BARGE_IDLE);
+  const overlapPaused = () => bargeRef.current.paused;
   const bargeStartRef = useRef<number | null>(null);
   const bargePauseStartedRef = useRef<number | null>(null);
   const bargePauseMsRef = useRef<number | undefined>(undefined);
@@ -185,8 +187,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const bargeSinceReplyMsRef = useRef<number | undefined>(undefined);
   const replyStartedAtRef = useRef(0);
   const replyStartedPerfRef = useRef(0);
-  const bargeOutcomeRef = useRef<"stopped" | "resumed_noise" | "resumed_reaction" | "resumed_echo" | "none">("none");
-  const resetBargeMetrics = () => { bargeStartRef.current = null; bargePauseStartedRef.current = null; bargePauseMsRef.current = undefined; bargePausedRef.current = undefined; bargeGateBlockedMsRef.current = undefined; bargeGatePassedRef.current = false; bargeSinceReplyMsRef.current = undefined; bargeOutcomeRef.current = "none"; };
+  const resetBargeMetrics = () => { bargeStartRef.current = null; bargePauseStartedRef.current = null; bargePauseMsRef.current = undefined; bargePausedRef.current = undefined; bargeGateBlockedMsRef.current = undefined; bargeGatePassedRef.current = false; bargeSinceReplyMsRef.current = undefined; runBarge({ t: "reply_ended" }); };
   const mutedRef = useRef(false);
   const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // STT-SMARTTURN-01: the held run begun on the edge partial, and whether the next partial is that edge partial (the first after the voice stopped).
@@ -267,27 +268,34 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   /** PAUSE-EXIT-01: the pause's one exit when no final came in time. */
   const resolvePauseByDeadline = () => {
     pauseDeadlineRef.current = null;
-    if (!overlapPausedRef.current) return;
-    if (overlapTranscriptRef.current) {
-      // Real words since the pause: a cut-in. The reply stops for good; the final, when it lands, is the next turn.
-      trace("pause_resolved", { reason: "deadline_interrupt", played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
-      if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current);
-      duplexCounters.interruptions++;
-      bargeOutcomeRef.current = "stopped";
-      interrupt("voice");
-    } else {
-      trace("pause_resolved", { reason: "deadline_resume" });
-      bargeOutcomeRef.current = "resumed_noise";
-      restoreVoice();
-      overlapPausedRef.current = false;
-    }
+    runBarge({ t: "deadline" });
   };
   const pauseWithDeadline = () => {
     if (bargeStartRef.current !== null) { bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current); bargePausedRef.current = true; }
     turnSchedulerRef.current?.pause();
-    overlapPausedRef.current = true;
     clearPauseDeadline();
     pauseDeadlineRef.current = setTimeout(resolvePauseByDeadline, PAUSE_DEADLINE_MS);
+  };
+  /** The thin layer: step the pure machine, then run what it asks for. */
+  const runBarge = (event: BargeEvent) => {
+    const step = nextBargeState(bargeRef.current, event);
+    bargeRef.current = step.state;
+    for (const effect of step.effects) {
+      switch (effect.k) {
+        case "pause": pauseWithDeadline(); break;
+        case "resume": restoreVoice(); break;
+        case "stop_reply": interrupt("voice"); break;
+        case "clear_duck": if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; } break;
+        case "clear_overlap_timer": if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current); overlapPauseTimerRef.current = null; break;
+        case "clear_false_timer": if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current); falseInterruptionTimerRef.current = null; break;
+        case "start_false_timer":
+          falseInterruptionTimerRef.current = setTimeout(() => { falseInterruptionTimerRef.current = null; runBarge({ t: "false_interruption_elapsed" }); }, DUPLEX_FALSE_INTERRUPTION_MS);
+          break;
+        case "mark_pause_ms": if (bargeStartRef.current !== null) bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current); break;
+        case "count": if (effect.which === "interruption") duplexCounters.interruptions++; else duplexCounters.reactionResumes++; break;
+        case "trace": trace(effect.event, effect.played ? { ...effect.extra, played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) } : effect.extra); break;
+      }
+    }
   };
   const cancelReaction = () => {
     reactionEpochRef.current += 1;
@@ -365,7 +373,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
     overlapPauseTimerRef.current = null;
     falseInterruptionTimerRef.current = null;
-    overlapPausedRef.current = false;
+    runBarge({ t: "interrupted" });
     const active = activeTurnRef.current;
     if (reason === "voice" && active) markVoiceInterrupted(active.turnId);
     if (active && interruptedTurnRef.current !== active.turnId) {
@@ -529,14 +537,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             break;
           case "reply_resume":
             // The sound was not speech: carry on from the same spot.
-            trace("reply_resume", { paused: overlapPausedRef.current });
-            if (overlapPausedRef.current) {
-              trace("pause_resolved", { reason: "hub_resume" });
-              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
-              overlapPauseTimerRef.current = null;
-              restoreVoice();
-              overlapPausedRef.current = false;
-            }
+            runBarge({ t: "hub_resume" });
             break;
           case "timing":
             sttMsForNextTurn = message.speech_end_to_final_ms;
@@ -552,10 +553,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               const edgeText = message.v.trim();
               if (isOwnVoice(edgeText)) { trace("echo_partial", { words: edgeText.split(/\s+/).length, edge: true }); if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
               else if (isReaction(normalizedTranscript(edgeText), edgeText)) { /* reactions resume the reply; they do not start a held answer */ }
-              else if (!mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && !overlapPausedRef.current) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, false);
+              else if (!mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && !overlapPaused()) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, false);
               // The session would not start early: the label names the real blocker (the mode value, a paused overlap, or the reply audio flag still set
               // while the mode reads listening), never a catch-all, so a live record says why.
-              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : overlapPausedRef.current ? "refused_overlap_paused" : modeRef.current === "speaking" ? "refused_mode_speaking" : modeRef.current === "thinking" ? "refused_mode_thinking" : modeRef.current === "connecting" ? "refused_mode_connecting" : "refused_reply_speaking";
+              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : overlapPaused() ? "refused_overlap_paused" : modeRef.current === "speaking" ? "refused_mode_speaking" : modeRef.current === "thinking" ? "refused_mode_thinking" : modeRef.current === "connecting" ? "refused_mode_connecting" : "refused_reply_speaking";
             }
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
@@ -571,14 +572,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // A stop word she has just said herself ("he had to wait") is not a reason to pause her: the microphone hears her own words back.
               const stopMatch = /\b(?:stop|wait|hold|pause|quiet|enough|shush|shh|nope|hang|no)\b/.exec(heard);
               const stopWord = stopMatch !== null && !homeVoiceWords().includes(stopMatch[0]);
-              if (heard && !isReaction(heard, message.v) && !ownVoice) {
-                overlapTranscriptRef.current = true;
-                // One explicit stop word is sufficient; ordinary speech keeps the existing two-word threshold.
-                if (stopWord || heard.split(" ").length >= 2) {
-                  if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
-                  if (!overlapPausedRef.current) { trace(stopWord ? "pause_stop_word" : "pause", { words: heard.split(" ").length }); pauseWithDeadline(); }
-                }
-              }
+              runBarge({ t: "partial", heard: Boolean(heard), heardWords: heard ? heard.split(" ").length : 0, reaction: Boolean(heard) && isReaction(heard, message.v), ownVoice, stopWord });
             }
             // Not shown: a partial can revise itself several times a
             // second (interim ASR hypotheses) - the listening ring's
@@ -598,7 +592,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               // she spoke was the "blip" the owner heard: the microphone hears her own reply, that sound lasts as long as the reply, and
               // the pause came before any transcript could say whose voice it was. Her words in a partial (two real words that are not
               // her own) pause her; the final decides the rest (Jesse, 2026-10-30: she pauses only once the sound is clearly speech).
-              if (voiceBargeIn && !mutedRef.current && isReplySpeaking()) overlapTranscriptRef.current = false;
+              runBarge({ t: "sound_start", live: voiceBargeIn && !mutedRef.current && isReplySpeaking() });
             } else {
               activeSpeechRef.current = false;
               edgePartialPendingRef.current = true; // STT-SMARTTURN-01: the next partial is the edge partial
@@ -621,16 +615,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                   }).catch(() => undefined);
                 }, REACTION_PAUSE_MS);
               }
-              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
-              overlapPauseTimerRef.current = null;
-              if (overlapPausedRef.current && !overlapTranscriptRef.current) {
-                if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
-                falseInterruptionTimerRef.current = setTimeout(() => {
-                  falseInterruptionTimerRef.current = null;
-                  if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_noise"; restoreVoice(); }
-                  overlapPausedRef.current = false;
-                }, DUPLEX_FALSE_INTERRUPTION_MS);
-              }
+              runBarge({ t: "sound_end" });
             }
             break;
           case "final": {
@@ -654,14 +639,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (normalized && (isOwnEcho(text, spokenWords) || echoTurn.drop)) {
               echoCounters.dropped++; echoDropsRef.current += 1;
               trace("echo_final", { words: normalized.split(" ").length });
-              if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_echo" });
+              runBarge({ t: "final_echo" });
               traceRef.current?.endUtterance();
-              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
-              overlapPauseTimerRef.current = null;
-              if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
-              falseInterruptionTimerRef.current = null;
-              if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_echo"; restoreVoice(); }
-              overlapPausedRef.current = false;
               discardSpeculation();
               if (speculativeOutcomeRef.current === "armed" || speculativeOutcomeRef.current === "echo") speculativeOutcomeRef.current = "armed";
               break;
@@ -669,26 +648,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (normalized) lastAcceptedCutInAtRef.current = nowMs;
             speechStartedAtRef.current = -1;
             if (voiceBargeIn && isReplySpeaking() && !mutedRef.current) {
-              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
-              overlapPauseTimerRef.current = null;
-              if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
-              falseInterruptionTimerRef.current = null;
               if (!normalized || isReaction(normalized, text)) {
                 // Only noise or a bare reaction: carry on speaking.
-                trace("reaction", { words: normalized ? normalized.split(" ").length : 0, paused: overlapPausedRef.current });
-                if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_reaction" });
-                if (normalized) duplexCounters.reactionResumes++;
-                if (overlapPausedRef.current) { bargeOutcomeRef.current = "resumed_reaction"; restoreVoice(); }
-                overlapPausedRef.current = false;
+                runBarge({ t: "final_reaction", words: normalized ? normalized.split(" ").length : 0 });
                 if (speculationRef.current) { discardSpeculation(); speculativeOutcomeRef.current = "discarded"; }
                 break;
               }
-              overlapTranscriptRef.current = true;
-              duplexCounters.interruptions++;
-              bargeOutcomeRef.current = "stopped";
-              if (overlapPausedRef.current) trace("pause_resolved", { reason: "final_interrupt" });
-              trace("interrupt", { words: normalized.split(" ").length, played_ms: Math.round(turnSchedulerRef.current?.playedMs?.() ?? 0) });
-              interrupt("voice");
+              runBarge({ t: "final_words", words: normalized.split(" ").length });
             } else if (voiceBargeIn && modeRef.current === "thinking" && !mutedRef.current) {
               trace("interrupt", { words: normalized.split(" ").length, thinking: true });
               interrupt("voice");
@@ -728,10 +694,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             refusedThisUtteranceRef.current = false;
             const edgePartials = edgeCountRef.current; edgeCountRef.current = 0;
             const echoDrops = echoDropsRef.current; echoDropsRef.current = 0;
-            if (bargeStartRef.current !== null && overlapPausedRef.current && bargePauseMsRef.current === undefined) { bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current); bargePausedRef.current = true; }
+            if (bargeStartRef.current !== null && overlapPaused() && bargePauseMsRef.current === undefined) { bargePauseMsRef.current = Math.max(0, performance.now() - bargeStartRef.current); bargePausedRef.current = true; }
             trace("turn_send", { words: text.split(/\s+/).filter(Boolean).length, speculative, edges: edgePartials, echo_drops: echoDrops });
             traceRef.current?.endUtterance();
-            const bargeFields = bargeStartRef.current !== null ? { ...(bargePauseMsRef.current !== undefined && bargePauseMsRef.current <= 60_000 ? { bargePauseMs: bargePauseMsRef.current } : {}), ...(bargeGateBlockedMsRef.current !== undefined && bargeGateBlockedMsRef.current <= 60_000 ? { bargeGateBlockedMs: bargeGateBlockedMsRef.current } : {}), ...(bargeSinceReplyMsRef.current !== undefined && bargeSinceReplyMsRef.current <= 60_000 ? { bargeSinceReplyMs: bargeSinceReplyMsRef.current } : {}), bargePaused: bargePausedRef.current ?? false, bargeOutcome: bargeOutcomeRef.current } : {};
+            const bargeFields = bargeStartRef.current !== null ? { ...(bargePauseMsRef.current !== undefined && bargePauseMsRef.current <= 60_000 ? { bargePauseMs: bargePauseMsRef.current } : {}), ...(bargeGateBlockedMsRef.current !== undefined && bargeGateBlockedMsRef.current <= 60_000 ? { bargeGateBlockedMs: bargeGateBlockedMsRef.current } : {}), ...(bargeSinceReplyMsRef.current !== undefined && bargeSinceReplyMsRef.current <= 60_000 ? { bargeSinceReplyMs: bargeSinceReplyMsRef.current } : {}), bargePaused: bargePausedRef.current ?? false, bargeOutcome: bargeRef.current.outcome } : {};
             if (bargeStartRef.current !== null && [bargePauseMsRef.current, bargeGateBlockedMsRef.current, bargeSinceReplyMsRef.current].some((value) => value !== undefined && value > 60_000)) trace("barge_metric_out_of_range");
             onVoiceTiming?.({ sttMs: sttMs !== null && Number.isFinite(sttMs) && sttMs >= 0 ? sttMs : 0, phase: "final", ...(speculation ? { speculative } : {}), edgePartials, echoDrops, ...bargeFields });
             resetBargeMetrics();
