@@ -113,7 +113,7 @@ describe("General", () => {
     expect(view.getByText("The Stack is running").closest("section")!.querySelector("svg")).not.toBeNull();
     expect(view.getByText("This computer")).toBeTruthy();
     expect(view.getByText("0.4.2")).toBeTruthy();
-    expect((await view.findByRole("link", { name: "Open Stack admin" })).getAttribute("target")).toBe("_blank");
+    expect((await view.findByRole("link", { name: "Open the Stack admin sign-in page" })).getAttribute("target")).toBe("_blank");
     fireEvent.click(view.getByRole("button", { name: "Check now" }));
     await waitFor(() => expect(fixture!.requests.filter((request) => request.endsWith("/api/ai/stack/general")).length).toBeGreaterThan(1));
   });
@@ -137,31 +137,62 @@ describe("General", () => {
 describe("General: the Stack admin link", () => {
   test("shows a working link to the Stack admin sign-in on the computer that runs it", async () => {
     const view = open(makePerson("owner"), "/settings/stack");
-    expect((await view.findByRole("link", { name: "Open Stack admin" })).getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
+    expect((await view.findByRole("link", { name: "Open the Stack admin sign-in page" })).getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
   });
   test("from another device it uses the Tailscale address the Stack reports", async () => {
     adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null };
     const view = open(makePerson("owner"), "/settings/stack");
-    const link = await view.findByRole("link", { name: "Open Stack admin" });
+    const link = await view.findByRole("link", { name: "Open the Stack admin sign-in page" });
     expect(link.getAttribute("href")).toMatch(/^http:\/\/(127\.0\.0\.1|100\.64\.0\.9):8770\/admin\/$/);
   });
-  test("when no address reaches this device it says why in words, not a bare dead button", async () => {
-    adminLink = { local_url: null, remote_url: null, reason: "The Stack's admin page opens only on the computer that runs MaiPai." };
+  test("a Stack that lists the tailnet address makes the link work from any computer, with no same-computer warning", async () => {
+    adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null, remote_state: "listening", can_turn_on: false };
     const view = open(makePerson("owner"), "/settings/stack");
-    expect(await view.findByText("The Stack's admin page opens only on the computer that runs MaiPai.")).toBeTruthy();
-    expect((view.getByRole("button", { name: "Open Stack admin" }) as HTMLButtonElement).disabled).toBe(true);
+    await view.findByRole("link", { name: "Open the Stack admin sign-in page" });
+    expect(view.queryByText(/only on the computer|same computer/i)).toBeNull();
+  });
+  test("with the setting on but the Stack not restarted yet it says restart pending in words, not a bare dead button", async () => {
+    adminLink = { local_url: null, remote_url: null, reason: "The setting is on and takes effect when the Stack restarts. Restart the Stack, then this link works from any computer on your tailnet.", remote_state: "restart_pending", can_turn_on: false };
+    const view = open(makePerson("owner"), "/settings/stack");
+    expect(await view.findByText(/takes effect when the Stack restarts/)).toBeTruthy();
+    expect((view.getByRole("button", { name: "Open the Stack admin sign-in page" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(view.queryByRole("button", { name: "Turn on admin page over Tailscale" })).toBeNull();
+  });
+  test("with the setting off it offers one button that turns it on, then shows restart pending", async () => {
+    adminLink = { local_url: null, remote_url: null, reason: "Turn on \"Admin page over Tailscale\" to open the admin page from another computer.", remote_state: "off", can_turn_on: true };
+    const view = open(makePerson("owner"), "/settings/stack");
+    const turnOnCalls: string[] = [];
+    const wrapped = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (path.endsWith("/api/ai/stack/admin-link/turn-on")) {
+        turnOnCalls.push(init?.method ?? "GET");
+        adminLink = { local_url: null, remote_url: null, reason: "The setting is on and takes effect when the Stack restarts.", remote_state: "restart_pending", can_turn_on: false };
+        return Promise.resolve(Response.json(adminLink));
+      }
+      return wrapped(input, init);
+    }) as typeof fetch;
+    fireEvent.click(await view.findByRole("button", { name: "Turn on admin page over Tailscale" }));
+    expect(await view.findByText("The setting is on and takes effect when the Stack restarts.")).toBeTruthy();
+    expect(turnOnCalls).toEqual(["POST"]);
+    expect(view.queryByRole("button", { name: "Turn on admin page over Tailscale" })).toBeNull();
   });
 });
 
 describe("General: live use of the Stack's computer", () => {
-  test("shows the memory share, what is loaded and the jobs, read from the Stack", async () => {
+  test("draws the shared colored memory bar from the Stack's own readings, and the jobs", async () => {
     const view = open(makePerson("owner"), "/settings/stack");
     const usage = await view.findByTestId("stack-usage");
-    expect(within(usage).getByText("Memory the Stack may use")).toBeTruthy();
-    expect(within(usage).getByText(/of 120 GB in use/)).toBeTruthy();
-    expect(within(usage).getByText(/Chat 23\.\d GB, Voice out 4\.\d GB/)).toBeTruthy();
+    const memory = await within(usage).findByTestId("stack-memory-now");
+    expect(within(memory).getByText("60 GB of 128 GB")).toBeTruthy();
+    expect(within(memory).getByText("Comfortable")).toBeTruthy();
+    const chat = within(memory).getByTestId("stack-memory-segment-chat");
+    expect(chat.getAttribute("style")).toContain("var(--chart-1)");
+    expect(within(memory).getByTestId("stack-memory-segment-tts").getAttribute("style")).not.toBe(chat.getAttribute("style"));
+    expect(within(memory).getByTestId("stack-memory-segment-free")).toBeTruthy();
+    expect(within(memory).queryByTestId("stack-memory-segment-image")).toBeNull();
+    expect(within(memory).getByText(/Nova 8B/)).toBeTruthy();
     expect(within(usage).getByText("1 running, 2 waiting")).toBeTruthy();
-    expect(within(usage).getByRole("progressbar")).toBeTruthy();
   });
   test("with the Stack stopped there is no usage panel", async () => {
     const view = open(makePerson("owner"), "/settings/stack", { stackGeneral: { where: "this_computer", reachable: false, version: null, problems: null, reason: "x" } });

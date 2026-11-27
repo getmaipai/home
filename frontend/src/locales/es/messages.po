@@ -592,11 +592,6 @@ msgid "{greeting}. Here is your household today."
 msgstr "{greeting}. Así está tu hogar hoy."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:46
-msgid "{held} of {budget} in use"
-msgstr "{held} de {budget} en uso"
-
-#. js-lingui-explicit-id
 #: src/apps/reminders/ComingUpRow.tsx:35
 #: src/apps/reminders/ComingUpRow.tsx:36
 #, needs-review
@@ -1366,7 +1361,7 @@ msgid "{row}: {category}"
 msgstr "{row}: {category}"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:66
+#: src/apps/settings/stack/StackUsage.tsx:49
 msgid "{running} running, {waiting} waiting"
 msgstr "{running} en marcha, {waiting} en espera"
 
@@ -13404,6 +13399,11 @@ msgid "Home could not start the sound. Check the request and try again."
 msgstr "Home no pudo iniciar el sonido. Revisa la solicitud e intenta de nuevo."
 
 #. js-lingui-explicit-id
+#: src/apps/settings/StackAdminLink.tsx:54
+msgid "Home could not turn that on. Check that the Stack is running, then try again."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CodingSettings.tsx:84
 #, needs-review
 msgid "Home could not update coding mode. Try again."
@@ -15065,7 +15065,7 @@ msgid "jobs"
 msgstr "tareas"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:62
+#: src/apps/settings/stack/StackUsage.tsx:45
 msgid "Jobs"
 msgstr "Tareas"
 
@@ -16641,11 +16641,6 @@ msgstr "Cargar noticias antes de tiempo"
 #, needs-review
 msgid "Loaded"
 msgstr "Cargado"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:52
-msgid "Loaded now"
-msgstr "Cargado ahora"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotPasswordSection.tsx:138
@@ -18309,11 +18304,6 @@ msgstr "Memoria en uso por chat y voz: {gb} GB"
 #, needs-review
 msgid "Memory judge"
 msgstr "Juez de memoria"
-
-#. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:38
-msgid "Memory the Stack may use"
-msgstr "Memoria que puede usar el Stack"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusComponents.tsx:146
@@ -20540,17 +20530,12 @@ msgid "Nothing in the pictures or the personality would scare or confuse a young
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:55
-msgid "Nothing is loaded."
-msgstr "No hay nada cargado."
-
-#. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:161
 msgid "Nothing is queued after this song."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackUsage.tsx:65
+#: src/apps/settings/stack/StackUsage.tsx:48
 msgid "Nothing is running or waiting."
 msgstr "No hay nada en marcha ni en espera."
 
@@ -21602,11 +21587,6 @@ msgid "Open source conversation"
 msgstr "Abrir conversación original"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackAdminLink.tsx:29
-msgid "Open Stack admin"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1057
 #, needs-review
 msgid "setting.news.reader_open.label"
@@ -21629,6 +21609,11 @@ msgstr "Abre el razonamiento del modelo bajo cada respuesta del chat en lugar de
 #, needs-review
 msgid "setting.news.reader_open.option.site"
 msgstr "Abre el sitio web del editor."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/StackAdminLink.tsx:60
+msgid "Open the Stack admin sign-in page"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/stack/StackGeneral.tsx:35
@@ -32491,6 +32476,11 @@ msgid "Turn on"
 msgstr "Activar"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/StackAdminLink.tsx:74
+msgid "Turn on admin page over Tailscale"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/CloseAppsStep.tsx:80
 #, needs-review
 msgid "Turn on Automatic"
@@ -33277,8 +33267,8 @@ msgid "Use Max"
 msgstr "Usa Max"
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackUsage.tsx:39
 #: src/apps/settings/stack/StackUsage.tsx:40
-#: src/apps/settings/stack/StackUsage.tsx:41
 msgid "Use right now"
 msgstr "Uso en este momento"
 

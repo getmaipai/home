@@ -41,6 +41,15 @@ export function buildAdminLink({ port, onThisComputer, access }: AdminLinkInput)
 
 interface Reported { state: RemoteAdminState; url: string | null; message: string | null }
 
+const defaultProbe = async (url: string): Promise<boolean> => {
+  try { return (await fetch(`${url.replace(/admin\/$/, "")}healthz`, { signal: AbortSignal.timeout(1_500) })).ok; } catch { return false; }
+};
+let probe: (url: string) => Promise<boolean> = defaultProbe;
+const defaultAddress = async (): Promise<string | null> => (await getTailscaleStatus()).ips.find((ip) => !ip.includes(":")) ?? null;
+let tailnetAddress: () => Promise<string | null> = defaultAddress;
+export function __setAdminLinkSeamsForTests(seams: { probe?: (url: string) => Promise<boolean>; address?: () => Promise<string | null> } | null): void { probe = seams?.probe ?? defaultProbe; tailnetAddress = seams?.address ?? defaultAddress; }
+const NOT_LISTENING = "The setting is on, but the Stack is not listening on your tailnet yet. Restart the Stack, then this link works from any computer on your tailnet.";
+
 /** The Stack's own report. An older Stack without that route is read from its settings instead (in effect means listening on this computer's tailnet address). */
 async function readAccess(port: number): Promise<Reported | null> {
   try {
@@ -54,10 +63,13 @@ async function readAccess(port: number): Promise<Reported | null> {
     const entry = Array.isArray(settings) ? settings.find((s) => (s as { key?: unknown })?.key === SETTING) as { in_effect?: unknown; pending?: unknown } | undefined : undefined;
     if (!entry) return null;
     if (entry.in_effect === true) {
-      const address = (await getTailscaleStatus()).ips.find((ip) => !ip.includes(":")) ?? null;
-      return address
-        ? { state: "listening", url: `http://${address}:${port}/admin/`, message: null }
-        : { state: "no_address", url: null, message: "The setting is on, but this computer has no Tailscale address. Sign in to Tailscale on this computer, then restart the Stack." };
+      const address = await tailnetAddress();
+      if (address) {
+        // An older Stack cannot say whether it bound the address, so ask the address itself before offering it.
+        const url = `http://${address}:${port}/admin/`;
+        return (await probe(url)) ? { state: "listening", url, message: null } : { state: "restart_pending", url: null, message: NOT_LISTENING };
+      }
+      return { state: "no_address", url: null, message: "The setting is on, but this computer has no Tailscale address. Sign in to Tailscale on this computer, then restart the Stack." };
     }
     if (entry.pending === true) return { state: "restart_pending", url: null, message: "The setting is on and takes effect when the Stack restarts. Restart the Stack, then this link works from any computer on your tailnet." };
     return { state: "off", url: null, message: "Turn on \"Admin page over Tailscale\" to open the admin page from another computer." };

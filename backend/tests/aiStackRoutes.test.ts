@@ -11,7 +11,7 @@ import { collectHomeValues, ensureChoicesMigrated, readMigrationRecord } from "@
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { readSlot } from "@/lib/tiers";
 import { __resetStackEngineForTests } from "@/lib/stackEngine";
-import { buildAdminLink } from "@/lib/stackAdminLink";
+import { __setAdminLinkSeamsForTests, buildAdminLink } from "@/lib/stackAdminLink";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -20,10 +20,12 @@ let migrated = false;
 let migrateAnswer: Record<string, unknown> = {};
 let down = false;
 let remoteOn = false;
+let pendingOn = false;
+let access: Record<string, unknown> | null = null;
 let view: Record<string, unknown> = { profile: "p64", memory_gb: 64, categories: [], migration: { done: false } };
 
 beforeEach(() => {
-  resetDb(); remoteOn = false; calls = []; migrated = false; down = false; __resetChoiceSnapshotForTests();
+  resetDb(); remoteOn = false; pendingOn = false; access = null; calls = []; migrated = false; down = false; __resetChoiceSnapshotForTests();
   migrateAnswer = { dry_run: false, already_done: false, results: [], accepted: 0, refused: [], done_at: "2026-11-22T10:00:00.000Z" };
   view = { profile: "p64", memory_gb: 64, categories: [], migration: { done: false } };
   __setChoicesFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
@@ -38,14 +40,19 @@ beforeEach(() => {
     if (url.pathname === "/healthz") return Response.json({ ok: true, version: "0.4.2", contract: 1, uptimeSeconds: 12 });
     if (url.pathname === "/stack/v1/health") return Response.json({ health: [{ code: "disk_low", severity: "warning", title: "Low disk", text: "x", since: "2026-11-27T00:00:00Z", cause: "x" }] });
     if (url.pathname === "/stack/v1/licences") return Response.json({ terms_version: "2026-11-25", accepted: method === "POST", accepted_at: method === "POST" ? "now" : null, by: body?.by ?? null, licences: [] });
-    if (method === "GET" && url.pathname === "/stack/v1/settings") return Response.json({ sections: [], settings: [{ key: "stack.admin.tailscale", in_effect: remoteOn }] });
+    if (method === "GET" && url.pathname === "/stack/v1/admin-access") return access ? Response.json(access) : Response.json({ error: "Not found" }, { status: 404 });
+    if (method === "PUT" && url.pathname === "/stack/v1/settings") { pendingOn = body?.["stack.admin.tailscale"] === true; if (access) access = { tailscale: { state: "restart_pending", url: null, address: "100.64.0.9", port: 8770, message: "The setting is on and takes effect when the Stack restarts." } }; return Response.json({ sections: [], settings: [] }); }
+    if (method === "GET" && url.pathname === "/stack/v1/settings") return Response.json({ sections: [], settings: [{ key: "stack.admin.tailscale", in_effect: remoteOn, pending: pendingOn ? true : null }] });
+    if (method === "GET" && url.pathname === "/stack/v1/resources/summary") return Response.json({ sampled_at: "2026-11-27T10:00:00Z", current: { total: 1000, used: 400, avail: 600, pressure: 0 } });
+    if (method === "GET" && url.pathname === "/stack/v1/resources/engines") return Response.json({ sampled_at: null, budget: { total_bytes: 1000, cap_bytes: 900, loaded_bytes: 70 }, engines: [{ role: "chat", label: "Chat", state: "running", model_id: "nova-8b", memory_bytes: 70 }] });
+    if (method === "GET" && url.pathname === "/stack/v1/components") return Response.json({ components: [{ id: "nova-8b", label: "Nova 8B", kind: "model" }] });
     if (url.pathname.endsWith("/chat/standard") && method === "PUT") return Response.json({ error: "That model does not fit this computer. Pick a smaller one.", code: "does_not_fit" }, { status: 409 });
     if (method === "PUT" && url.pathname.startsWith("/stack/v1/choices/")) return Response.json({ ok: true, ...(body ?? {}) });
     if (method === "POST" && url.pathname.endsWith("/install")) return Response.json({ job: "job-1", part: "nova-8b", joined: false }, { status: 202 });
     return Response.json({ ok: true });
   }) as never);
 });
-afterEach(() => { __resetStackEngineForTests(); __setChoicesFetchForTests(null); __resetChoiceSnapshotForTests(); });
+afterEach(() => { __setAdminLinkSeamsForTests(null); __resetStackEngineForTests(); __setChoicesFetchForTests(null); __resetChoiceSnapshotForTests(); });
 
 async function admin() {
   const client = new TestClient();
@@ -219,23 +226,73 @@ describe("the pipeline's cached read of the Stack's choice", () => {
 });
 
 describe("the link to the Stack's own admin page", () => {
-  const base = { port: 8770, onThisComputer: true, remoteOn: false, tailscaleAddress: null as string | null };
-  test("buildAdminLink: loopback link always; a remote link only when remote access is on and an address exists; plain reasons otherwise", () => {
-    expect(buildAdminLink(base)).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null });
-    expect(buildAdminLink(base).reason).toContain("turn on remote access");
-    expect(buildAdminLink({ ...base, remoteOn: true, tailscaleAddress: "100.64.0.9" })).toMatchObject({ remote_url: "http://100.64.0.9:8770/admin/" });
-    expect(buildAdminLink({ ...base, remoteOn: true }).remote_url).toBeNull();
-    expect(buildAdminLink({ ...base, remoteOn: true }).reason).toContain("Tailscale");
-    expect(buildAdminLink({ ...base, onThisComputer: false })).toMatchObject({ local_url: null, remote_url: null });
-    expect(buildAdminLink({ ...base, onThisComputer: false }).reason).toContain("another computer");
+  const listening = { state: "listening" as const, url: "http://100.64.0.9:8770/admin/", message: null };
+  const base = { port: 8770, onThisComputer: true, access: { state: "off" as const, url: null, message: "Turn on it." } };
+  test("buildAdminLink: the local link when the Stack runs here; the remote link only while the Stack says it listens on the tailnet; plain reasons otherwise", () => {
+    expect(buildAdminLink(base)).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null, remote_state: "off", can_turn_on: true, reason: "Turn on it." });
+    expect(buildAdminLink({ ...base, access: listening })).toMatchObject({ remote_url: "http://100.64.0.9:8770/admin/", reason: null, can_turn_on: false });
+    const pending = buildAdminLink({ ...base, access: { state: "restart_pending", url: null, message: "Restart the Stack." } });
+    expect(pending).toMatchObject({ remote_url: null, remote_state: "restart_pending", can_turn_on: false, reason: "Restart the Stack." });
+    expect(buildAdminLink({ ...base, access: { state: "no_address", url: null, message: "No Tailscale address." } }).can_turn_on).toBe(false);
+    // The Stack on another computer reports its own tailnet address, so the link still works; only the loopback link is gone.
+    expect(buildAdminLink({ ...base, onThisComputer: false, access: listening })).toMatchObject({ local_url: null, remote_url: "http://100.64.0.9:8770/admin/" });
+    expect(buildAdminLink({ ...base, access: null })).toMatchObject({ remote_state: "unknown", can_turn_on: false });
+    expect(buildAdminLink({ ...base, access: null }).reason).toContain("Check that the Stack is running");
   });
-  test("the route is for owners and admins only and answers the local link with the remote flag read from the Stack", async () => {
+  test("the page never tells people it opens only on the computer that runs it", () => {
+    const words = [buildAdminLink(base).reason, buildAdminLink({ ...base, access: null }).reason, buildAdminLink({ ...base, onThisComputer: false }).reason].join(" ");
+    expect(words).not.toMatch(/only on the computer|same computer/i);
+  });
+  test("the route is for owners and admins only and answers the Stack's own report: listening gives the tailnet link", async () => {
+    access = { tailscale: { state: "listening", url: "http://100.64.0.9:8770/admin/", address: "100.64.0.9", port: 8770, message: "ok" } };
     const { client, actor } = await admin();
     const res = await client.get("/api/ai/stack/admin-link");
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null });
+    expect(await res.json()).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", remote_state: "listening", reason: null });
     demote(actor.id, "adult");
     expect((await client.get("/api/ai/stack/admin-link")).status).toBe(403);
+  });
+  test("a Stack that reports the setting on but not listening yet says restart pending, with no link", async () => {
+    access = { tailscale: { state: "restart_pending", url: null, address: "100.64.0.9", port: 8770, message: "The setting is on and takes effect when the Stack restarts." } };
+    const { client } = await admin();
+    expect(await (await client.get("/api/ai/stack/admin-link")).json()).toMatchObject({ remote_url: null, remote_state: "restart_pending", reason: expect.stringContaining("restarts") });
+  });
+  test("an older Stack with no admin-access route is read from its settings: pending becomes restart pending, off offers the switch", async () => {
+    const { client } = await admin();
+    expect(await (await client.get("/api/ai/stack/admin-link")).json()).toMatchObject({ remote_state: "off", can_turn_on: true });
+    pendingOn = true;
+    expect(await (await client.get("/api/ai/stack/admin-link")).json()).toMatchObject({ remote_state: "restart_pending", can_turn_on: false, remote_url: null });
+  });
+  test("an older Stack with the setting in effect is offered only when its tailnet address really answers", async () => {
+    remoteOn = true;
+    __setAdminLinkSeamsForTests({ address: async () => "100.64.0.9", probe: async () => false });
+    const { client } = await admin();
+    expect(await (await client.get("/api/ai/stack/admin-link")).json()).toMatchObject({ remote_state: "restart_pending", remote_url: null, reason: expect.stringContaining("not listening on your tailnet yet") });
+    __setAdminLinkSeamsForTests({ address: async () => "100.64.0.9", probe: async (url) => url === "http://100.64.0.9:8770/admin/" });
+    expect(await (await client.get("/api/ai/stack/admin-link")).json()).toMatchObject({ remote_state: "listening", remote_url: "http://100.64.0.9:8770/admin/", reason: null });
+    __setAdminLinkSeamsForTests({ address: async () => null });
+    expect(await (await client.get("/api/ai/stack/admin-link")).json()).toMatchObject({ remote_state: "no_address", remote_url: null });
+  });
+  test("turn-on sends the one setting to the Stack and answers the new state; an adult who is not an admin is refused", async () => {
+    access = { tailscale: { state: "off", url: null, address: "100.64.0.9", port: 8770, message: "Turn on." } };
+    const { client, actor } = await admin();
+    const res = await client.post("/api/ai/stack/admin-link/turn-on", {});
+    expect(res.status).toBe(200);
+    expect(writes().at(-1)).toEqual({ method: "PUT", path: "/stack/v1/settings", body: { "stack.admin.tailscale": true } });
+    expect(await res.json()).toMatchObject({ remote_state: "restart_pending", can_turn_on: false });
+    demote(actor.id, "adult");
+    expect((await client.post("/api/ai/stack/admin-link/turn-on", {})).status).toBe(403);
+  });
+});
+
+describe("the colored memory breakdown reads the Stack's own numbers", () => {
+  test("resources summary, engines and components pass through unchanged for an admin and are refused otherwise", async () => {
+    const { client, actor } = await admin();
+    expect(await (await client.get("/api/ai/stack/resources/summary")).json()).toMatchObject({ current: { total: 1000, used: 400 } });
+    expect(await (await client.get("/api/ai/stack/resources/engines")).json()).toMatchObject({ budget: { cap_bytes: 900 }, engines: [{ role: "chat", memory_bytes: 70 }] });
+    expect(await (await client.get("/api/ai/stack/components")).json()).toMatchObject({ components: [{ id: "nova-8b" }] });
+    demote(actor.id, "adult");
+    expect((await client.get("/api/ai/stack/resources/summary")).status).toBe(403);
   });
 });
 

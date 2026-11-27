@@ -93,9 +93,12 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (route.endsWith("/api/ai/stack/disks")) return Promise.resolve(Response.json({ disks: [] }));
     if (route.endsWith("/api/ai/stack/disks/features")) return Promise.resolve(Response.json({ features: [] }));
     if (route.endsWith("/api/ai/stack/disks/moves")) return Promise.resolve(Response.json({ moves: [] }));
-    if (route.endsWith("/api/ai/stack/admin-link")) return Promise.resolve(Response.json({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: null }));
+    if (route.endsWith("/api/ai/stack/admin-link")) return Promise.resolve(Response.json({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: null, remote_state: "off", can_turn_on: false }));
     if (route.endsWith("/api/ai/stack/status")) return Promise.resolve(Response.json({ busy: { running: 1, waiting: 2 }, memory: { total_bytes: 137438953472, free_bytes: 53410299904, budget_bytes: 128849018880, pressure: "normal" }, jobs: [] }));
-    if (route.endsWith("/api/ai/stack/memory")) return Promise.resolve(Response.json({ ledger: { reserved_bytes: 57779984576, warm_bytes: 19115033694, budget_bytes: 128849018880, items: [{ id: "chat", class: "reserved", live_bytes: 25181984984 }, { id: "tts", class: "reserved", live_bytes: 5233852416 }, { id: "image-pool", class: "warm", live_bytes: null }] } }));
+    if (route.endsWith("/api/ai/stack/resources/summary")) return Promise.resolve(Response.json({ sampled_at: "2026-11-27T10:00:00Z", current: { total: 137438953472, used: 64424509440, avail: 72000000000, pressure: 0 } }));
+    if (route.endsWith("/api/ai/stack/resources/engines")) return Promise.resolve(Response.json({ sampled_at: "2026-11-27T10:00:00Z", budget: { total_bytes: 137438953472, cap_bytes: 128849018880, loaded_bytes: 30415837400 }, engines: [{ role: "chat", label: "Chat", state: "running", model_id: "nova-8b", memory_bytes: 25181984984 }, { role: "tts", label: "Voice out", state: "idle", model_id: null, memory_bytes: 5233852416 }, { role: "image", label: "Pictures", state: "idle", model_id: null, memory_bytes: 0 }] }));
+    if (route.endsWith("/api/ai/stack/components")) return Promise.resolve(Response.json({ components: [{ id: "nova-8b", label: "Nova 8B", kind: "model" }] }));
+    if (route.endsWith("/api/ai/stack/choices")) return Promise.resolve(Response.json({ categories: [{ role: "chat" }, { role: "image" }, { role: "tts" }] }));
     if (route.endsWith("/api/ai/stack/general")) return Promise.resolve(Response.json(stackGeneral));
     if (route.endsWith("/api/ai/stack/migration")) return Promise.resolve(Response.json({ done: true, done_at: "2026-11-22T00:00:00.000Z", accepted: 0, refused: [], dismissed: true }));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));

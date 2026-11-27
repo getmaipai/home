@@ -18,11 +18,11 @@ const realFetch = globalThis.fetch;
 let fake: FakeStackClient;
 let wire: Array<{ method: string; path: string; body: unknown }> = [];
 let stored: Record<string, unknown> = {};
-let adminLink: Record<string, unknown> = { local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: "Open this page on the computer that runs MaiPai, or turn on remote access in the Stack's settings." };
+let adminLink: Record<string, unknown> = { local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: "Turn on \"Admin page over Tailscale\" to open the admin page from another computer.", remote_state: "off", can_turn_on: true };
 let migration: Record<string, unknown> = { done: true, refused: [], dismissed: true };
 
 beforeEach(() => {
-  adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: "Open this page on the computer that runs MaiPai, or turn on remote access in the Stack's settings." };
+  adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: "Turn on \"Admin page over Tailscale\" to open the admin page from another computer.", remote_state: "off", can_turn_on: true };
   fake = createFakeStackClient(); wire = []; stored = {}; migration = { done: true, refused: [], dismissed: true };
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
@@ -164,29 +164,30 @@ describe("the link to the Stack's admin page", () => {
   test("the link is no longer a card on this page: it lives on Settings, Stack, General", async () => {
     const view = open();
     await view.findByTestId("feature-chat");
-    expect(view.queryByRole("link", { name: "Open Stack admin" })).toBeNull();
+    expect(view.queryByRole("link", { name: "Open the Stack admin sign-in page" })).toBeNull();
     expect(view.queryByTestId("extra-stack-admin")).toBeNull();
   });
   test("on the computer itself it is one link that opens a new tab", async () => {
     const view = openLink("localhost");
-    const link = (await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement;
+    const link = (await view.findByRole("link", { name: "Open the Stack admin sign-in page" })) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toContain("noopener");
   });
-  test("from another device with remote access off it is not a link and says why in plain words", async () => {
+  test("from another device with the setting off it is not a link and says what to turn on, with one button", async () => {
     const view = openLink("hub.example.com");
-    expect(await view.findByText(/turn on remote access in the Stack's settings/)).toBeTruthy();
-    expect(view.queryByRole("link", { name: "Open Stack admin" })).toBeNull();
+    expect(await view.findByText(/Turn on "Admin page over Tailscale"/)).toBeTruthy();
+    expect(view.getByRole("button", { name: "Turn on admin page over Tailscale" })).toBeTruthy();
+    expect(view.queryByRole("link", { name: "Open the Stack admin sign-in page" })).toBeNull();
   });
   test("from another device with remote access on it links to the Tailscale address", async () => {
     adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null };
     const view = openLink("hub.example.com");
-    expect(((await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement).getAttribute("href")).toBe("http://100.64.0.9:8770/admin/");
+    expect(((await view.findByRole("link", { name: "Open the Stack admin sign-in page" })) as HTMLAnchorElement).getAttribute("href")).toBe("http://100.64.0.9:8770/admin/");
   });
   test("on the computer itself (localhost) it always links to the local address", async () => {
     adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null };
     const view = openLink("localhost");
-    expect(((await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement).getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
+    expect(((await view.findByRole("link", { name: "Open the Stack admin sign-in page" })) as HTMLAnchorElement).getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
   });
 });
