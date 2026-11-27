@@ -8,6 +8,7 @@ import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { stackAdminButton, useStackAdminLink } from "@/apps/settings/StackAdminLink";
+import { StackUsage } from "@/apps/settings/stack/StackUsage";
 import { readStackGeneral, STACK_GENERAL_KEY, stackDownProps } from "@/apps/settings/stack/StackDown";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
@@ -47,6 +48,7 @@ export function StackGeneral({ person }: SettingsViewProps) {
           </ItemContent>
         </Item>
       </ItemGroup>
+      {data.reachable ? <StackUsage /> : null}
       <section aria-label={i18n._({ id: "Manage", message: "Manage" })} className="flex flex-col gap-2">
         {link.ready && !link.href && link.reason ? <p className="text-supporting">{link.reason}</p> : null}
         <div className="flex flex-wrap items-center gap-2">

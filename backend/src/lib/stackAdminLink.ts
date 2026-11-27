@@ -26,7 +26,7 @@ export function buildAdminLink({ port, onThisComputer, remoteOn, tailscaleAddres
   const remote_url = remoteOn && tailscaleAddress ? `http://${tailscaleAddress}:${port}/admin/` : null;
   const reason = remoteOn && !tailscaleAddress
     ? "Remote access is on in the Stack's settings, but this computer has no Tailscale address yet. Open this page on the computer that runs MaiPai."
-    : "Open this page on the computer that runs MaiPai, or turn on remote access in the Stack's settings.";
+    : "The Stack's admin page opens only on the computer that runs MaiPai. Open it there, or turn on \"Also serve the admin page on Tailscale\" in the Stack's settings.";
   return { local_url, remote_url, reason };
 }
 

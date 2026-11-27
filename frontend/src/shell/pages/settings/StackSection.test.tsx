@@ -13,6 +13,7 @@ import type { Roster } from "@/lib/api";
 
 let fixture: HomeFixture | null = null;
 const realFetch = globalThis.fetch;
+let adminLink: Record<string, unknown> | null = null;
 let loras: unknown = { loras: [], trash_days: 30 };
 
 function Where() { const { pathname, search } = useLocation(); return <output data-testid="where">{pathname}{search}</output>; }
@@ -24,6 +25,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
     const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
     const json = (body: unknown) => Promise.resolve(Response.json(body));
     if (path.endsWith("/api/engine-link/credentials")) return json({ paired: false });
+    if (adminLink && path.endsWith("/api/ai/stack/admin-link")) return json(adminLink);
     if (path === "/api/loras/stack") return json(loras);
     if (path === "/api/loras/stack/sources") return json({ sources: [] });
     if (path.endsWith("/api/plugins/stats")) return json({ total: 0, fallthroughRate: null, byCommand: [] });
@@ -42,7 +44,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
 const where = (view: ReturnType<typeof open>) => view.getByTestId("where").textContent;
 const stack = () => SETTINGS_AREAS.find((area) => area.id === "settings")!.sections.find((section) => section.id === "stack")!;
 
-afterEach(() => { cleanup(); fixture?.restore(); fixture = null; loras = { loras: [], trash_days: 30 }; });
+afterEach(() => { cleanup(); fixture?.restore(); fixture = null; loras = { loras: [], trash_days: 30 }; adminLink = null; });
 
 describe("the menu mirrors the one definition in the spec", () => {
   test("General first, then one tab for each tab the screens name, in the order the file lists them", () => {
@@ -129,6 +131,42 @@ describe("General", () => {
     expect(await view.findByText("The Stack is running and lists 2 to look at")).toBeTruthy();
     expect(view.getByText("The Stack is running and lists 2 to look at").closest("section")!.querySelector("svg")).not.toBeNull();
     expect(view.getByText("Another computer, over your home network or tailnet")).toBeTruthy();
+  });
+});
+
+describe("General: the Stack admin link", () => {
+  test("shows a working link to the Stack admin sign-in on the computer that runs it", async () => {
+    const view = open(makePerson("owner"), "/settings/stack");
+    expect((await view.findByRole("link", { name: "Open Stack admin" })).getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
+  });
+  test("from another device it uses the Tailscale address the Stack reports", async () => {
+    adminLink = { local_url: "http://127.0.0.1:8770/admin/", remote_url: "http://100.64.0.9:8770/admin/", reason: null };
+    const view = open(makePerson("owner"), "/settings/stack");
+    const link = await view.findByRole("link", { name: "Open Stack admin" });
+    expect(link.getAttribute("href")).toMatch(/^http:\/\/(127\.0\.0\.1|100\.64\.0\.9):8770\/admin\/$/);
+  });
+  test("when no address reaches this device it says why in words, not a bare dead button", async () => {
+    adminLink = { local_url: null, remote_url: null, reason: "The Stack's admin page opens only on the computer that runs MaiPai." };
+    const view = open(makePerson("owner"), "/settings/stack");
+    expect(await view.findByText("The Stack's admin page opens only on the computer that runs MaiPai.")).toBeTruthy();
+    expect((view.getByRole("button", { name: "Open Stack admin" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe("General: live use of the Stack's computer", () => {
+  test("shows the memory share, what is loaded and the jobs, read from the Stack", async () => {
+    const view = open(makePerson("owner"), "/settings/stack");
+    const usage = await view.findByTestId("stack-usage");
+    expect(within(usage).getByText("Memory the Stack may use")).toBeTruthy();
+    expect(within(usage).getByText(/of 120 GB in use/)).toBeTruthy();
+    expect(within(usage).getByText(/Chat 23\.\d GB, Voice out 4\.\d GB/)).toBeTruthy();
+    expect(within(usage).getByText("1 running, 2 waiting")).toBeTruthy();
+    expect(within(usage).getByRole("progressbar")).toBeTruthy();
+  });
+  test("with the Stack stopped there is no usage panel", async () => {
+    const view = open(makePerson("owner"), "/settings/stack", { stackGeneral: { where: "this_computer", reachable: false, version: null, problems: null, reason: "x" } });
+    await view.findByText("The Stack is not answering");
+    expect(view.queryByTestId("stack-usage")).toBeNull();
   });
 });
 

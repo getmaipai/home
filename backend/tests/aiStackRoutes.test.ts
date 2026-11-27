@@ -33,6 +33,8 @@ beforeEach(() => {
     calls.push({ method, path: url.pathname, body });
     if (url.pathname === "/stack/v1/choices/migrate") { migrated = true; return Response.json(migrateAnswer); }
     if (method === "GET" && url.pathname === "/stack/v1/choices") return Response.json(view);
+    if (url.pathname === "/stack/v1/status") return Response.json({ health: "ok", busy: { running: 1, waiting: 0 }, using: [], memory: { total_bytes: 100, free_bytes: 40, budget_bytes: 90, pressure: "normal" }, jobs: [] });
+    if (url.pathname === "/stack/v1/memory") return Response.json({ ledger: { reserved_bytes: 10, warm_bytes: 5, budget_bytes: 90, items: [{ id: "chat", class: "reserved", live_bytes: 7 }] } });
     if (url.pathname === "/healthz") return Response.json({ ok: true, version: "0.4.2", contract: 1, uptimeSeconds: 12 });
     if (url.pathname === "/stack/v1/health") return Response.json({ health: [{ code: "disk_low", severity: "warning", title: "Low disk", text: "x", since: "2026-11-27T00:00:00Z", cause: "x" }] });
     if (url.pathname === "/stack/v1/licences") return Response.json({ terms_version: "2026-11-25", accepted: method === "POST", accepted_at: method === "POST" ? "now" : null, by: body?.by ?? null, licences: [] });
@@ -255,6 +257,19 @@ describe("the General tab's read (STACK-MENU-SYNC-01)", () => {
     const { client, actor } = await admin();
     expect((await new TestClient().get("/api/ai/stack/general")).status).toBe(401);
     for (const role of ["adult", "teen", "child"] as const) { demote(actor.id, role); expect((await client.get("/api/ai/stack/general")).status).toBe(403); }
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("live use of the Stack's computer (General tab)", () => {
+  test("an admin reads the Stack's status and memory ledger unchanged; anyone else is refused and nothing reaches the Stack", async () => {
+    const { client, actor } = await admin();
+    expect(await (await client.get("/api/ai/stack/status")).json()).toMatchObject({ busy: { running: 1 }, memory: { budget_bytes: 90 } });
+    expect(await (await client.get("/api/ai/stack/memory")).json()).toMatchObject({ ledger: { items: [{ id: "chat" }] } });
+    calls = [];
+    demote(actor.id, "adult");
+    expect((await client.get("/api/ai/stack/status")).status).toBe(403);
+    expect((await client.get("/api/ai/stack/memory")).status).toBe(403);
     expect(calls).toEqual([]);
   });
 });

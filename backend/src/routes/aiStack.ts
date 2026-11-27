@@ -119,6 +119,13 @@ aiStackRoutes.openapi(createRoute({ method: "get", path: "/admin-link", tags: ["
 aiStackRoutes.openapi(createRoute({ method: "get", path: "/general", tags: ["AI"], summary: "Where the Stack runs, whether it answers, its version and problem count", middleware: [requireRole("owner", "admin")] as const, responses: ok("The Stack's state; a Stack that does not answer is reachable false with a plain reason.") }),
   async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readStackGeneral(), 200) as never; });
 
+// Live use of the Stack's computer for Settings, Stack, General: the Stack's own status (memory share, what is running, jobs) and its memory ledger
+// (what is loaded and how much each part holds), passed through unchanged. Home draws them and keeps no copy.
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/status", tags: ["AI"], summary: "The Stack's live status (the Stack's GET /stack/v1/status)", middleware: [requireRole("owner", "admin")] as const, responses: ok("Memory, what is in use, the busy count and the jobs.") }),
+  (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/status")));
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/memory", tags: ["AI"], summary: "The Stack's memory ledger (the Stack's GET /stack/v1/memory)", middleware: [requireRole("owner", "admin")] as const, responses: ok("What is loaded and how much each part holds.") }),
+  (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/memory")));
+
 // Drives (multi-disk, 2026-11-25): which drives hold the models, where each feature's files are, and the Move button. The Stack does the work;
 // these pass the calls through unchanged (`/api/ai/stack/disks...` is `/stack/v1/disks...`).
 const driveRoute = (method: "get" | "post", path: string, summary: string) => createRoute({ method, path, tags: ["AI"], summary, middleware: [requireRole("owner", "admin")] as const, ...(method === "post" ? { request: { body: body(false) } } : {}), responses: ok(summary) });
