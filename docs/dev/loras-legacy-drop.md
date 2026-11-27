@@ -56,7 +56,16 @@ INSERT INTO picture_adapter_prefs SELECT json_extract(row_json,'$.adapter_id'), 
 
 The Stack's own library is untouched by all of this. Its records, files and the unified `loras/manifest.json` are the Stack's backup concern.
 
-## Last manual step: legacy files in the Stack's data folder (not part of this slice, nothing deletes them yet)
+## Last manual step: legacy files in the Stack's data folder (done 2026-11-27)
+
+Status: done on 2026-11-27. The two legacy manifests below were deleted from the live Stack's data directory. Before deleting, both matched the hashes in the table and the
+copies in the backup folder (`data-scratch/backups/loras-slice5/stack-data/`), and the unified `loras/manifest.json` held all 3 ids. After deleting, `GET /stack/v1/loras`
+still listed the same 3 styles, the unified manifest hash did not change, and the Stack did not re-create the legacy files. The `.safetensors` files were not touched.
+
+Rollback: copy `images/loras/manifest.json` and `video/loras/manifest.json` back from `data-scratch/backups/loras-slice5/stack-data/` (same relative paths) into the Stack data dir.
+The Stack does not need a restart for the unified library to keep working.
+
+The original plan for this step, kept for the record:
 
 Do this only after the hub has restarted on this code, the log shows the drop, and one picture and one video style still resolve. Folder: the live Stack's data directory.
 The Stack merged these two manifests into `loras/manifest.json` and leaves them in place; the `.safetensors` files stay (the unified library still uses them).
