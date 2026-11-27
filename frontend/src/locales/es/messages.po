@@ -4257,7 +4257,7 @@ msgstr "Límite de almacenamiento de copias de seguridad (GB)"
 #: src/apps/settings/AiModelsPage.tsx:26
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:104
-#: src/shell/Routes.tsx:170
+#: src/shell/Routes.tsx:244
 #, needs-review
 msgid "Backups"
 msgstr "Copias de seguridad"
@@ -5631,7 +5631,7 @@ msgstr "Configuración del chat"
 #: src/shell/pages/UiShowcasePage.tsx:132
 #: src/shell/pages/UiShowcasePage.tsx:167
 #: src/shell/pages/UiShowcasePage.tsx:170
-#: src/shell/Routes.tsx:173
+#: src/shell/Routes.tsx:247
 #, needs-review
 msgid "Chat showcase"
 msgstr "Demo de chat"
@@ -7021,7 +7021,7 @@ msgstr "Próximamente"
 #. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #: src/shell/pageHeaderTitle.tsx:106
-#: src/shell/Routes.tsx:171
+#: src/shell/Routes.tsx:245
 #, needs-review
 msgid "Commands"
 msgstr "Comandos"
@@ -7270,6 +7270,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:40
 msgid "Context"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:9
+msgid "Context build"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -7714,7 +7719,7 @@ msgid "Could not delete this voice. Try again."
 msgstr "No se pudo eliminar esta voz. Inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:464
+#: src/shell/Routes.tsx:539
 #, needs-review
 msgid "Could not discard Incognito chats. Try again."
 msgstr "No se pudieron descartar los chats Incógnito. Inténtalo de nuevo."
@@ -7868,7 +7873,7 @@ msgid "Could not load more memories. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:63
+#: src/shell/pages/PerformancePage.tsx:64
 #, needs-review
 msgid "Could not load performance."
 msgstr "No se pudo cargar el rendimiento."
@@ -7902,6 +7907,11 @@ msgstr "No se pudieron cargar los recordatorios. Revisa tu conexión e inténtal
 #, needs-review
 msgid "Could not load repairs."
 msgstr "No se pudieron cargar las reparaciones."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:29
+msgid "Could not load reply timing."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FamilyPage.tsx:50
@@ -8266,7 +8276,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:317
-#: src/shell/Routes.tsx:366
+#: src/shell/Routes.tsx:441
 #, needs-review
 msgid "Could not reach {name}. Try again."
 msgstr "No se pudo contactar a {name}. Inténtalo de nuevo."
@@ -8773,7 +8783,7 @@ msgstr "Carátula"
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicStudioPages.tsx:183
 #: src/shell/pages/ProjectsPage.tsx:39
-#: src/shell/Routes.tsx:480
+#: src/shell/Routes.tsx:555
 #, needs-review
 msgid "Create"
 msgstr "Crear"
@@ -10483,7 +10493,7 @@ msgid "Engine roles"
 msgstr "Roles del motor"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:165
+#: src/shell/pages/PerformancePage.tsx:179
 #, needs-review
 msgid "Engines"
 msgstr "Motores"
@@ -11336,7 +11346,7 @@ msgstr "Encuentra todo en tu hogar."
 
 #. js-lingui-explicit-id
 #: src/shell/AmbientCompanionPane.tsx:273
-#: src/shell/Routes.tsx:366
+#: src/shell/Routes.tsx:441
 #, needs-review
 msgid "Find me"
 msgstr "Encuéntrame"
@@ -11449,10 +11459,25 @@ msgid "Firmware was written, but Home could not record its version. {detail}"
 msgstr "El firmware se escribió, pero Home no pudo registrar su versión. {detail}"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:13
+msgid "First audio"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:12
+msgid "First sentence"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1768
 #, needs-review
 msgid "setting.tours.autostart.enabled.does"
 msgstr "Las primeras visitas pueden abrir una guía, y Ayuda mantiene disponible Muéstrame alrededor."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:11
+msgid "First word"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:67
@@ -12942,8 +12967,8 @@ msgstr "Guarda lo que algunos descargados piden antes de comenzar."
 #: src/shell/pages/WikipediaPage.tsx:155
 #: src/shell/pages/WikipediaPage.tsx:179
 #: src/shell/routeHeader.ts:23
-#: src/shell/Routes.tsx:478
-#: src/shell/Routes.tsx:532
+#: src/shell/Routes.tsx:553
+#: src/shell/Routes.tsx:607
 #, needs-review
 msgid "Home"
 msgstr "Home"
@@ -15604,7 +15629,7 @@ msgstr "Las exportaciones de etiquetas se crean solo cuando un operador usa la h
 
 #. js-lingui-explicit-id
 #: src/shell/pages/AdminPages.es.test.tsx:115
-#: src/shell/pages/PerformancePage.tsx:153
+#: src/shell/pages/PerformancePage.tsx:167
 #, needs-review
 msgid "Label harvest ({turns, plural, one {# turn} other {# turns}})"
 msgstr "Cosecha de etiquetas ({turns, plural, one {# turno} other {# turnos}})"
@@ -15817,7 +15842,7 @@ msgid "Layer timing"
 msgstr "Tiempo de capa"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:141
+#: src/shell/pages/PerformancePage.tsx:155
 #, needs-review
 msgid "Layers"
 msgstr "Capas"
@@ -16253,7 +16278,7 @@ msgstr "Nivel: {toFixed} por ciento"
 #: src/shell/pages/personAccessCopy.ts:10
 #: src/shell/pages/settings/settingsBackLink.ts:53
 #: src/shell/pages/status/StatusComponents.tsx:31
-#: src/shell/Routes.tsx:481
+#: src/shell/Routes.tsx:556
 #, needs-review
 msgid "Library"
 msgstr "Biblioteca"
@@ -16814,7 +16839,7 @@ msgid "Loading offline books"
 msgstr "Cargando libros sin conexión"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:64
+#: src/shell/pages/PerformancePage.tsx:65
 #, needs-review
 msgid "Loading performance"
 msgstr "Cargando rendimiento"
@@ -16843,6 +16868,11 @@ msgstr "Cargando proyectos"
 #, needs-review
 msgid "Loading repairs"
 msgstr "Cargando reparaciones"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:29
+msgid "Loading reply timing"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:76
@@ -18187,8 +18217,8 @@ msgstr "Velocidad máxima usada para actualizaciones automáticas de la bibliote
 #: src/shell/pages/MediaHomePage.tsx:25
 #: src/shell/pages/MediaHomePage.tsx:58
 #: src/shell/pages/MediaSearchPage.tsx:17
-#: src/shell/Routes.tsx:479
-#: src/shell/Routes.tsx:532
+#: src/shell/Routes.tsx:554
+#: src/shell/Routes.tsx:607
 #, needs-review
 msgid "Media"
 msgstr "Medios"
@@ -19949,7 +19979,8 @@ msgid "No release published yet"
 msgstr "Aún no hay una versión publicada"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:80
+#: src/shell/pages/performance/WaterfallBody.tsx:30
+#: src/shell/pages/PerformancePage.tsx:81
 msgid "No replies timed yet."
 msgstr ""
 
@@ -20072,6 +20103,11 @@ msgstr "sin Stack configurado"
 #, needs-review
 msgid "No Stack configured"
 msgstr "Stack no configurado"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:41
+msgid "No stage was timed for this reply."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MakeSongPage.tsx:160
@@ -22113,8 +22149,8 @@ msgstr "Porcentaje del tamaño de texto normal. \"Predeterminado\" sigue tu elec
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:101
-#: src/shell/pages/PerformancePage.tsx:54
-#: src/shell/Routes.tsx:166
+#: src/shell/pages/PerformancePage.tsx:55
+#: src/shell/Routes.tsx:240
 #, needs-review
 msgid "Performance"
 msgstr "Rendimiento"
@@ -23063,6 +23099,11 @@ msgid "Preamp"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:10
+msgid "Prefill"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:139
 #: src/apps/settings/StackChanInstallDialog.tsx:139
 #, needs-review
@@ -23437,7 +23478,7 @@ msgid "Queue message"
 msgstr "Coloca el mensaje en cola"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:89
+#: src/shell/pages/PerformancePage.tsx:103
 #, needs-review
 msgid "Queues"
 msgstr "Colas"
@@ -24274,7 +24315,7 @@ msgstr "Problemas de reparación"
 #: src/shell/pageHeaderTitle.tsx:103
 #: src/shell/pages/dashboard/Attention.tsx:25
 #: src/shell/pages/RepairsPage.tsx:60
-#: src/shell/Routes.tsx:168
+#: src/shell/Routes.tsx:242
 #, needs-review
 msgid "Repairs"
 msgstr "Reparaciones"
@@ -24377,7 +24418,7 @@ msgid "Replies: \"{text}\""
 msgstr "Responde: \"{text}\""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:74
+#: src/shell/pages/PerformancePage.tsx:75
 #, needs-review
 msgid "Reply time per day"
 msgstr "Tiempo de respuesta por día"
@@ -25142,7 +25183,7 @@ msgid "Route"
 msgstr "Ruta"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:115
+#: src/shell/pages/PerformancePage.tsx:129
 #, needs-review
 msgid "Route taken"
 msgstr "Ruta seguida"
@@ -26660,7 +26701,7 @@ msgstr "Configurando tu IA"
 #: src/shell/pages/FilesPage.tsx:304
 #: src/shell/pages/PersonProfilePage.tsx:236
 #: src/shell/pages/settings/SettingsHomePage.tsx:45
-#: src/shell/Routes.tsx:532
+#: src/shell/Routes.tsx:607
 #, needs-review
 msgid "Settings"
 msgstr "Ajustes"
@@ -26952,7 +26993,7 @@ msgid "Show keyboard shortcuts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/Routes.tsx:440
+#: src/shell/Routes.tsx:515
 #, needs-review
 msgid "Show me around"
 msgstr "Muéstrame por dónde"
@@ -28511,7 +28552,7 @@ msgstr ""
 #: src/shell/pages/RepairsPage.tsx:67
 #: src/shell/pages/StatusPage.tsx:37
 #: src/shell/pages/UpdatesPage.tsx:53
-#: src/shell/Routes.tsx:169
+#: src/shell/Routes.tsx:243
 #, needs-review
 msgid "Status"
 msgstr "Estado"
@@ -28747,7 +28788,7 @@ msgstr "Cronómetro en marcha"
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:27
 #: src/shell/pages/TrashPage.tsx:58
-#: src/shell/Routes.tsx:165
+#: src/shell/Routes.tsx:239
 #, needs-review
 msgid "Storage"
 msgstr "Almacenamiento"
@@ -28759,7 +28800,7 @@ msgid "area.Storage"
 msgstr "Almacenamiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PerformancePage.tsx:178
+#: src/shell/pages/PerformancePage.tsx:192
 #, needs-review
 msgid "Storage & hardware"
 msgstr "Almacenamiento y hardware"
@@ -29648,7 +29689,7 @@ msgstr "No se envió. Inténtalo de nuevo."
 #: src/shell/pages/UpdatesPage.tsx:129
 #: src/shell/pages/UpdatesPage.tsx:184
 #: src/shell/pages/UpdatesPage.tsx:187
-#: src/shell/Routes.tsx:366
+#: src/shell/Routes.tsx:441
 #: src/shell/sessionLockContext.tsx:124
 #, needs-review
 msgid "That did not work"
@@ -32127,7 +32168,7 @@ msgstr "Herramientas"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/ToolsOfferedBody.tsx:11
-#: src/shell/pages/PerformancePage.tsx:128
+#: src/shell/pages/PerformancePage.tsx:142
 #, needs-review
 msgid "Tools offered per turn"
 msgstr "Herramientas ofrecidas por interacción"
@@ -32548,7 +32589,7 @@ msgstr "¿Apagar esta función?"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatThreadSlots.tsx:405
-#: src/shell/Routes.tsx:217
+#: src/shell/Routes.tsx:291
 #, needs-review
 msgid "Turn trace"
 msgstr "Trazado de turnos"
@@ -32620,7 +32661,7 @@ msgstr "Activa la búsqueda y reproducción de emisoras de radio de internet."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/TurnsByEngineBody.tsx:42
-#: src/shell/pages/PerformancePage.tsx:102
+#: src/shell/pages/PerformancePage.tsx:116
 #, needs-review
 msgid "Turns per engine"
 msgstr "Turnos por motor"
@@ -32777,6 +32818,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:245
 msgid "Type your own style first, or pick one of the styles."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:32
+msgid "Typical reply ({turns, plural, one {# recent reply} other {# recent replies}})"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -33109,7 +33155,7 @@ msgstr ""
 #: src/shell/pageHeaderTitle.tsx:102
 #: src/shell/pages/dashboard/Attention.tsx:26
 #: src/shell/pages/UpdatesPage.tsx:78
-#: src/shell/Routes.tsx:167
+#: src/shell/Routes.tsx:241
 #, needs-review
 msgid "Updates"
 msgstr "Actualizaciones"
@@ -33442,7 +33488,7 @@ msgstr "Usado en el chat"
 #: src/apps/settings/UsersSection.tsx:180
 #: src/shell/pageHeaderTitle.tsx:108
 #: src/shell/pages/UsersPage.tsx:12
-#: src/shell/Routes.tsx:172
+#: src/shell/Routes.tsx:246
 #, needs-review
 msgid "Users"
 msgstr "Usuarios"
@@ -34607,6 +34653,11 @@ msgstr "Cuándo:"
 #. js-lingui-explicit-id
 #: src/apps/settings/SafetyChangesSection.tsx:52
 msgid "Where"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PerformancePage.tsx:90
+msgid "Where a reply's time goes"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -35904,6 +35955,11 @@ msgstr "Tu PIN está establecido."
 #, needs-review
 msgid "api.error.upload_profile_gone"
 msgstr "Tu perfil ya no está disponible. Inicia sesión de nuevo."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/performance/WaterfallBody.tsx:33
+msgid "Your reply {n} back"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: ../backend/src/routes/settings.ts:93
