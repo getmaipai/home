@@ -92,6 +92,7 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import { recordToolAudit } from "@/lib/toolAudit";
+import { mayRetain } from "@/lib/gate/retention";
 import { readLook } from "@/lib/companionLook";
 import { trimClosers } from "@/lib/guards";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
@@ -341,7 +342,8 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
   const opts = { ...(state.searchAssist?.eligible && state.searchAssist.p_rounded !== null ? { rules: ["search_assist.scored"] } : {}), signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.audio?.length ? { audio: state.audio } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
-  if (state.temporary) {
+  const speakerBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
+  if (!mayRetain("transcript", { temporary: state.temporary, band: speakerBand })) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
     appendTemporaryTurn(actor, surface, text, value, { ...opts, judgeStatus: "skipped" });
@@ -398,7 +400,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
  * the memory judge, a summary or a title. A temporary or ephemeral turn
  * stores nothing (C7); its details travel on the stream's error event. */
 function logFailedTurn(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
-  if (state.ephemeral || state.temporary) return;
+  if (state.ephemeral || !mayRetain("transcript", { temporary: state.temporary, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) })) return;
   // `supersedes` and `branchFrom` place the row in its branch; logTurn()
   // stores no `supersedes` for a failed row, so it retires nothing.
   const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, crisisSignal: carriesCrisisSignal(state.safety), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
@@ -615,7 +617,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
       return { ok: false, result: { ok: false, status: 403, code: "ask_not_allowed", error } };
     }
   }
-  text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
+  text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], !mayRetain("attachment", { temporary, band }) || opts.ephemeral === true);
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",

@@ -1,5 +1,6 @@
 import permissions from "@maipai/spec/vocab/permissions.json" with { type: "json" };
 import grantActions from "@maipai/spec/vocab/grant-actions.json" with { type: "json" };
+import { mayRetain } from "./retention";
 import type { Approver, DenyReason, GateDecision, GateRequest, Provenance } from "./types";
 
 type Band = "child" | "teen" | "adult";
@@ -108,7 +109,7 @@ export function decide(request: GateRequest): GateDecision {
 
   if (request.context?.crisis && what.capabilities.some((id) => ["lookup", "chosen_destination", "action", "spend"].includes(capabilityPolicy(id)?.risk ?? ""))) return deny("crisis_state");
   if (who.anonymous && what.capabilities.some((id) => id.startsWith("memory:") || id.startsWith("memory."))) return deny("anonymous_speaker");
-  if ((request.context?.temporary || request.context?.incognito) && (request.context.incognitoBlocked || what.capabilities.includes("memory:write"))) return deny("temporary_mode");
+  if ((request.context?.temporary || request.context?.incognito) && (request.context.incognitoBlocked || (what.capabilities.includes("memory:write") && !mayRetain("memory", { temporary: true, band: who.band })))) return deny("temporary_mode");
   if (what.minRole && !roleMeetsFloor(who.role, what.minRole)) return deny("min_band");
   if (what.denied) return deny("grant_denied");
 

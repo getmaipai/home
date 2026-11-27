@@ -507,12 +507,12 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         // answers in plain words (no names it may not see), so the call is allowed through to say so.
         entries.push({ proposal, decision: { allow: true } });
       } else if (planned.kind === "refuse") {
-        recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: "never", band, count: planned.count });
+        recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: "never", band, count: planned.count, temporary: state.temporary });
         noteRefusal("format_not_here");
         entries.push({ proposal, decision: { allow: false, reason: "format_not_here" } });
       } else if (planned.kind === "ask") {
         const minor = band === "child" || band === "teen";
-        recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: minor ? "never" : "ask", band, count: planned.count });
+        recordToolAudit({ personId: state.actor.id, tool: "house", action, decision: minor ? "never" : "ask", band, count: planned.count, temporary: state.temporary });
         if (minor) {
           noteRefusal("parent_required");
           entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });
@@ -711,7 +711,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         const itemCount = typeof args.itemCount === "number" ? args.itemCount : typeof args.item_count === "number" ? args.item_count : Array.isArray(args.items) ? args.items.length : undefined;
         const brake = brakeFor({ tool: brakeTool, action, args, itemCount, actor: { id: state.actor.id, role: String(state.actor.role), band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) }, listScope: scope, tainted: state.context.some((item) => item.source === "search_result" || item.source === "page"), mode });
         const auditBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
-        recordToolAudit({ personId: state.actor.id, tool: brakeTool, action, decision: brake.decision, band: auditBand });
+        recordToolAudit({ personId: state.actor.id, tool: brakeTool, action, decision: brake.decision, band: auditBand, temporary: state.temporary });
         if (brake.reason === "parent_required") {
           noteRefusal("parent_required");
           entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });
