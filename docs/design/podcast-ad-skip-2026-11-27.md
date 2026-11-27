@@ -1,6 +1,6 @@
 # Podcast ad skipping on Home (2026-11-27)
 
-**Status: architect verdict pending.** This is a design proposal; it does not claim approval. Stack ownership and the service contract follow the Stack plan at `/Users/jessetorres/Developer/github.com/getmaipai/stack/.claude/worktrees/minuspod-ad-skip-integration-c7a6ad/docs/plans/ad-skip-2026-11-27.md` (Jesse, 2026-11-27). The shared `media-segments` record and its spec must be architect-approved in commons before implementation that persists it.
+**Status: architect verdict pending (owner ordered the build 2026-11-27).** Stack ownership and the service contract follow the Stack plan at `/Users/jessetorres/Developer/github.com/getmaipai/stack/.claude/worktrees/minuspod-ad-skip-integration-c7a6ad/docs/plans/ad-skip-2026-11-27.md` (Jesse, 2026-11-27).
 
 ## Scope and saved copies
 
@@ -44,7 +44,7 @@ Using the seeded dev hub, save a fixture episode and prove that only its fetched
 
 ## Build order
 
-All slices depend on an architect-approved `media-segments` spec in commons. Sizes are S or M; file lists are expected touch points, refined against the approved spec.
+All slices use the pinned `media-segments` spec in commons. Sizes are S or M; file lists are expected touch points.
 
 | Id | Size | Objective, files, acceptance |
 |---|---|---|
@@ -108,4 +108,4 @@ Use shipped kit primitives only: `Player`, `Badge`, `Pill`, `Toast`, `Progress`,
 
 ## Build boundary
 
-No frontend work is authorized by this first-slice brief. The backend slice is gated on the shared spec-first/architect review and should be started only after that contract exists; this note does not mark any item approved or complete.
+No frontend work is authorized by this first-slice brief. Backend slices 01 and 02 proceed under the owner's ruling; this note does not mark any item approved or complete.

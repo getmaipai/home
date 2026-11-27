@@ -198,6 +198,7 @@ export interface StackClient {
   /** GET /v1/images/talk-frames/{job}/{index}: one frame's PNG (kept ten minutes). */
   talkFramePicture?(job: string, index: number, opts?: { signal?: AbortSignal }): Promise<Uint8Array>;
   submitJob(request: { kind: string; role?: string | null; input?: Record<string, unknown> }, opts?: { signal?: AbortSignal }): Promise<StackJob>;
+  correctMediaSegment?(segmentId: string, status: "confirmed" | "rejected", opts?: { signal?: AbortSignal }): Promise<unknown>;
   job(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   jobs(opts?: { signal?: AbortSignal }): Promise<StackJob[]>;
   cancelJob(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
@@ -568,6 +569,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     talkFramePicture: (job, index, opts) => call(`/v1/images/talk-frames/${encodeURIComponent(job)}/${index}`, { method: "GET" }, async (res) => new Uint8Array(await res.arrayBuffer()), opts),
     imageEditResult: (job, opts) => call(`/v1/images/edits/${encodeURIComponent(job)}`, { method: "GET" }, async (res) => new Uint8Array(await res.arrayBuffer()), opts),
     submitJob: (request, opts) => call("/stack/v1/jobs", jsonInit(request), async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
+    correctMediaSegment: (segmentId, status, opts) => call(`/stack/v1/segments/${encodeURIComponent(segmentId)}`, { ...jsonInit({ status }), method: "PUT" }, async (res) => json<unknown>(res), opts),
     job: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     jobs: (opts) => call("/stack/v1/jobs", { method: "GET" }, async (res) => { const body = await json<{ jobs: unknown }>(res); return Array.isArray(body.jobs) ? body.jobs.map((job) => StackJobSchema.parse(job)) : []; }, opts),
     cancelJob: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),

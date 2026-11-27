@@ -679,6 +679,7 @@ export async function saveEpisode(actor: PersonRow, itemId: string, options: Sav
     }
     db.update(mediaItems).set({ locFileId: stored.value.id, size: stored.value.size, fingerprint: stored.value.sha256, mediaType, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
     syncFileReferences(stored.value.id);
+    void import("@/lib/media/podcastSegments").then(({ processPodcastCopy }) => processPodcastCopy(row.id, { idle: true })).catch(() => {});
     return { ok: true, value: itemFromRow(itemRow(row.id)!) };
   } catch (error) {
     if (error instanceof RedirectLimitError) return { ok: false, status: 502, error: "The episode server sent more than five redirects or left out the next address. Try again later or ask the show for a direct episode link." };

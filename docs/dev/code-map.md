@@ -888,6 +888,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcastParity.ts` | episodeSortOf, seasonsOf, orderEpisodes, followPodcast, unfollowPodcast, isFollowed |
 | `backend/src/lib/media/podcastRates.ts` | RATE_MIN, RATE_MAX, RATE_LINE, showRateOf, setShowRate |
+| `backend/src/lib/media/podcastSegments.ts` | PODCAST_SEGMENT_KINDS, BUILTIN_SEGMENT_POLICY, resolveSegmentPolicy, resolvedPodcastPolicies, skipPlanFor, processPodcastCopy |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
 | `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, plainNotes |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |

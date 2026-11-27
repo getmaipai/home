@@ -2374,6 +2374,12 @@ export const mediaItems = sqliteTable(
   ],
 );
 
+export const podcastSegmentLinks = sqliteTable("podcast_segment_links", {
+  mediaItemId: text("media_item_id").primaryKey().references(() => mediaItems.id, { onDelete: "cascade" }),
+  sha256: text("sha256").notNull(), pipelineVersion: text("pipeline_version").notNull().default("1"), state: text("state").notNull(), recordId: text("record_id"), jobId: text("job_id"),
+  record: text("record"), reason: text("reason"), updatedAt: text("updated_at").notNull(),
+});
+
 // MUSIC-ID-01 (docs/design/music-identify-2026-11-13.md): each scanned library song's Chromaprint fingerprint, kept next to the library
 // records so a heard clip is matched against the household's own music with no network. `fingerprint` is base64 of little-endian 32-bit
 // words ('' when fpcalc could not read the file, so it is not retried until the file changes); `file_key` is the item's own

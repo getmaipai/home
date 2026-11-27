@@ -24,6 +24,7 @@ import { __forgetStackOutagesForTests } from "@/lib/stackEngine";
 import { isolateQueueProvidersForTests } from "@/lib/jobs/householdQueue";
 import {
   people,
+  podcastSegmentLinks,
   alarms,
   worldPlaces,
   quickTimers,
@@ -250,6 +251,7 @@ export function resetDb(): void {
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(loraPeople).run(); // STACK-LORAS-01: the named adults of a style
   installFakeLoraStack(); // STACK-LORAS-01: the Stack holds the library; every test starts with an empty fake one
+  db.delete(podcastSegmentLinks).run();
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
   db.delete(mediaProgress).run();
   db.delete(mediaWatchSessions).run();
