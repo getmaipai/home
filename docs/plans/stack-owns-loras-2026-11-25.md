@@ -10,7 +10,7 @@ Status: APPROVED by the architect with five edits (applied below). Item: STACK-L
 - Slice 4, Home reader: done.
 - Design change after Jesse's 2026-11-26 answer: the Stack tags each style nsfw or not, from the site flag or set by an admin; no Stack ticket verifier and no callback; Home keeps its own ticket when lowering through Home; unflagged installs stay untagged (C11, no `RULES.md` change).
 - Slice 5, migration: dry run passed on copies; live import done, 3 records, 0 conflicts; second run unchanged; file sha256 identical; backup kept; live on Home `sha-973dd97` pinned to Stack `bcf6d63`.
-- Slice 6, Home removal: NOT started, waiting for Jesse to confirm all 3 styles show in the live Styles tab.
+- Slice 6, Home removal: in preparation in a separate worktree (guarded migration, rollback doc), not landed; it waits for Jesse to confirm all 3 styles show in the live Styles tab.
 
 Note: the live Styles tab was not yet checked by a person.
 
