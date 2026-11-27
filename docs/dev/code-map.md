@@ -1348,7 +1348,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
 | `backend/src/lib/toolAudit.ts` | recordToolAudit, recordToolIntent, recordToolResult, toolOutcomeUnknown, listOwnToolAudit, toolAuditCounts |
-| `backend/src/lib/toolBrake.ts` | brakeFor |
+| `backend/src/lib/toolBrake.ts` | brakeFor, BACKGROUND_READ_TOOLS, backgroundToolDecision |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |
 | `backend/src/lib/toolUndo.ts` | purgeExpiredUndo, recordListContext, recordUndo, undoBlockFor, undoPropsFor, runUndo |
 | `backend/src/lib/topicPrompt.ts` | topicBlockFor, topicBlockForTurn, withTopicBlock, topicMessages, topicMessagesForId |
@@ -1398,7 +1398,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/languageLine.ts` | LANGUAGE_LINES, languageLineFor |
 | `backend/src/lib/turnMachine/machine.ts` | turnMachine |
 | `backend/src/lib/turnMachine/messages.ts` | dataContextHeaderPatternSource, contextToMessages, bareMessages, continuationMessages |
-| `backend/src/lib/turnMachine/nodes/answer.ts` | NOT_AVAILABLE_LINE, PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE, missedLookupLine |
+| `backend/src/lib/turnMachine/nodes/answer.ts` | NOT_AVAILABLE_LINE, PARENT_REQUIRED_LINE, HOUSEHOLD_SUBJECT_NEVER_LINE, policyRefusalLine, PICTURE_STARTED_LINE, VIDEO_STARTED_LINE |
 | `backend/src/lib/turnMachine/nodes/commands.ts` | commandsNode |
 | `backend/src/lib/turnMachine/nodes/context.ts` | MEMORY_CONTEXT_MIN_SCORE, TOOL_ROUND_SHARE, sceneSpeakerForTurn, fitSceneBlock, renderScene, decideReasoning |
 | `backend/src/lib/turnMachine/nodes/lookupFallback.ts` | lookupMissed, lookupMissKind, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryEligible |
