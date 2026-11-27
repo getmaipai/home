@@ -86,51 +86,125 @@ import { AmbientHeaderProvider } from "@/shell/ambientHeaderContext";
 import { AmbientPageContextProvider, ambientPageContextForRoute } from "@/shell/pageContext";
 import { routeTitle } from "@/shell/routeHeader";
 import { formatTime, formatUnit } from "@/lib/format";
+import { installRoutePreloadListeners, registerRoutePreloaders, preloadRoute } from "@/lib/routePreload";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
 // charts, the media player, the settings libraries and the profile editors, which most visits never open.
-const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPage");
-const CompanionsPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionsPage");
-const CompanionDetailPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionDetailPage");
-const CompanionFlowPage = lazyNamed(() => import("@/shell/pages/companionFlow/CompanionFlowPage"), "CompanionFlowPage");
-const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
-const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
-const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
-const TrashPage = lazyNamed(() => import("@/shell/pages/TrashPage"), "TrashPage");
-const PerformancePage = lazyNamed(() => import("@/shell/pages/PerformancePage"), "PerformancePage");
-const TurnTracePage = lazyNamed(() => import("@/shell/pages/TurnTracePage"), "TurnTracePage");
-const UpdatesPage = lazyNamed(() => import("@/shell/pages/UpdatesPage"), "UpdatesPage");
-const RepairsPage = lazyNamed(() => import("@/shell/pages/RepairsPage"), "RepairsPage");
-const ActivityPage = lazyNamed(() => import("@/shell/pages/ActivityPage"), "ActivityPage");
-const StatusPage = lazyNamed(() => import("@/shell/pages/StatusPage"), "StatusPage");
+const loadFamilyPage = () => import("@/shell/pages/FamilyPage");
+const FamilyPage = lazyNamed(loadFamilyPage, "FamilyPage");
+const loadCompanionsPage = () => import("@/shell/pages/CompanionsPage");
+const CompanionsPage = lazyNamed(loadCompanionsPage, "CompanionsPage");
+const CompanionDetailPage = lazyNamed(loadCompanionsPage, "CompanionDetailPage");
+const loadCompanionFlowPage = () => import("@/shell/pages/companionFlow/CompanionFlowPage");
+const CompanionFlowPage = lazyNamed(loadCompanionFlowPage, "CompanionFlowPage");
+const loadProjectsPage = () => import("@/shell/pages/ProjectsPage");
+const ProjectsPage = lazyNamed(loadProjectsPage, "ProjectsPage");
+const loadPersonProfilePage = () => import("@/shell/pages/PersonProfilePage");
+const PersonProfilePage = lazyNamed(loadPersonProfilePage, "PersonProfilePage");
+const loadStoragePage = () => import("@/shell/pages/StoragePage");
+const StoragePage = lazyNamed(loadStoragePage, "StoragePage");
+const loadTrashPage = () => import("@/shell/pages/TrashPage");
+const TrashPage = lazyNamed(loadTrashPage, "TrashPage");
+const loadPerformancePage = () => import("@/shell/pages/PerformancePage");
+const PerformancePage = lazyNamed(loadPerformancePage, "PerformancePage");
+const loadTurnTracePage = () => import("@/shell/pages/TurnTracePage");
+const TurnTracePage = lazyNamed(loadTurnTracePage, "TurnTracePage");
+const loadUpdatesPage = () => import("@/shell/pages/UpdatesPage");
+const UpdatesPage = lazyNamed(loadUpdatesPage, "UpdatesPage");
+const loadRepairsPage = () => import("@/shell/pages/RepairsPage");
+const RepairsPage = lazyNamed(loadRepairsPage, "RepairsPage");
+const loadActivityPage = () => import("@/shell/pages/ActivityPage");
+const ActivityPage = lazyNamed(loadActivityPage, "ActivityPage");
+const loadStatusPage = () => import("@/shell/pages/StatusPage");
+const StatusPage = lazyNamed(loadStatusPage, "StatusPage");
 // AUDIT-DEAD-01: the chat showcase and the Elements adoption ledger (77 KB of JSON) are developer tools; `import.meta.env.DEV` is a
 // build-time constant, so a production build drops the import, the route and the chunk (bundle.test.ts checks for the ledger).
 const UiShowcasePage = import.meta.env.DEV ? lazyNamed(() => import("@/shell/pages/UiShowcasePage"), "UiShowcasePage") : null;
-const BackupsPage = lazyNamed(() => import("@/shell/pages/BackupsPage"), "BackupsPage");
-const CommandsPage = lazyNamed(() => import("@/shell/pages/CommandsPage"), "CommandsPage");
-const PrivacyPage = lazyNamed(() => import("@/shell/pages/PrivacyPage"), "PrivacyPage");
-const UsersPage = lazyNamed(() => import("@/shell/pages/UsersPage"), "UsersPage");
-const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage");
-const ReferencePage = lazyNamed(() => import("@/shell/pages/ReferencePage"), "ReferencePage");
-const WikipediaPage = lazyNamed(() => import("@/shell/pages/WikipediaPage"), "WikipediaPage");
-const MusicLikeThisPage = lazyNamed(() => import("@/shell/pages/MusicLikeThisPage"), "MusicLikeThisPage");
-const NewsDiscussPage = lazyNamed(() => import("@/shell/pages/NewsDiscussPage"), "NewsDiscussPage");
-const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
-const CodePage = lazyNamed(() => import("@/apps/code/CodePage"), "CodePage");
-const MediaHomePage = lazyNamed(() => import("@/shell/pages/MediaHomePage"), "MediaHomePage");
-const MediaSearchPage = lazyNamed(() => import("@/shell/pages/MediaSearchPage"), "MediaSearchPage");
-const AllAppsPage = lazyNamed(() => import("@/shell/pages/AllAppsPage"), "AllAppsPage");
-const MicTestPage = lazyNamed(() => import("@/shell/pages/MicTestPage"), "MicTestPage");
-const SettingsAreaPage = lazyNamed(() => import("@/shell/pages/settings/SettingsAreaPage"), "SettingsAreaPage");
-const SettingsHomePage = lazyNamed(() => import("@/shell/pages/settings/SettingsHomePage"), "SettingsHomePage");
-const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), "SetupReviewPage");
+const loadBackupsPage = () => import("@/shell/pages/BackupsPage");
+const BackupsPage = lazyNamed(loadBackupsPage, "BackupsPage");
+const loadCommandsPage = () => import("@/shell/pages/CommandsPage");
+const CommandsPage = lazyNamed(loadCommandsPage, "CommandsPage");
+const loadPrivacyPage = () => import("@/shell/pages/PrivacyPage");
+const PrivacyPage = lazyNamed(loadPrivacyPage, "PrivacyPage");
+const loadUsersPage = () => import("@/shell/pages/UsersPage");
+const UsersPage = lazyNamed(loadUsersPage, "UsersPage");
+const loadFilesPage = () => import("@/shell/pages/FilesPage");
+const FilesPage = lazyNamed(loadFilesPage, "FilesPage");
+const loadReferencePage = () => import("@/shell/pages/ReferencePage");
+const ReferencePage = lazyNamed(loadReferencePage, "ReferencePage");
+const loadWikipediaPage = () => import("@/shell/pages/WikipediaPage");
+const WikipediaPage = lazyNamed(loadWikipediaPage, "WikipediaPage");
+const loadMusicLikeThisPage = () => import("@/shell/pages/MusicLikeThisPage");
+const MusicLikeThisPage = lazyNamed(loadMusicLikeThisPage, "MusicLikeThisPage");
+const loadNewsDiscussPage = () => import("@/shell/pages/NewsDiscussPage");
+const NewsDiscussPage = lazyNamed(loadNewsDiscussPage, "NewsDiscussPage");
+const loadPackageAppPage = () => import("@/shell/pages/PackageAppPage");
+const PackageAppPage = lazyNamed(loadPackageAppPage, "PackageAppPage");
+const loadCodePage = () => import("@/apps/code/CodePage");
+const CodePage = lazyNamed(loadCodePage, "CodePage");
+const loadMediaHomePage = () => import("@/shell/pages/MediaHomePage");
+const MediaHomePage = lazyNamed(loadMediaHomePage, "MediaHomePage");
+const loadMediaSearchPage = () => import("@/shell/pages/MediaSearchPage");
+const MediaSearchPage = lazyNamed(loadMediaSearchPage, "MediaSearchPage");
+const loadAllAppsPage = () => import("@/shell/pages/AllAppsPage");
+const AllAppsPage = lazyNamed(loadAllAppsPage, "AllAppsPage");
+const loadMicTestPage = () => import("@/shell/pages/MicTestPage");
+const MicTestPage = lazyNamed(loadMicTestPage, "MicTestPage");
+const loadSettingsAreaPage = () => import("@/shell/pages/settings/SettingsAreaPage");
+const SettingsAreaPage = lazyNamed(loadSettingsAreaPage, "SettingsAreaPage");
+const loadSettingsHomePage = () => import("@/shell/pages/settings/SettingsHomePage");
+const SettingsHomePage = lazyNamed(loadSettingsHomePage, "SettingsHomePage");
+const loadSetupReviewPage = () => import("@/apps/setup/SetupReviewPage");
+const SetupReviewPage = lazyNamed(loadSetupReviewPage, "SetupReviewPage");
 
 // MEDIA-POLISH-01: package app pages load on demand. They carry the schema interpreter, the kit Player and Media Chrome, which pushed
 // the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
-const RemindersPage = lazy(() => import("@/apps/reminders/RemindersPage").then((m) => ({ default: m.RemindersPage })));
-const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ default: m.ClockPage })));
-const HousePage = lazyNamed(() => import("@/shell/pages/HousePage"), "HousePage");
+const loadRemindersPage = () => import("@/apps/reminders/RemindersPage").then((m) => ({ default: m.RemindersPage }));
+const RemindersPage = lazy(loadRemindersPage);
+const loadClockPage = () => import("@/apps/clock/ClockPage").then((m) => ({ default: m.ClockPage }));
+const ClockPage = lazy(loadClockPage);
+const loadHousePage = () => import("@/shell/pages/HousePage");
+const HousePage = lazyNamed(loadHousePage, "HousePage");
+
+registerRoutePreloaders({
+  "/people": loadFamilyPage,
+  "/people/:id": loadPersonProfilePage,
+  "/companions": loadCompanionsPage,
+  "/companions/create": loadCompanionFlowPage,
+  "/companions/:id/create": loadCompanionFlowPage,
+  "/companions/:id": loadCompanionsPage,
+  "/chat/projects": loadProjectsPage,
+  "/storage": loadStoragePage,
+  "/storage/trash": loadTrashPage,
+  "/performance": loadPerformancePage,
+  "/trace/:turnId": loadTurnTracePage,
+  "/updates": loadUpdatesPage,
+  "/repairs": loadRepairsPage,
+  "/activity": loadActivityPage,
+  "/status": loadStatusPage,
+  "/backups": loadBackupsPage,
+  "/commands": loadCommandsPage,
+  "/privacy": loadPrivacyPage,
+  "/users": loadUsersPage,
+  "/files": loadFilesPage,
+  "/reference/*": loadReferencePage,
+  "/wikipedia/*": loadWikipediaPage,
+  "/apps/audio/like-this": loadMusicLikeThisPage,
+  "/apps/news/discuss": loadNewsDiscussPage,
+  "/apps/code/*": loadCodePage,
+  "/apps/*": loadPackageAppPage,
+  "/media": loadMediaHomePage,
+  "/media/search": loadMediaSearchPage,
+  "/all-apps": loadAllAppsPage,
+  "/mic-test": loadMicTestPage,
+  "/settings": loadSettingsHomePage,
+  "/settings/:section?/:detailId?": loadSettingsAreaPage,
+  "/setup/review": loadSetupReviewPage,
+  "/reminders": loadRemindersPage,
+  "/clock": loadClockPage,
+  "/house": loadHousePage,
+});
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -237,6 +311,7 @@ function ShellInstallStrip({ person }: { person: Roster }) {
 // which needs to return `<ThemeProvider>` before anything inside it
 // can call a hook that reads from it.
 function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
+  useEffect(() => installRoutePreloadListeners(preloadRoute), []);
   useReportNowPlaying();
   const location = useLocation();
   const everyApp = useAppCatalog();

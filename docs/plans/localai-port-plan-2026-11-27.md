@@ -77,7 +77,7 @@ These come before any agent that acts. `BRAKES-01` is the parent: its `tool_acti
 |---|---|---|
 | Per-turn latency waterfall, counts only | `TURN-WATERFALL-01` | M |
 | Voice session as a pure state machine with seeded random-walk tests | `VOICE-MACHINE-01` | M |
-| Route preload on hover and one reload on a stale chunk | `CHAT-PRELOAD-01` | S |
+| Route preload on hover and focus (the stale-chunk reload already exists in `pwaBoot.ts`) | `CHAT-PRELOAD-01` | S |
 | Find in thread, kit Element first (rule 9) | `CHAT-FIND-01` | S to M |
 | Resume a turn after a hub restart | `CHAT-RESUME-01` | S to M |
 | Model update safety, fit wording, engine tuning and the sound and speech engines | Stack rows, see below | S to M |
