@@ -46,6 +46,45 @@ Using the seeded dev hub, save a fixture episode and prove that only its fetched
 
 All slices use the pinned `media-segments` spec in commons. Sizes are S or M; file lists are expected touch points.
 
+## One skip layer for all players
+
+Jesse's ruling (2026-11-27): skipping and its visual treatment belong in the shared kit `Player`, including the docked mini player. Podcasts, Videos, and every other media app pass data and callbacks to that layer; none builds a second skip UI. This extends MEDIA-PLAYER-01, MEDIA-VIZ-01, MEDIA-VIDEOS-01, and AUDIO-SESSION-01. The kit Player already supports audio, video, and mini layouts, controlled media elements, scrubber progress, chapters, keyboard controls, and Media Session; its current Home uses are in `frontend/src/shell/MediaPlayerRegistration.tsx`, `GlobalMiniPlayer.tsx`, Music speech, and package `player` schema nodes. Commons' `PlayerLiveShowcase` is the story reference.
+
+The shared Player accepts segment ranges (`start`, `end`, `kind`, `status`), a resolved skip plan, and callbacks for seek, skip, undo, hear-anyway, wrong-segment, and missing-ad marking. It owns the shared interaction and presentation: marked ranges on the scrubber, a “Skipped a break” pill with Undo, “Skip intro”, “Skip recap”, “Skip sponsor”, “Hear it anyway”, “This was wrong”, and “Missed an ad”. Audio, video, and mini layouts use the same tokens, labels, accessibility behavior, and state transitions. The mini layout stays compact: the pill and one Skip button sit on the bar, ranges appear on its thin progress line, and tapping the bar opens the full player. The Videos layout overlays the same pill and buttons on the video and puts ranges on the seek bar like a chapter track. Keyboard actions work there too. Reserve overlay space so controls do not move the video layout when an action appears.
+
+One token map defines kind colours, patterns, and icons for all media. Colour is never the only distinction. The spec's additive `media-segments` kind enum adds `interaction` (like, subscribe, or follow reminders), `preview` (what is coming), and `filler` (dead air or silence). Map SponsorBlock categories as follows:
+
+| SponsorBlock category | MaiPai kind |
+|---|---|
+| sponsor | sponsor |
+| selfpromo | selfpromo |
+| interaction | interaction |
+| intro | intro |
+| outro | outro |
+| preview | preview |
+| filler | filler |
+| recap | recap |
+
+SponsorBlock data is non-commercial and is never bundled with Home or Stack. Detection of media files is through the Stack's own `media.segments` job: it accepts audio or video files, decodes a video's audio track, and may use captions as assist. See Stack `docs/integrations.md`, `media.segments`, and `STACK-SEGMENTS-01`.
+
+One shared declaration defines `media.skip.<kind>` with `skip`, `mark`, `off`, and `inherit`. Resolution is per-source override (show or channel), person global, per-app default, then household default, with `inherit` continuing to the next layer. Videos defaults: sponsor, selfpromo, and interaction skip; intro and outro mark. Podcasts retain this note's defaults for ad, sponsor, bumper, selfpromo, intro, outro, and recap. Video has no separate settings registry or player preference store.
+
+Process saved copies and videos downloaded into the Videos app. Never process live web streams. Platform-inserted ads in a video file require the same clean-copy or content-detection path as podcast breaks. A downloaded video usually has no inserted ads, so ad skipping is conditional on a segment actually being present; do not promise that every video contains removable ads.
+
+Acceptance: audio, video, full, and mini layouts render identical kind ranges, status, buttons, labels, and callbacks; keyboard and screen reader behavior is shared; the mini bar opens the full player without stopping playback; video overlays cause no layout jump; stale plans are ignored; saved copies use source-time ranges and stream/live playback has no plan. Stories and tests cover every layout and status, including undo, manual skip, hear-anyway, correction, and missing-ad marking.
+
+### Revised order
+
+| Id | Size | Files and acceptance |
+|---|---|---|
+| HOME-SKIP-KIT-01 | M | Commons `ui` Player, stories, tests. Add the shared segment, plan, callback props and all audio/video/mini interactions, scrubber ranges, overlays, keyboard actions, and shared kind tokens. First; tag before Home consumes it. |
+| HOME-SKIP-MINI-01 | S | `frontend/src/shell/GlobalMiniPlayer.tsx`, media registration and shell tests. Wire the shared mini layout to the resolved plan and callbacks; compact pill and Skip button, thin ranges, expand to full player. |
+| HOME-SKIP-VIDEOS-01 | M | Videos package watch page/player binding, video settings, routes and tests. Feed downloaded/saved video plans into kit Player and declare Videos defaults. Verify overlay stability and seek-bar chapter track. |
+| HOME-SKIP-SPEC-01 | S | Commons `spec` media-segments schema, fixtures and generated types. Add `interaction`, `preview`, and `filler` additively. |
+| HOME-SKIP-STACK-01 | M | Stack `media.segments` video input and caption assist; link to `STACK-SEGMENTS-01`. Decode audio from video files and optionally use captions; test saved-file input and no live stream processing. |
+
+Repoint HOME-ADSKIP-03 and the visual portions of HOME-ADSKIP-06, -07, -10, and -13 at HOME-SKIP-KIT-01. Podcasts supplies data, policy, and callbacks; it does not rebuild Player UI. MEDIA-VIZ-01's shared dock and MEDIA-VIDEOS-01's player integration use the same layer. AUDIO-SESSION-01 remains the single playback session and coordinator.
+
 | Id | Size | Objective, files, acceptance |
 |---|---|---|
 | HOME-ADSKIP-01 | S | Stack adapter and saved-copy analysis lifecycle; `backend/src/lib/media/podcastSegments.ts`, `backend/src/lib/stack/client.ts`, `backend/src/lib/stackEngine.ts`, `backend/src/db/schema.ts`, migration, save and poller hooks. Scripted Stack tests prove submit/poll, SHA binding, dedupe, stale invalidation, idle scheduling and graceful offline behavior. |
