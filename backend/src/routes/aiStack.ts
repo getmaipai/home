@@ -11,6 +11,7 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { forwardToStack, refusalStatus, StackChoicesError, type Forwarded } from "@/lib/stackChoicesForward";
 import { dismissMigrationNotice, ensureChoicesMigrated, HOME_FEATURE_SWITCHES, readMigrationRecord } from "@/lib/stackChoicesMigration";
 import { readAdminLink } from "@/lib/stackAdminLink";
+import { readStackGeneral } from "@/lib/stackGeneral";
 import { refreshStackChoiceSnapshot } from "@/lib/stackChoiceSnapshot";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetInstallStatusCache } from "@/lib/installStatus";
@@ -113,6 +114,10 @@ aiStackRoutes.openapi(createRoute({ method: "post", path: "/migration/dismiss", 
 // Where the Stack's own admin page is (its address on this computer, and over Tailscale when the Stack allows it), for the "Open Stack admin" link.
 aiStackRoutes.openapi(createRoute({ method: "get", path: "/admin-link", tags: ["AI"], summary: "Where the Stack's own admin page is", middleware: [requireRole("owner", "admin")] as const, responses: ok("The link and the plain reason.") }),
   async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readAdminLink(), 200) as never; });
+
+// Settings, Stack, General (STACK-MENU-SYNC-01): where the Stack runs, whether it answers, its version and its problem count, read from the Stack on every call.
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/general", tags: ["AI"], summary: "Where the Stack runs, whether it answers, its version and problem count", middleware: [requireRole("owner", "admin")] as const, responses: ok("The Stack's state; a Stack that does not answer is reachable false with a plain reason.") }),
+  async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readStackGeneral(), 200) as never; });
 
 // Drives (multi-disk, 2026-11-25): which drives hold the models, where each feature's files are, and the Move button. The Stack does the work;
 // these pass the calls through unchanged (`/api/ai/stack/disks...` is `/stack/v1/disks...`).

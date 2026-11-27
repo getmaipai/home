@@ -106,10 +106,10 @@ describe("the settings route", () => {
 
   test("an adult asking for Home settings sees why access is refused and can open their settings", async () => {
     const adult = makePerson("adult");
-    const view = open(adult, "/settings/ai?tab=overview");
+    const view = open(adult, "/settings/stack?tab=models");
     expect(await view.findByText("An owner or admin sets this.")).toBeTruthy();
     expect(view.getByRole("link", { name: "Open your settings" }).getAttribute("href")).toBe("/settings/profile");
-    expect(where(view)).toBe("/settings/ai?tab=overview");
+    expect(where(view)).toBe("/settings/stack?tab=models");
     expect(fixture!.scopes).not.toContain("household");
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
@@ -131,7 +131,7 @@ describe("the settings route", () => {
   test("an owner opens Settings and sees the personal and household pages together", async () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/household"));
-    expect(rows(view)).toEqual(["Profile", "Look and ease", "Chat", "Voice and robot", "Notifications", "Your data", "Household", "Privacy and safety", "AI and models", "Media", "Voices", "Search and web", "Apps and devices", "Backups and updates", "Advanced"]);
+    expect(rows(view)).toEqual(["Profile", "Look and ease", "Chat", "Voice and robot", "Notifications", "Your data", "Household", "Privacy and safety", "Stack", "Media", "Voices", "Search and web", "Apps and devices", "Backups and updates", "Advanced"]);
     expect(view.getByRole("heading", { level: 1, name: /^Household$/ })).toBeTruthy();
   });
 
@@ -175,7 +175,7 @@ describe("the settings route", () => {
   });
 
   test.each(["child", "teen"] as const)("a %s is sent to their own settings from Engines and AI without a word (UNSEEN-01)", async (role) => {
-    const view = open(makePerson(role), "/settings/ai?tab=overview");
+    const view = open(makePerson(role), "/settings/stack?tab=models");
     await waitFor(() => expect(where(view)).toBe("/settings/profile"));
     expect(view.queryByText("Where the engine runs")).toBeNull();
     expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
@@ -409,7 +409,7 @@ describe("what the page asks for", () => {
     expect(fixture!.scopes.every((scope) => scope === "person:person-teen")).toBe(true);
     cleanup();
     fixture!.restore();
-    for (const page of ["household", "privacy", "ai", "home-voice", "apps", "backups"]) {
+    for (const page of ["household", "privacy", "media", "home-voice", "apps", "backups"]) {
       open(makePerson("owner"), `/settings/${page}`);
       await waitFor(() => expect(fixture!.scopes.length).toBeGreaterThan(0));
       expect(fixture!.scopes.some((scope) => scope.split("&")[0] === "household")).toBe(true);
@@ -473,12 +473,12 @@ describe("the rail on a settings route (RULES S1 and S3)", () => {
 describe("old URLs through the route", () => {
   test("/settings?tab=household&section=ai as an admin replaces to Home settings AI", async () => {
     const view = open(makePerson("admin"), "/settings?tab=household&section=ai");
-    await waitFor(() => expect(where(view)).toBe("/settings/ai?tab=overview"));
+    await waitFor(() => expect(where(view)).toBe("/settings/stack?tab=models"));
   });
 
   test("/settings?tab=household as an adult opens the explanation with no household request", async () => {
     const view = open(makePerson("adult"), "/settings?tab=household&section=ai");
-    await waitFor(() => expect(where(view)).toBe("/settings/ai?tab=overview"));
+    await waitFor(() => expect(where(view)).toBe("/settings/stack?tab=models"));
     expect(await view.findByText("An owner or admin sets this.")).toBeTruthy();
     expect(fixture!.scopes).not.toContain("household");
   });

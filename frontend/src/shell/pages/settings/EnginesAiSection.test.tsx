@@ -47,57 +47,56 @@ afterEach(() => {
   fixture = null;
 });
 
-describe("Engines and AI uses four tabs inside the settings shell", () => {
-  test("Features is the first tab and shows feature cards without attention", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=overview");
-    expect(await view.findByRole("tab", { name: "Features" })).toBeTruthy();
+describe("Stack, Models: the AI and models page and the engines console in the settings shell", () => {
+  test("Models shows the feature cards, the engine link and the console, and the Stack tabs are General, Models, Styles, Monitor, Maintain", async () => {
+    const view = open(makePerson("owner"), "/settings/stack?tab=models");
     // STACK-MODELS-HOME-01: the shared page draws one card per feature from the Stack's choices (the kit's seeded Stack stands in here).
     expect(await view.findByTestId("feature-chat")).toBeTruthy();
     expect(view.queryByRole("heading", { name: "Needs attention" })).toBeNull();
-    expect(view.queryByText("Install the AI for this computer")).toBeNull();
-    expect(view.queryByText("Engine computer link")).toBeNull();
-    expect(view.queryByRole("tab", { name: "Models" })).toBeNull();
-    expect(view.getByRole("tab", { name: "Engines" })).toBeTruthy();
-    expect(view.getByRole("tab", { name: "Advanced" })).toBeTruthy();
+    expect(await view.findByText("Engine computer link")).toBeTruthy();
+    for (const name of ["General", "Models", "Styles", "Monitor", "Maintain"]) expect(view.getByRole("tab", { name })).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
-    expect(view.getAllByRole("link", { name: "AI and models" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
+    expect(view.getAllByRole("link", { name: "Stack" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
   });
 
-  test("a teen is sent to their own settings and never sees the Features page (UNSEEN-01)", async () => {
-    const view = open(makePerson("teen"), "/settings/ai?tab=overview");
-    await waitFor(() => expect(view.queryByText(/Features/)).toBeNull());
+  test("the old Stack admin card is gone from the Models page (the link lives on General)", async () => {
+    const view = open(makePerson("owner"), "/settings/stack?tab=models");
+    await view.findByTestId("feature-chat");
+    expect(view.queryByTestId("extra-stack-admin")).toBeNull();
+  });
+
+  test("a teen is sent to their own settings and never sees the Models page (UNSEEN-01)", async () => {
+    const view = open(makePerson("teen"), "/settings/stack?tab=models");
+    await waitFor(() => expect(view.queryByRole("tab", { name: "Models" })).toBeNull());
     expect(view.queryByTestId("ai-features")).toBeNull();
   });
 
   test("?tab keeps the requested shell tab in the URL", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
-    expect(view.getByTestId("router-location").textContent).toContain("tab=advanced");
-    expect(view.queryByRole("tab", { name: "Advanced" })).toBeNull();
+    const view = open(makePerson("owner"), "/settings/stack?tab=maintain");
+    expect(view.getByTestId("router-location").textContent).toContain("tab=maintain");
   });
 
-  test("Advanced keeps the model and storage sections the Models tab used to hold", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
+  test("Maintain keeps the Hugging Face token the Advanced tab used to hold", async () => {
+    const view = open(makePerson("owner"), "/settings/stack?tab=maintain");
     expect(await view.findByText("Hugging Face token (for voice cloning)")).toBeTruthy();
     expect(view.queryByRole("button", { name: "Free up space" })).toBeNull();
-    expect(view.queryByText("Models and storage")).toBeNull();
-    expect(view.queryByText("This computer: Apple Silicon, 24 GB memory.")).toBeNull();
   });
 
-  test("the spec declares the tab strip and default view tab", () => {
-    const ai = SETTINGS_AREAS.find((area) => area.id === "settings")!.sections.find((section) => section.id === "ai")!;
-    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "engines", "advanced", "performance", "coding"]);
-    expect(ai.tabs?.filter((tab) => ["overview", "engines", "advanced"].includes(tab.id)).every((tab) => tab.view === "home.engine_admin")).toBe(true);
-    expect(SETTINGS_VIEWS["home.engine_admin"]).toBeDefined();
+  test("the spec declares the tab strip and the views behind it", () => {
+    const stack = SETTINGS_AREAS.find((area) => area.id === "settings")!.sections.find((section) => section.id === "stack")!;
+    expect(stack.tabs?.map((tab) => tab.id)).toEqual(["general", "models", "styles", "monitor", "maintain"]);
+    expect(stack.tabs?.filter((tab) => tab.view).map((tab) => tab.view)).toEqual(["stack.general", "home.engine_admin", "stack.monitor", "stack.maintain"]);
+    for (const view of ["stack.general", "home.engine_admin", "stack.monitor", "stack.maintain"]) expect(SETTINGS_VIEWS[view]).toBeDefined();
   });
 
-  test("Engines keeps the engine location setting available", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=engines");
+  test("Models keeps the engine location setting available", async () => {
+    const view = open(makePerson("owner"), "/settings/stack?tab=models");
     const where = await view.findByRole("combobox", { name: "Where the engine runs" });
     expect((where as HTMLButtonElement).disabled).toBe(false);
   });
 
   test("the pairing wizard opens from this page without a selection first, on step 1 of 5", async () => {
-    const view = open(makePerson("admin"), "/settings/ai?tab=engines");
+    const view = open(makePerson("admin"), "/settings/stack?tab=models");
     fireEvent.click(await view.findByRole("button", { name: "Pair engine computer" }));
     expect(await view.findByText("Step 1 of 5: Where the engine runs")).toBeTruthy();
   });

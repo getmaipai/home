@@ -13,7 +13,7 @@ You are an owner or an admin. Your Home needs the memory to run bigger jobs at a
 
 ## Pick a preset
 
-1. Open **Settings**, then **AI and models**, then **Performance**.
+1. Open **Settings**, then **Stack**, then the **Monitor** tab, then **Performance**.
 2. Under **Big-job behaviour**, choose one:
    - **Chat first.** Home waits for 60 seconds with no chat before it makes chat simpler. It asks before it lowers a big job.
    - **Balanced.** Home waits for 20 seconds with no chat. It lowers a picture job without asking, and asks before it lowers video or music.
@@ -39,7 +39,7 @@ On the same tab, the owner sees a **Tune this computer** card. It lists changes 
 
 ## See what Home is doing
 
-On the **Overview** tab of **AI and models**, a status line shows what each kind of job is doing during a big job, for example chat simpler and music waiting. While a Max job runs, an admin can press **Stop the Max job** on that page. Chat then goes back to normal.
+On the **Models** tab of **Stack**, a status line shows what each kind of job is doing during a big job, for example chat simpler and music waiting. While a Max job runs, an admin can press **Stop the Max job** on that page. Chat then goes back to normal.
 
 ## If chat got simpler
 

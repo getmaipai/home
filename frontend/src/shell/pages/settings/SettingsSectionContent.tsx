@@ -146,7 +146,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={minorDdgsTitle()} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
       {tabView ? <SettingsView view={tabView} {...viewProps} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
-      {(section.id === "ai" && props.tab === "overview" ? section.cards?.filter((card) => card.group === "household.chat_pause") ?? [] : cardsInTab(visibleCards(section, viewer, registry, "home"), props.tab)).map((card) => {
+      {cardsInTab(visibleCards(section, viewer, registry, "home"), props.tab).map((card) => {
         // The face card inside `account.data` already draws this group's one
         // key (the enrollment sounds switch); a second card would repeat it.
         if (section.id === "profile" && card.group === "person.profile") return null;
@@ -156,7 +156,6 @@ export function SettingsSectionContent(props: SectionContentProps) {
         // Voice recognition owns person.voice_print.enrollment in its body; do not show its registry row again.
         if (section.id === "profile" && card.group === "person.voice_print") return null;
         if (section.id === "voice" && card.group === "device.voice" && props.tab === "device") return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props, returnPath, places)}</div>;
-        if (section.id === "ai" && props.tab === "overview" && card.group === "household.chat_pause") return <div key={card.group}>{keysCard(card, viewer, props, returnPath, places)}</div>;
         if (card.view) return <SettingsView key={`${card.scope}:${card.group ?? card.label}`} view={card.view} card={card} {...viewProps} />;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
         return <div key={`${card.scope}:${card.group}`}>

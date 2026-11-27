@@ -11,7 +11,7 @@ You need three things: Coding turned on by an admin, your own key, and OpenCode 
 
 ## 1. Make your key
 
-1. Open **Settings**, then **AI and models**, then **Coding**.
+1. Open **Settings**, then **Stack**, then the **Maintain** tab, then **Coding**.
 2. Choose **Create key**, name it after the computer it is for, and pick when it expires.
 3. Copy the key now. Home shows it once.
 

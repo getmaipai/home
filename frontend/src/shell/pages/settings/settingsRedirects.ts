@@ -5,6 +5,15 @@ import { placeForGroup, settingsPath } from "@/shell/pages/settings/settingsArea
 const HOME_DEFAULT = settingsPath("household", "general");
 const PERSONAL_DEFAULT = settingsPath("profile", "profile");
 const mappings = legacyMap.mappings;
+// STACK-MENU-SYNC-01: places that moved inside Settings (`moved` in legacy-sections.json): the old section or tab and the Stack tab that took it over.
+const moved = (legacyMap as { moved?: Array<{ old: { section: string; tab?: string }; new: { section: string; tab?: string } }> }).moved ?? [];
+
+/** Where an old Settings address (`/settings/ai?tab=engines`, `/settings/media?tab=styles`) lives now, or undefined when it did not move. A tab with no row of its own follows its section's row. */
+export function movedSettingsTarget(section: string | undefined, tab: string | undefined, key?: string): string | undefined {
+  if (!section) return undefined;
+  const row = moved.find((candidate) => candidate.old.section === section && candidate.old.tab === tab && tab !== undefined) ?? moved.find((candidate) => candidate.old.section === section && candidate.old.tab === undefined);
+  return row ? settingsPath(row.new.section, row.new.tab, key) : undefined;
+}
 const LEGACY_GROUPS: Record<string, readonly string[]> = {
   "household.ai": ["household.ai_advanced", "household.ai_models", "household.chat_pause", "household.ai_runtime", "household.ai_developer"],
   "household.network": ["household.network_port"],
@@ -14,7 +23,7 @@ export function legacySettingsSectionTarget(area: string, section: string, viewe
   const mapping = mappings.find((row) => row.old.area === area && row.old.section === section);
   if (!mapping) return area === "home" ? HOME_DEFAULT : area === "chat" ? settingsPath("chat") : PERSONAL_DEFAULT;
   if (mapping.replacement) return settingsPath(mapping.replacement.section, undefined, hash.slice(1));
-  if (mapping.new.section === "household" || ["privacy", "ai", "media", "home-voice", "search", "apps", "backups", "advanced"].includes(mapping.new.section)) {
+  if (mapping.new.section === "household" || ["privacy", "stack", "media", "home-voice", "search", "apps", "backups", "advanced"].includes(mapping.new.section)) {
     if (!viewer.canManageHousehold) return settingsPath(mapping.new.section, mapping.new.tab, hash.slice(1));
   }
   return settingsPath(mapping.new.section, mapping.new.tab, hash.slice(1));
@@ -51,7 +60,7 @@ export function legacySettingsTarget(search: string, hash: string, viewer: { can
 export function retiredManagePageTarget(pathname: string, viewer: { canManageHousehold: boolean }): string | undefined {
   const path = pathname.replace(/\/$/, "");
   if (path === "/voices") return viewer.canManageHousehold ? settingsPath("home-voice", "voices") : settingsPath("voice", "voice");
-  if (path === "/engines" || path === "/models") return viewer.canManageHousehold ? settingsPath("ai", "overview") : PERSONAL_DEFAULT;
+  if (path === "/engines" || path === "/models") return viewer.canManageHousehold ? settingsPath("stack", "models") : PERSONAL_DEFAULT;
   if (path === "/devices") return settingsPath("profile", "profile");
   return undefined;
 }

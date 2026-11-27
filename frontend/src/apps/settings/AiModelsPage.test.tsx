@@ -161,19 +161,18 @@ describe("the page", () => {
 
 describe("the link to the Stack's admin page", () => {
   const openLink = (hostname: string) => renderWithQueryClient(<StackAdminLink hostname={hostname} />);
-  test("an owner sees one clearly labeled link with a one-line explanation, opening a new tab", async () => {
+  test("the link is no longer a card on this page: it lives on Settings, Stack, General", async () => {
     const view = open();
+    await view.findByTestId("feature-chat");
+    expect(view.queryByRole("link", { name: "Open Stack admin" })).toBeNull();
+    expect(view.queryByTestId("extra-stack-admin")).toBeNull();
+  });
+  test("on the computer itself it is one link that opens a new tab", async () => {
+    const view = openLink("localhost");
     const link = (await view.findByRole("link", { name: "Open Stack admin" })) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("http://127.0.0.1:8770/admin/");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toContain("noopener");
-    expect(view.getByTestId("extra-stack-admin")).toBeTruthy();
-  });
-  test("a person who is not an owner or admin does not see it", async () => {
-    const view = renderWithQueryClient(<MemoryRouter><AiModelsPage person={makePerson("adult")} onPersonChange={() => {}} /></MemoryRouter>);
-    await view.findByTestId("feature-chat").catch(() => undefined);
-    expect(view.queryByRole("link", { name: "Open Stack admin" })).toBeNull();
-    expect(view.queryByTestId("extra-stack-admin")).toBeNull();
   });
   test("from another device with remote access off it is not a link and says why in plain words", async () => {
     const view = openLink("hub.example.com");

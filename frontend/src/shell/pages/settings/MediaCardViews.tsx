@@ -51,7 +51,7 @@ function linkRows(rows: LinkSpec[], navigate: (to: string) => void) {
   ));
 }
 
-const CHOOSE_MODELS = settingsPath("ai", "overview");
+const CHOOSE_MODELS = settingsPath("stack", "models");
 
 /** Children and teens: the kids switch and the two daily limits. Admin only (the area is). */
 export function MediaKidsView(props: SettingsViewProps) { return <MediaKeysList person={props.person} card={props.card} />; }
@@ -73,7 +73,7 @@ export function MediaVideosView(props: SettingsViewProps) {
       {copy.max_note ? <p className="text-sm text-muted-foreground">{copy.max_note}</p> : null}
       {linkRows([
         { title: copy.models_label, help: copy.models_help, button: copy.models_button, to: CHOOSE_MODELS },
-        { title: copy.styles_label, help: copy.styles_help, button: copy.styles_button, to: settingsPath("media", "styles") },
+        { title: copy.styles_label, help: copy.styles_help, button: copy.styles_button, to: settingsPath("stack", "styles") },
       ], navigate)}
     </>
   );

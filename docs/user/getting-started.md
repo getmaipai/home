@@ -27,7 +27,7 @@ The top of the wizard shows two parts: **Your Home** and **Your AI**. The screen
 9. **Turn on web search.** You only see this screen when Home's own search is not ready. See [the web search step](#the-web-search-step) below.
 10. **Create your owner account.** Type your name and choose a PIN or password. You type it twice. The two boxes turn green with "Passcodes match" when they agree, and red with a fix when they do not. A PIN or password can be 4 to 128 characters. Press **Create owner account**.
 11. **Coding on this Home.** Choose whether to set up Coding mode. It needs a Mac with 128 GB of memory. Press **Set up coding** or **Not now**.
-12. **How should Home share this computer?** Only shows when the AI engine can answer. Pick **Chat first**, **Balanced** or **Big jobs first**. You can change it later in **Settings**, under **AI and models**, then **Performance**.
+12. **How should Home share this computer?** Only shows when the AI engine can answer. Pick **Chat first**, **Balanced** or **Big jobs first**. You can change it later in **Settings**, under **Stack**, then **Monitor**, then **Performance**.
 13. **Close apps for big jobs.** Only shows on a Mac used as a regular computer. Pick **Not now** or **Automatic**. See [Let Home close apps](close-apps.md).
 14. **Save your backup key.** If this computer breaks, this key restores your Home on a new one. Press **Download**. **Continue** unlocks after the download starts. The key can only be downloaded, not shown on screen.
 15. **You're all set.** You can talk with Home as soon as you open it. If the AI is still downloading, chat starts answering when the first model finishes. Press **Open my Home**.

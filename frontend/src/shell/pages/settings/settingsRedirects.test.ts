@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import legacyMap from "@maipai/spec/settings/legacy-sections.json";
-import { aliasTarget, customizeTarget, legacySettingsSectionTarget, legacySettingsTarget, retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
+import { aliasTarget, customizeTarget, legacySettingsSectionTarget, legacySettingsTarget, movedSettingsTarget, retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 
 const admin = { canManageHousehold: true };
@@ -41,8 +41,8 @@ describe("legacy settings search links", () => {
     ["?tab=me&section=profile", "/settings/profile?tab=profile"],
     ["?tab=me&section=appearance", "/settings/appearance?tab=appearance"],
     ["?tab=me&section=chat", "/settings/chat"],
-    ["?tab=household&section=ai", "/settings/ai?tab=overview"],
-    ["?tab=household&section=household.ai", "/settings/ai?tab=advanced#chat.flash_attention_override"],
+    ["?tab=household&section=ai", "/settings/stack?tab=models"],
+    ["?tab=household&section=household.ai", "/settings/stack?tab=maintain#chat.flash_attention_override"],
     ["?tab=household&section=household.search", "/settings/search?tab=search#search.searxng_url"],
     ["?tab=me&section=person.search", "/settings/chat?tab=general#search.safe_search"],
     ["?tab=device", "/settings/voice?tab=device"],
@@ -50,7 +50,7 @@ describe("legacy settings search links", () => {
     expect(legacySettingsTarget(search, "", admin, registry)).toBe(expected);
   });
   test("household search links remain on their page so non-admins see the access explanation", () => {
-    expect(legacySettingsTarget("?tab=household&section=household.ai", "", member, registry)).toBe("/settings/ai?tab=advanced#chat.flash_attention_override");
+    expect(legacySettingsTarget("?tab=household&section=household.ai", "", member, registry)).toBe("/settings/stack?tab=maintain#chat.flash_attention_override");
   });
   test("hash deep links survive the legacy chat section", () => {
     expect(legacySettingsTarget("?tab=me&section=chat", "#chat.photo_uploads", member, registry)).toBe("/settings/chat#chat.photo_uploads");
@@ -59,7 +59,7 @@ describe("legacy settings search links", () => {
 
 describe("other moved routes", () => {
   test.each([
-    ["/engines", "/settings/ai?tab=overview"], ["/models", "/settings/ai?tab=overview"], ["/voices", "/settings/home-voice?tab=voices"],
+    ["/engines", "/settings/stack?tab=models"], ["/models", "/settings/stack?tab=models"], ["/voices", "/settings/home-voice?tab=voices"],
   ])("%s points to the household page", (path, expected) => expect(retiredManagePageTarget(path, admin)).toBe(expected));
   test("voice remains personal to a non-admin and devices reaches profile", () => {
     expect(retiredManagePageTarget("/voices", member)).toBe("/settings/voice?tab=voice");
@@ -88,5 +88,19 @@ describe("aliasTarget (AUDIT-UI-01)", () => {
     expect(aliasTarget("/settings/voices", admin)).toBe(settingsPath("home-voice", "voices"));
     expect(aliasTarget("/settings/voices", member)).toBe(settingsPath("voice", "voice"));
     expect(aliasTarget("/nowhere", admin)).toBe("/nowhere");
+  });
+});
+
+// STACK-MENU-SYNC-01: every row of `moved` in the spec's legacy-sections.json is honoured, and a tab with no row of its own follows its section.
+describe("places that moved into Settings, Stack", () => {
+  const moved = (legacyMap as { moved: Array<{ old: { section: string; tab?: string }; new: { section: string; tab?: string } }> }).moved;
+  test.each(moved.map((row) => [row.old, row.new] as const))("%j moves to %j", (old, to) => {
+    expect(movedSettingsTarget(old.section, old.tab)).toBe(settingsPath(to.section, to.tab));
+  });
+  test("an unknown AI tab follows the section, a Media tab that did not move stays, and the key rides along", () => {
+    expect(movedSettingsTarget("ai", "nothing")).toBe(settingsPath("stack", "models"));
+    expect(movedSettingsTarget("media", "pictures")).toBeUndefined();
+    expect(movedSettingsTarget("media", undefined)).toBeUndefined();
+    expect(movedSettingsTarget("ai", "advanced", "chat.flash_attention_override")).toBe("/settings/stack?tab=maintain#chat.flash_attention_override");
   });
 });

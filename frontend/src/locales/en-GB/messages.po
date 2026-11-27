@@ -2044,7 +2044,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:116
+#: src/shell/pages/settings/settingsViews.tsx:118
 msgid "Add a robot"
 msgstr ""
 
@@ -2972,8 +2972,8 @@ msgid "An owner or admin can download it in Settings, Search, Offline books (pic
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:76
-#: src/shell/pages/settings/SettingsAreaPage.tsx:89
+#: src/shell/pages/settings/SettingsAreaPage.tsx:83
+#: src/shell/pages/settings/SettingsAreaPage.tsx:96
 msgid "An owner or admin sets this."
 msgstr ""
 
@@ -3036,6 +3036,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:702
 msgid "setting.engines.stack.where.option_label.another_computer"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:37
+msgid "Another computer, over your home network or tailnet"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3169,7 +3174,7 @@ msgid "Applied."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:292
+#: src/shell/pages/settings/SettingsAreaPage.tsx:298
 msgid "Applies to everyone at home"
 msgstr ""
 
@@ -3391,6 +3396,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1822
 msgid "setting.ui.home_layout.option_label.ask"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1915
+msgid "area.Ask in plain words. Nothing changes until you approve."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -3737,7 +3747,7 @@ msgid "setting.backup.max_total_gb.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:29
+#: src/apps/settings/AiModelsPage.tsx:26
 #: src/apps/settings/BackupsSection.tsx:204
 #: src/shell/pageHeaderTitle.tsx:104
 #: src/shell/Routes.tsx:170
@@ -3745,12 +3755,12 @@ msgid "Backups"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1915
+#: src/lib/settingCopy.generated.ts:1916
 msgid "area.Backups"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1916
+#: src/lib/settingCopy.generated.ts:1917
 msgid "area.Backups and updates"
 msgstr ""
 
@@ -3866,7 +3876,7 @@ msgid "Before you start"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1917
+#: src/lib/settingCopy.generated.ts:1918
 msgid "area.Behaviour"
 msgstr ""
 
@@ -3983,7 +3993,7 @@ msgid "Blocked"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1918
+#: src/lib/settingCopy.generated.ts:1919
 msgid "area.Blocked sites"
 msgstr ""
 
@@ -4783,7 +4793,7 @@ msgid "setting.access.tier.max.option_label.chat"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1919
+#: src/lib/settingCopy.generated.ts:1920
 msgid "area.Chat"
 msgstr ""
 
@@ -4926,7 +4936,7 @@ msgid "failure.composer.gpu.teen"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1920
+#: src/lib/settingCopy.generated.ts:1921
 msgid "area.Chat pause"
 msgstr ""
 
@@ -5002,6 +5012,12 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/RepairsPage.tsx:126
 msgid "Check my computers again"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:32
+#: src/apps/settings/stack/StackGeneral.tsx:63
+msgid "Check now"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -5128,7 +5144,7 @@ msgid "Checking..."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1921
+#: src/lib/settingCopy.generated.ts:1922
 msgid "area.Checks"
 msgstr ""
 
@@ -5205,7 +5221,7 @@ msgid "Children"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1922
+#: src/lib/settingCopy.generated.ts:1923
 msgid "area.Children and teens"
 msgstr ""
 
@@ -5893,7 +5909,7 @@ msgid "Clock"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1923
+#: src/lib/settingCopy.generated.ts:1924
 msgid "area.Clock"
 msgstr ""
 
@@ -5998,7 +6014,7 @@ msgid "setting.coding.home_mode.option_label.coding"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1924
+#: src/lib/settingCopy.generated.ts:1925
 msgid "area.Coding"
 msgstr ""
 
@@ -6187,7 +6203,7 @@ msgid "Commands"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1925
+#: src/lib/settingCopy.generated.ts:1926
 msgid "area.Commands"
 msgstr ""
 
@@ -6345,7 +6361,7 @@ msgid "Connection"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1926
+#: src/lib/settingCopy.generated.ts:1927
 msgid "area.Connections"
 msgstr ""
 
@@ -6848,7 +6864,7 @@ msgid "Could not get that backup ready."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:265
+#: src/shell/pages/settings/SettingsAreaPage.tsx:271
 msgid "Could not hide this item. Try again."
 msgstr ""
 
@@ -7747,7 +7763,7 @@ msgid "Create a Coding key"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1927
+#: src/lib/settingCopy.generated.ts:1928
 msgid "area.Create a command"
 msgstr ""
 
@@ -8017,7 +8033,7 @@ msgid "setting.ui.appearance.option_label.dark"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1928
+#: src/lib/settingCopy.generated.ts:1929
 msgid "area.Data and privacy"
 msgstr ""
 
@@ -8508,12 +8524,12 @@ msgid "Detect speakers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1929
+#: src/lib/settingCopy.generated.ts:1930
 msgid "area.Developer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1930
+#: src/lib/settingCopy.generated.ts:1931
 msgid "area.Developer tools"
 msgstr ""
 
@@ -8524,7 +8540,7 @@ msgid "Device schedules"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1931
+#: src/lib/settingCopy.generated.ts:1932
 msgid "area.Devices"
 msgstr ""
 
@@ -8695,6 +8711,11 @@ msgid "setting.storage.library.documents.threshold_percent.label"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1933
+msgid "area.Does anything need fixing?"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:111
 #: src/shell/pages/status/StatusBoard.tsx:111
 msgid "Does not repeat"
@@ -8733,7 +8754,7 @@ msgstr ""
 #: src/shell/InstallDock.tsx:261
 #: src/shell/pages/AllAppsPage.tsx:117
 #: src/shell/pages/companionFlow/KeyframeEditor.tsx:97
-#: src/shell/pages/settings/SettingsAreaPage.tsx:257
+#: src/shell/pages/settings/SettingsAreaPage.tsx:263
 #: src/shell/pages/status/StatusBoard.tsx:26
 msgid "Done"
 msgstr ""
@@ -8902,6 +8923,11 @@ msgid "Drawing your character..."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1934
+msgid "area.Drives"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:416
 msgid "Drop to add to your Library"
 msgstr ""
@@ -8987,7 +9013,7 @@ msgid "Earlier"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1932
+#: src/lib/settingCopy.generated.ts:1935
 msgid "area.Ease of use"
 msgstr ""
 
@@ -9226,7 +9252,7 @@ msgid "Engines"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1933
+#: src/lib/settingCopy.generated.ts:1936
 msgid "area.Engines"
 msgstr ""
 
@@ -9731,7 +9757,7 @@ msgid "setting.robot.face.color.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1934
+#: src/lib/settingCopy.generated.ts:1937
 msgid "area.Face enrollment"
 msgstr ""
 
@@ -9796,7 +9822,7 @@ msgid "Family"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1935
+#: src/lib/settingCopy.generated.ts:1938
 msgid "area.Family"
 msgstr ""
 
@@ -9849,11 +9875,6 @@ msgstr ""
 #: src/shell/pages/AllAppsPage.tsx:114
 #: src/shell/pages/AllAppsPage.tsx:116
 msgid "Favorites"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1936
-msgid "area.Features"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -10026,6 +10047,11 @@ msgid "Fine"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1939
+msgid "area.Fine tuning. The defaults are fine for most people."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:812
 msgid "setting.generation.picture_tier.option.boost"
 msgstr ""
@@ -10041,8 +10067,8 @@ msgid "settings.attention.setup.todo"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:244
-#: src/shell/pages/settings/SettingsAreaPage.tsx:248
+#: src/shell/pages/settings/SettingsAreaPage.tsx:250
+#: src/shell/pages/settings/SettingsAreaPage.tsx:254
 msgid "Finish setting up"
 msgstr ""
 
@@ -10672,7 +10698,7 @@ msgid "Gender"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1937
+#: src/lib/settingCopy.generated.ts:1940
 msgid "area.General"
 msgstr ""
 
@@ -11159,6 +11185,11 @@ msgid "setting.news.default_topics.teen.option_label.health"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1941
+msgid "area.Health"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:38
 msgid "Health and medicine"
 msgstr ""
@@ -11201,6 +11232,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:118
 msgid "setting.chat.search_assist.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1942
+msgid "area.Helper"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -11438,7 +11474,7 @@ msgid "setting.engines.stack.where.option.this_computer"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1938
+#: src/lib/settingCopy.generated.ts:1943
 msgid "area.Home Assistant"
 msgstr ""
 
@@ -11732,6 +11768,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:407
 msgid "failure.advice.engine_computer.cause"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:32
+msgid "Home could not reach the Stack. Start it, then check again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:32
+msgid "Home could not read the Stack"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -12168,7 +12214,7 @@ msgid "House"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1939
+#: src/lib/settingCopy.generated.ts:1944
 msgid "area.House"
 msgstr ""
 
@@ -12178,7 +12224,7 @@ msgid "setting.person.locale.option_label.household"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1940
+#: src/lib/settingCopy.generated.ts:1945
 msgid "area.Household"
 msgstr ""
 
@@ -12881,7 +12927,7 @@ msgid "Incognito can't turn on partway through a chat. Start a new chat to go in
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsSectionContent.tsx:163
+#: src/shell/pages/settings/SettingsSectionContent.tsx:162
 msgid "Incognito is on, so places cannot be added or renamed until you turn it off."
 msgstr ""
 
@@ -13070,7 +13116,7 @@ msgid "setting.news.default_topics.teen.option.world"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1941
+#: src/lib/settingCopy.generated.ts:1946
 msgid "area.Internet check"
 msgstr ""
 
@@ -13107,6 +13153,21 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:184
 msgid "IP address {ip}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1947
+msgid "area.Is anything out of date?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1948
+msgid "area.Is everything working?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1949
+msgid "area.Is there enough memory?"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -13424,7 +13485,7 @@ msgid "Keep things as they are"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:155
+#: src/shell/pages/settings/settingsViews.tsx:159
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr ""
 
@@ -13618,7 +13679,7 @@ msgid "Keyboard shortcuts"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1942
+#: src/lib/settingCopy.generated.ts:1950
 msgid "area.Keyboard shortcuts"
 msgstr ""
 
@@ -13633,7 +13694,7 @@ msgid "setting.news.default_topics.child.option_label.kids"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1943
+#: src/lib/settingCopy.generated.ts:1951
 msgid "area.Kids"
 msgstr ""
 
@@ -13712,7 +13773,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:66
+#: src/shell/pages/settings/settingsViews.tsx:67
 msgid "Language"
 msgstr ""
 
@@ -14307,6 +14368,11 @@ msgid "Licence"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1952
+msgid "area.Licences"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:348
 msgid "Life"
 msgstr ""
@@ -14375,7 +14441,7 @@ msgid "Limits"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1944
+#: src/lib/settingCopy.generated.ts:1953
 msgid "area.Limits"
 msgstr ""
 
@@ -14466,7 +14532,7 @@ msgid "Listening"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1945
+#: src/lib/settingCopy.generated.ts:1954
 msgid "area.Listening and playback"
 msgstr ""
 
@@ -14808,8 +14874,8 @@ msgid "Loading sessions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:65
-#: src/shell/pages/settings/SettingsAreaPage.tsx:162
+#: src/shell/pages/settings/SettingsAreaPage.tsx:72
+#: src/shell/pages/settings/SettingsAreaPage.tsx:169
 #: src/shell/pages/settings/SettingsRenderer.tsx:203
 msgid "Loading settings"
 msgstr ""
@@ -15022,7 +15088,7 @@ msgid "setting.ui.look.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1946
+#: src/lib/settingCopy.generated.ts:1955
 msgid "area.Look and ease"
 msgstr ""
 
@@ -15067,7 +15133,7 @@ msgid "Looking at this computer…"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1947
+#: src/lib/settingCopy.generated.ts:1956
 msgid "area.Looking up songs online"
 msgstr ""
 
@@ -15094,6 +15160,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1564
 msgid "setting.search.web.teen_mode.option.on"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1957
+msgid "area.Looks you add to pictures and video, and where their files live."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15300,6 +15371,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/code/NewSession.tsx:116
 msgid "main"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1958
+msgid "area.Maintain"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15807,8 +15883,13 @@ msgid "Man"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1948
+#: src/lib/settingCopy.generated.ts:1959
 msgid "area.Manage"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:59
+msgid "Manage"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -15956,12 +16037,12 @@ msgid "Media"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1949
+#: src/lib/settingCopy.generated.ts:1960
 msgid "area.Media"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1950
+#: src/lib/settingCopy.generated.ts:1961
 msgid "area.Media minutes"
 msgstr ""
 
@@ -16288,7 +16369,7 @@ msgid "Model"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1951
+#: src/lib/settingCopy.generated.ts:1962
 msgid "area.Model per job"
 msgstr ""
 
@@ -16298,13 +16379,28 @@ msgid "Model:"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1963
+msgid "area.Models"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1510
 msgid "setting.search.safe_search.option_label.moderate"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1964
+msgid "area.Modes"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:28
 msgid "Mon"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1965
+msgid "area.Monitor"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -16523,7 +16619,7 @@ msgid "setting.access.tier.max.option_label.music"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1952
+#: src/lib/settingCopy.generated.ts:1966
 msgid "area.Music"
 msgstr ""
 
@@ -16850,12 +16946,12 @@ msgid "Needs your choice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1953
+#: src/lib/settingCopy.generated.ts:1967
 msgid "area.Network"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1954
+#: src/lib/settingCopy.generated.ts:1968
 msgid "area.Network and access"
 msgstr ""
 
@@ -17567,7 +17663,7 @@ msgid "No session matches that. Clear the search to see them all."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:199
+#: src/shell/pages/settings/SettingsAreaPage.tsx:206
 msgid "No settings match that search."
 msgstr ""
 
@@ -17790,6 +17886,11 @@ msgid "Normal mode is on. Chat, pictures, videos and songs run as usual."
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1969
+msgid "area.Normal or Max coding, and which features are on."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/UiShowcasePage.tsx:32
 msgid "Normal pace"
 msgstr ""
@@ -17839,6 +17940,11 @@ msgid "Not installed"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:55
+msgid "Not known while it is not answering"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:41
 msgid "Not measured yet."
 msgstr ""
@@ -17850,7 +17956,7 @@ msgstr ""
 #: src/apps/setup/CloseAppsStep.tsx:73
 #: src/apps/setup/SetupWizard.tsx:478
 #: src/apps/setup/SetupWizard.tsx:478
-#: src/shell/pages/settings/SettingsAreaPage.tsx:259
+#: src/shell/pages/settings/SettingsAreaPage.tsx:265
 msgid "Not now"
 msgstr ""
 
@@ -18119,7 +18225,7 @@ msgid "Notifications"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1955
+#: src/lib/settingCopy.generated.ts:1970
 msgid "area.Notifications"
 msgstr ""
 
@@ -18391,7 +18497,7 @@ msgid "setting.search.source_mode.wikimedia.option_label.offline"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1956
+#: src/lib/settingCopy.generated.ts:1971
 msgid "area.Offline books"
 msgstr ""
 
@@ -18708,7 +18814,7 @@ msgid "Online"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1957
+#: src/lib/settingCopy.generated.ts:1972
 msgid "area.Online radio and podcasts"
 msgstr ""
 
@@ -18879,6 +18985,11 @@ msgid "Open in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackScreenStubs.tsx:13
+msgid "Open in Stack admin"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/music/MusicPlayerBar.tsx:97
 #: src/shell/music/MusicPlayerBar.tsx:97
 #: src/shell/pages/MakeSongPage.tsx:98
@@ -18939,7 +19050,7 @@ msgid "Open source conversation"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/StackAdminLink.tsx:19
+#: src/apps/settings/StackAdminLink.tsx:29
 msgid "Open Stack admin"
 msgstr ""
 
@@ -18964,6 +19075,11 @@ msgid "setting.news.reader_open.option.site"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:43
+msgid "Open the Stack admin to see them."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:423
 msgid "Open Voices"
 msgstr ""
@@ -18974,8 +19090,8 @@ msgid "Open Weather"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/SettingsAreaPage.tsx:78
-#: src/shell/pages/settings/SettingsAreaPage.tsx:90
+#: src/shell/pages/settings/SettingsAreaPage.tsx:85
+#: src/shell/pages/settings/SettingsAreaPage.tsx:97
 msgid "Open your settings"
 msgstr ""
 
@@ -19132,7 +19248,7 @@ msgid "Overview"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1958
+#: src/lib/settingCopy.generated.ts:1973
 msgid "area.Overview"
 msgstr ""
 
@@ -19174,7 +19290,7 @@ msgid "Pair"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:116
+#: src/shell/pages/settings/settingsViews.tsx:118
 msgid "Pair a robot with this home."
 msgstr ""
 
@@ -19395,7 +19511,7 @@ msgid "Performance"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1959
+#: src/lib/settingCopy.generated.ts:1974
 msgid "area.Performance"
 msgstr ""
 
@@ -19433,7 +19549,7 @@ msgid "setting.persona.active_id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1960
+#: src/lib/settingCopy.generated.ts:1975
 msgid "area.Personality"
 msgstr ""
 
@@ -19443,7 +19559,7 @@ msgid "Personality notes"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1961
+#: src/lib/settingCopy.generated.ts:1976
 msgid "area.Personalization"
 msgstr ""
 
@@ -19872,7 +19988,7 @@ msgid "setting.access.tier.max.option_label.pictures"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1962
+#: src/lib/settingCopy.generated.ts:1977
 msgid "area.Pictures"
 msgstr ""
 
@@ -19969,7 +20085,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:70
+#: src/shell/pages/settings/settingsViews.tsx:71
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr ""
@@ -20203,7 +20319,7 @@ msgid "setting.topics.teen.risk.option_label.redirect"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1963
+#: src/lib/settingCopy.generated.ts:1978
 msgid "area.Port"
 msgstr ""
 
@@ -20409,7 +20525,7 @@ msgid "Privacy"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1964
+#: src/lib/settingCopy.generated.ts:1979
 msgid "area.Privacy and safety"
 msgstr ""
 
@@ -20430,12 +20546,12 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:223
-#: src/shell/pages/settings/settingsViews.tsx:60
+#: src/shell/pages/settings/settingsViews.tsx:61
 msgid "Profile"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1965
+#: src/lib/settingCopy.generated.ts:1980
 msgid "area.Profile"
 msgstr ""
 
@@ -20961,7 +21077,7 @@ msgid "setting.reference.download.when.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1966
+#: src/lib/settingCopy.generated.ts:1981
 msgid "area.Reference library"
 msgstr ""
 
@@ -21324,7 +21440,7 @@ msgid "Repairs"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1967
+#: src/lib/settingCopy.generated.ts:1982
 msgid "area.Repairs"
 msgstr ""
 
@@ -21498,6 +21614,11 @@ msgid "Resolved {date}"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1983
+msgid "area.Resources"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/preview/SetupPreviewBar.tsx:43
 #: src/shell/pages/EnginesPage.tsx:240
 #: src/shell/pages/status/StatusComponents.tsx:136
@@ -21528,6 +21649,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:871
 msgid "setting.host.guard.mode.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:1984
+msgid "area.Restart, check, and repair."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21837,7 +21963,7 @@ msgid "Robot"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1968
+#: src/lib/settingCopy.generated.ts:1985
 msgid "area.Robot"
 msgstr ""
 
@@ -21999,7 +22125,7 @@ msgid "setting.home.robots.enabled.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1969
+#: src/lib/settingCopy.generated.ts:1986
 msgid "area.Robots"
 msgstr ""
 
@@ -22678,7 +22804,7 @@ msgid "Search"
 msgstr "Search"
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1970
+#: src/lib/settingCopy.generated.ts:1987
 msgid "area.Search"
 msgstr ""
 
@@ -22699,12 +22825,12 @@ msgid "setting.engines.embed.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1971
+#: src/lib/settingCopy.generated.ts:1988
 msgid "area.Search and memory"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1972
+#: src/lib/settingCopy.generated.ts:1989
 msgid "area.Search and web"
 msgstr ""
 
@@ -23107,7 +23233,7 @@ msgid "setting.health.keep_warm.does"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1973
+#: src/lib/settingCopy.generated.ts:1990
 msgid "area.Sensitive subjects with teen controls"
 msgstr ""
 
@@ -23127,7 +23253,7 @@ msgid "Session details"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1974
+#: src/lib/settingCopy.generated.ts:1991
 msgid "area.Session lock"
 msgstr ""
 
@@ -23431,7 +23557,7 @@ msgid "Settings"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1975
+#: src/lib/settingCopy.generated.ts:1992
 msgid "area.Settings"
 msgstr ""
 
@@ -23540,7 +23666,7 @@ msgid "shared with {count, plural, one {# person} other {# people}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1976
+#: src/lib/settingCopy.generated.ts:1993
 msgid "area.Sharing the computer"
 msgstr ""
 
@@ -23670,8 +23796,8 @@ msgid "Show in Library"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:154
-#: src/shell/pages/settings/settingsViews.tsx:157
+#: src/shell/pages/settings/settingsViews.tsx:158
+#: src/shell/pages/settings/settingsViews.tsx:161
 msgid "Show in the sidebar"
 msgstr ""
 
@@ -23898,7 +24024,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:150
+#: src/shell/pages/settings/settingsViews.tsx:154
 msgid "Sidebar"
 msgstr ""
 
@@ -23950,7 +24076,7 @@ msgid "Signed in away from home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1977
+#: src/lib/settingCopy.generated.ts:1994
 msgid "area.Signed-in devices"
 msgstr ""
 
@@ -24068,7 +24194,7 @@ msgid "Skill"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1978
+#: src/lib/settingCopy.generated.ts:1995
 msgid "area.Skills"
 msgstr ""
 
@@ -24778,8 +24904,8 @@ msgid "setting.companion.voice.lively_child.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:27
-msgid "Stack admin"
+#: src/lib/settingCopy.generated.ts:1996
+msgid "area.Stack"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24790,6 +24916,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/pages/StatusPage.tsx:84
 msgid "Stack contract:"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:54
+msgid "Stack version"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25068,7 +25199,7 @@ msgid "Status"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1979
+#: src/lib/settingCopy.generated.ts:1997
 msgid "area.Status"
 msgstr ""
 
@@ -25263,7 +25394,7 @@ msgid "Stopwatch running"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:29
+#: src/apps/settings/AiModelsPage.tsx:26
 #: src/shell/library/LibraryStorage.tsx:24
 #: src/shell/pageHeaderTitle.tsx:99
 #: src/shell/pages/StoragePage.tsx:118
@@ -25275,7 +25406,7 @@ msgid "Storage"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1980
+#: src/lib/settingCopy.generated.ts:1998
 msgid "area.Storage"
 msgstr ""
 
@@ -25285,12 +25416,12 @@ msgid "Storage & hardware"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1981
+#: src/lib/settingCopy.generated.ts:1999
 msgid "area.Storage and backups"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:29
+#: src/apps/settings/AiModelsPage.tsx:26
 msgid "Storage and backups"
 msgstr ""
 
@@ -25430,7 +25561,7 @@ msgid "Styles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1982
+#: src/lib/settingCopy.generated.ts:2000
 msgid "area.Styles"
 msgstr ""
 
@@ -25496,7 +25627,7 @@ msgid "Synth actions"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1983
+#: src/lib/settingCopy.generated.ts:2001
 msgid "area.Synth controls"
 msgstr ""
 
@@ -25518,7 +25649,7 @@ msgid "Synths"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1984
+#: src/lib/settingCopy.generated.ts:2002
 msgid "area.Synths"
 msgstr ""
 
@@ -25663,7 +25794,7 @@ msgid "Teen protections are on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1985
+#: src/lib/settingCopy.generated.ts:2003
 msgid "area.Teens"
 msgstr ""
 
@@ -25679,7 +25810,7 @@ msgid "Teens and children"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1986
+#: src/lib/settingCopy.generated.ts:2004
 msgid "area.Telegram"
 msgstr ""
 
@@ -26067,7 +26198,7 @@ msgstr ""
 #: src/shell/pages/PackageAppPage.tsx:300
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
-#: src/shell/pages/settings/SettingsAreaPage.tsx:265
+#: src/shell/pages/settings/SettingsAreaPage.tsx:271
 #: src/shell/pages/settings/SettingsRenderer.tsx:193
 #: src/shell/pages/SignInPage.tsx:208
 #: src/shell/pages/SoundExtras.tsx:82
@@ -26798,7 +26929,7 @@ msgid "The home"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1987
+#: src/lib/settingCopy.generated.ts:2005
 msgid "area.The home"
 msgstr ""
 
@@ -27038,7 +27169,7 @@ msgid "setting.chat.search_assist.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:28
+#: src/apps/settings/AiModelsPage.tsx:25
 msgid "The model for each level is chosen above. Here you choose which people may use Boost and Max."
 msgstr ""
 
@@ -27385,8 +27516,18 @@ msgid "The sound is longer than asked: this computer has no audio tool to cut it
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/AiModelsPage.tsx:27
-msgid "The Stack has its own admin page with the same models and more settings. It opens in a new tab."
+#: src/apps/settings/stack/StackGeneral.tsx:41
+msgid "The Stack is not answering"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:44
+msgid "The Stack is running"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:43
+msgid "The Stack is running and lists {count} to look at"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -27744,6 +27885,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:234
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
+#: src/apps/settings/stack/StackGeneral.tsx:36
 msgid "This computer"
 msgstr ""
 
@@ -27788,7 +27930,7 @@ msgid "This computer needs to be a Mac with 128 GB of memory for Coding mode. Yo
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1988
+#: src/lib/settingCopy.generated.ts:2006
 msgid "area.This device"
 msgstr ""
 
@@ -28280,6 +28422,11 @@ msgid "Tools"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:2007
+msgid "area.Tools"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/performance/ToolsOfferedBody.tsx:11
 #: src/shell/pages/PerformancePage.tsx:128
 msgid "Tools offered per turn"
@@ -28765,7 +28912,7 @@ msgid "Two computers"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:73
+#: src/shell/pages/settings/settingsViews.tsx:74
 msgid "Two-step sign-in"
 msgstr ""
 
@@ -29143,12 +29290,12 @@ msgid "Updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1989
+#: src/lib/settingCopy.generated.ts:2008
 msgid "area.Updates"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1990
+#: src/lib/settingCopy.generated.ts:2009
 msgid "area.Updates and repairs"
 msgstr ""
 
@@ -29430,7 +29577,7 @@ msgid "Users"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1991
+#: src/lib/settingCopy.generated.ts:2010
 msgid "area.Users"
 msgstr ""
 
@@ -29631,7 +29778,7 @@ msgid "setting.access.tier.max.option_label.video"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1992
+#: src/lib/settingCopy.generated.ts:2011
 msgid "area.Videos"
 msgstr ""
 
@@ -29728,7 +29875,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:371
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:171
+#: src/shell/pages/settings/settingsViews.tsx:175
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr ""
@@ -29749,12 +29896,12 @@ msgid "setting.robot.voice.id.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1993
+#: src/lib/settingCopy.generated.ts:2012
 msgid "area.Voice"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1994
+#: src/lib/settingCopy.generated.ts:2013
 msgid "area.Voice and robot"
 msgstr ""
 
@@ -29820,7 +29967,7 @@ msgid "setting.person.voice_print.enrollment.title"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1995
+#: src/lib/settingCopy.generated.ts:2014
 msgid "area.Voice print enrollment"
 msgstr ""
 
@@ -29857,14 +30004,14 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/pages/settings/settingsViews.tsx:94
+#: src/shell/pages/settings/settingsViews.tsx:95
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 msgid "Voices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1996
+#: src/lib/settingCopy.generated.ts:2015
 msgid "area.Voices"
 msgstr ""
 
@@ -30026,7 +30173,7 @@ msgid "setting.engines.wakeword.choice.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1997
+#: src/lib/settingCopy.generated.ts:2016
 msgid "area.Wake word"
 msgstr ""
 
@@ -30110,12 +30257,12 @@ msgid "Web search"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1998
+#: src/lib/settingCopy.generated.ts:2017
 msgid "area.Web search"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:1999
+#: src/lib/settingCopy.generated.ts:2018
 msgid "area.Web search and memory settings"
 msgstr ""
 
@@ -30213,7 +30360,7 @@ msgid "setting.generation.music.length.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:2000
+#: src/lib/settingCopy.generated.ts:2019
 msgid "area.What connects to the internet"
 msgstr ""
 
@@ -30230,6 +30377,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/coreLabels.ts:33
 msgid "What is being made, what finished and what needs a look."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:2020
+msgid "area.What is doing the work behind the scenes?"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30454,6 +30606,11 @@ msgid "Where"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/apps/settings/stack/StackGeneral.tsx:48
+msgid "Where it runs"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1515
 msgid "setting.search.source_mode.help"
 msgstr ""
@@ -30473,6 +30630,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1189
 msgid "setting.reference.library_dir.help"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:2021
+msgid "area.Where the Stack keeps its files, and how full each drive is."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -30531,6 +30693,16 @@ msgid "setting.robot.controls.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:2023
+msgid "area.Which features are on, and which model does each one use?"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:2022
+msgid "area.Which Homes and tools can use this Stack?"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:10
 msgid "setting.access.tier.boost.help"
 msgstr ""
@@ -30571,6 +30743,11 @@ msgid "setting.generation.picture_quick_model.help"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/lib/settingCopy.generated.ts:2024
+msgid "area.Which model terms have been accepted?"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/CapabilityTable.tsx:42
 msgid "Which of Standard, Boost and Max this computer can ever run for each kind of job."
 msgstr ""
@@ -30606,7 +30783,7 @@ msgid "Who"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:2001
+#: src/lib/settingCopy.generated.ts:2025
 msgid "area.Who can code"
 msgstr ""
 
@@ -30648,7 +30825,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AiLevelAccess.tsx:51
-#: src/apps/settings/AiModelsPage.tsx:28
+#: src/apps/settings/AiModelsPage.tsx:25
 msgid "Who can use each level"
 msgstr ""
 
@@ -31419,7 +31596,7 @@ msgid "Your current PIN or password is not right. Try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:2002
+#: src/lib/settingCopy.generated.ts:2026
 msgid "area.Your data"
 msgstr ""
 
@@ -31740,7 +31917,7 @@ msgid "Yours"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/lib/settingCopy.generated.ts:2003
+#: src/lib/settingCopy.generated.ts:2027
 msgid "area.Yours"
 msgstr ""
 

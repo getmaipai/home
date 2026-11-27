@@ -12,7 +12,7 @@ When a big job needs more memory, Home first tries to unload its own models. If 
 
 ## Turn it on
 
-1. Open **Settings**, then **AI and models**, then **Performance**.
+1. Open **Settings**, then **Stack**, then the **Monitor** tab, then **Performance**.
 2. In **Close apps for big jobs**, look at **Always close**. Press **Use the starter list**, or **Add an app** one at a time.
 3. Look at **Never close**. Add any app that must always stay open.
 4. Choose **Automatic**.

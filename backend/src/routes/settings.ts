@@ -151,8 +151,8 @@ settingsRoutes.openapi(attentionRoute, async (c) => {
   });
   await source(() => cachedInstallStatus(), (install) => {
     if (!install) return;
-    if (["engine_failed", "failed", "stalled", "out_of_space"].includes(install.state)) items.push({ id: "install", kind: "problem", area: "ai", title: attentionCopy("installTitle"), line: install.problem ?? attentionCopy("installFailed"), action: { label: attentionCopy("aiOpen"), href: "/settings/ai?tab=models" } });
-    else if (install.state === "installing_engine" || install.state === "downloading") items.push({ id: "install-progress", kind: "not_set_up", area: "ai", title: attentionCopy("installRunningTitle"), line: attentionCopy("installRunningLine"), action: { label: attentionCopy("aiOpen"), href: "/settings/ai?tab=models" } });
+    if (["engine_failed", "failed", "stalled", "out_of_space"].includes(install.state)) items.push({ id: "install", kind: "problem", area: "ai", title: attentionCopy("installTitle"), line: install.problem ?? attentionCopy("installFailed"), action: { label: attentionCopy("aiOpen"), href: "/settings/stack?tab=models" } });
+    else if (install.state === "installing_engine" || install.state === "downloading") items.push({ id: "install-progress", kind: "not_set_up", area: "ai", title: attentionCopy("installRunningTitle"), line: attentionCopy("installRunningLine"), action: { label: attentionCopy("aiOpen"), href: "/settings/stack?tab=models" } });
     areas.ai = { state: install.state === "failed" || install.state === "engine_failed" || install.state === "stalled" || install.state === "out_of_space" ? "problem" : install.state === "none" || install.state === "ready" ? "ok" : "not_set_up", summary: install.state === "ready" ? attentionCopy("aiReady") : install.state === "none" ? attentionCopy("aiNoInstall") : attentionCopy("aiSetup") };
   });
   await source(() => cachedRoleHealth("chat"), (health) => {

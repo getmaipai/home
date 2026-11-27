@@ -5,7 +5,7 @@ description: Turn local coding on, choose who may use it and manage the parts it
 
 # Coding settings for admins
 
-Open **Settings**, then **AI and models**, then **Coding**.
+Open **Settings**, then **Stack**, then the **Maintain** tab, then **Coding**.
 
 ## Turn Coding on
 

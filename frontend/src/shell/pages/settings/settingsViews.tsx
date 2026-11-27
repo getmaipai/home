@@ -20,9 +20,10 @@ import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { AiModelsPage } from "@/apps/settings/AiModelsPage";
 import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
-import { PerformanceSettings } from "@/apps/settings/PerformanceSettings";
+import { StackGeneral } from "@/apps/settings/stack/StackGeneral";
+import { StackScreenStubs } from "@/apps/settings/stack/StackScreenStubs";
+import { StackMaintain, StackMonitor } from "@/apps/settings/stack/StackTabs";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
-import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { PeopleAccess } from "@/apps/settings/PeopleAccess";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
@@ -97,13 +98,14 @@ function HomeVoiceCatalogSettings() { useTabItem(i18n._({ id: "Voices", message:
 // Each is a trail view of its Home settings section (spec/settings/areas.json),
 // so the area's min_role gate (admin) is the only one this layer needs; the
 // hub still gates every call these make.
-// SETTINGS-UX-05: the existing Engines and AI pieces are placed in four short tabs.
+// STACK-MENU-SYNC-01: Settings, Stack, Models: the AI and models page (the Stack's shared Models page, Drives and Licences inside it), the engine link and
+// the engines console, then a stub for each Models screen the Stack has and Home has no page for yet (Modes).
 function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
-  const show = (id: string) => tab === id || (tab === undefined && id === "overview");
   return <>
-    {show("overview") ? <AiModelsPage person={person} onPersonChange={() => undefined} tab={tab} /> : null}
-    {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <HuggingFaceTokenSection /> : null}
+    <AiModelsPage person={person} onPersonChange={() => undefined} tab={tab} />
+    <EngineLinkCredentialSection />
+    <EnginesConsole person={person} />
+    <StackScreenStubs tab="models" />
   </>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
@@ -125,9 +127,11 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
   "home.engine_admin": HomeEngineAdminSettings,
+  "stack.general": StackGeneral,
+  "stack.monitor": StackMonitor,
+  "stack.maintain": StackMaintain,
   "ai.glance": AiModelsPage,
   "ai.always_on": AiAlwaysOnView,
-  "ai.performance": PerformanceSettings,
   "home.users_admin": HomeUsersAdminSettings,
   "home.devices_admin": HomeDevicesAdminSettings,
   "home.routing_stats": HomeRoutingStatsSettings,

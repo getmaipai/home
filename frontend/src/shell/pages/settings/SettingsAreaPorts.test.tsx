@@ -168,7 +168,7 @@ describe("ported from the old settings page", () => {
     const owner = makePerson("owner");
     const view = open(owner, "/settings/household?tab=people");
     const hrefs = new Set<string>();
-    for (const path of ["/settings/household?tab=people", "/settings/ai?tab=overview", "/settings/backups?tab=storage", "/settings/backups?tab=maintenance", "/settings/privacy?tab=privacy"]) {
+    for (const path of ["/settings/household?tab=people", "/settings/stack?tab=models", "/settings/backups?tab=storage", "/settings/backups?tab=maintenance", "/settings/privacy?tab=privacy"]) {
       cleanup();
       fixture!.restore();
       open(owner, path);

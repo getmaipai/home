@@ -64,7 +64,7 @@ describe("PageHeaderTitle", () => {
     ["/all-apps", "All apps", "lucide-layout-grid"],
     ["/reference", "Reference", "lucide-book-open"],
     ["/media", "Media", "lucide-cast"],
-    ["/settings/ai", "Settings", "lucide-settings"],
+    ["/settings/stack", "Settings", "lucide-settings"],
     ["/storage/trash", "Storage", "lucide-database"],
     // A page inside an app reads as the app (owner, 2026-10-29): never the page's own name.
     ["/chat/projects", "Chat", "lucide-message-circle"],

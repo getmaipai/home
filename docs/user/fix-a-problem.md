@@ -36,7 +36,7 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 ## If Chat won't send a message or answer
 
 - Check Repairs first. MaiPai may have already spotted the problem.
-- Make sure an AI model is set up. Open **Settings**, then **AI and models**, and confirm one is selected.
+- Make sure an AI model is set up. Open **Settings**, then **Stack**, then **Models**, and confirm one is selected.
 - Try reloading the page.
 
 ## If voice input doesn't work

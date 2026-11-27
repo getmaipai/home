@@ -80,10 +80,10 @@ describe("who may open Home settings", () => {
 describe("the sections that had no entry draw inside Home settings", () => {
   test("tab views retain the old household page content", () => {
     const tabViews = Object.fromEntries(homeArea().sections.map((section) => [section.id, Object.fromEntries((section.tabs ?? []).filter((tab) => tab.view).map((tab) => [tab.id, tab.view]))]));
-    expect(tabViews.ai).toMatchObject({ overview: "home.engine_admin" });
+    expect(tabViews.stack).toMatchObject({ general: "stack.general", models: "home.engine_admin", monitor: "stack.monitor", maintain: "stack.maintain" });
     // VIDEO-SETTINGS-04: the four tabs of Media have no tab view; their cards carry the views (see the next test).
     expect(Object.keys(tabViews.media ?? {})).toEqual([]);
-    expect(homeArea().sections.find((section) => section.id === "media")?.tabs?.map((tab) => tab.id)).toEqual(["pictures", "videos", "music", "styles"]);
+    expect(homeArea().sections.find((section) => section.id === "media")?.tabs?.map((tab) => tab.id)).toEqual(["pictures", "videos", "music"]);
     expect(tabViews.apps).toMatchObject({ robot: "home.devices_admin" });
     expect(homeArea().sections.find((section) => section.id === "apps")?.tabs?.[0]?.id).toBe("robot");
     expect(tabViews.advanced).toMatchObject({ developer: "home.routing_stats" });
@@ -113,12 +113,12 @@ describe("the sections that had no entry draw inside Home settings", () => {
   });
 
   test("engine computer pairing is on Engines", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=engines");
+    const view = open(makePerson("owner"), "/settings/stack?tab=models");
     expect(await view.findByText("Engine computer link")).toBeTruthy();
   });
 
   test("Hugging Face token is on Advanced", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
+    const view = open(makePerson("owner"), "/settings/stack?tab=maintain");
     expect(await view.findByText("Hugging Face token (for voice cloning)")).toBeTruthy();
   });
 
@@ -130,7 +130,7 @@ describe("the sections that had no entry draw inside Home settings", () => {
   });
 
   test("an admin sees them too", async () => {
-    const view = open(makePerson("admin"), "/settings/ai?tab=engines");
+    const view = open(makePerson("admin"), "/settings/stack?tab=models");
     expect(await view.findByText("Engine computer link")).toBeTruthy();
   });
 });
@@ -143,7 +143,7 @@ describe("Home settings holds household scope only", () => {
   });
 
   test("an owner opening every Home section reads the household scope and no person's", async () => {
-    for (const page of ["household", "privacy", "ai", "home-voice", "apps", "backups"]) {
+    for (const page of ["household", "privacy", "media", "home-voice", "apps", "backups"]) {
       const view = open(makePerson("owner"), `/settings/${page}`);
       await waitFor(() => expect(where(view)).toBe(`/settings/${page}`));
       await waitFor(() => expect(fixture!.scopes.length).toBeGreaterThan(0));
@@ -161,7 +161,7 @@ describe("Media cards (VIDEO-SETTINGS-04)", () => {
 
   test("every card the spec names by view has a view that draws, and none is left blank", () => {
     const named = specCards().filter((card) => card.view).map((card) => card.view);
-    expect(named).toEqual(["home.media_pictures", "home.media_kids", "home.media_videos", "home.media_music", "home.media_styles"]);
+    expect(named).toEqual(["home.media_pictures", "home.media_kids", "home.media_videos", "home.media_music"]);
   });
 
   test("the Pictures tab draws the picture keys and the Children and teens card with its four keys", async () => {
@@ -181,7 +181,7 @@ describe("Media cards (VIDEO-SETTINGS-04)", () => {
     expect(await music.findByText("Adults can make songs")).toBeTruthy();
     expect(await music.findByText("Song length")).toBeTruthy();
     cleanup();
-    const styles = open(makePerson("owner"), "/settings/media?tab=styles");
+    const styles = open(makePerson("owner"), "/settings/stack?tab=styles");
     expect(await styles.findByText("Adult-only styles")).toBeTruthy();
     expect(styles.queryByText("Use Civitai")).toBeNull();
   });
@@ -207,7 +207,7 @@ describe("Media cards (VIDEO-SETTINGS-04)", () => {
   test("Open Styles on the Videos tab opens the Styles tab", async () => {
     const videos = open(makePerson("owner"), "/settings/media?tab=videos");
     (await videos.findByRole("button", { name: "Open Styles" })).click();
-    await waitFor(() => expect(where(videos)).toBe("/settings/media"));
+    await waitFor(() => expect(where(videos)).toBe("/settings/stack"));
     expect(await videos.findByText("Adult-only styles")).toBeTruthy();
   });
 

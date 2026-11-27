@@ -165,7 +165,7 @@ describe("GET /api/search: settings", () => {
     const { client } = await owner();
     const groups = await search(client, "Flash attention");
     const found = group(groups, "setting")?.results.find((r) => r.id === "chat.flash_attention_override");
-    expect(found).toMatchObject({ kind: "setting", title: "Flash attention override", subtitle: expect.stringContaining("decide based on the model"), href: "/settings/ai?tab=advanced#chat.flash_attention_override" });
+    expect(found).toMatchObject({ kind: "setting", title: "Flash attention override", subtitle: expect.stringContaining("decide based on the model"), href: "/settings/stack?tab=maintain#chat.flash_attention_override" });
   });
 
   test("a person-scope setting opens the Account or Chat settings page that draws it", async () => {

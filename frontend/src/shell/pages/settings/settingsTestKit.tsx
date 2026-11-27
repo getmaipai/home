@@ -47,7 +47,7 @@ export interface HomeFixture {
   restore: () => void;
 }
 
-export function mockHome({ robots = false, robotsEnabled = robots, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, apps, extraKeys = [], places = [], attention = { items: [], areas: {} } }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; robotsEnabled?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[]; attention?: { items: Array<{ id: string; kind: "problem" | "missing" | "not_set_up"; area: string; title: string; line: string; action: { label: string; href: string } }>; areas: Record<string, { state: "ok" | "missing" | "problem" | "off" | "not_set_up"; summary: string }> } } = {}): HomeFixture {
+export function mockHome({ robots = false, robotsEnabled = robots, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, stackGeneral = { where: "this_computer", reachable: true, version: "0.4.2", problems: 0, reason: null }, apps, extraKeys = [], places = [], attention = { items: [], areas: {} } }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; robotsEnabled?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[]; stackGeneral?: Record<string, unknown>; attention?: { items: Array<{ id: string; kind: "problem" | "missing" | "not_set_up"; area: string; title: string; line: string; action: { label: string; href: string } }>; areas: Record<string, { state: "ok" | "missing" | "problem" | "off" | "not_set_up"; summary: string }> } } = {}): HomeFixture {
   const original = globalThis.fetch;
   const requests: string[] = [];
   const scopes: string[] = [];
@@ -85,6 +85,16 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (route.endsWith("/api/settings/attention")) return Promise.resolve(Response.json(attention));
     // STACK-MODELS-HOME-01: the AI and models page reads the Stack's choices through Home's forwarder; the kit's own seed stands in for the Stack.
     if (route.endsWith("/api/ai/stack/choices")) return Promise.resolve(Response.json(seedChoicesView()));
+    // STACK-MENU-SYNC-01: the Models tab also draws Licences and Drives, and the Stack tabs read the admin link and the General state.
+    // The Maintain tab draws the coding admin page (it was the Coding tab of AI and models).
+    if (route.endsWith("/api/coding/pieces")) return Promise.resolve(Response.json({ stack: "ok", message: null, coding_enabled: false, engine: "splash", missing: null, pieces: [] }));
+    if (route.endsWith("/api/coding/mode")) return Promise.resolve(Response.json({ readiness: { ready: false, first_unmet: null, checked_at: "2026-11-27T00:00:00.000Z", items: [], provenance: "test" }, mode: "normal", state: "ready", reason: null }));
+    if (route.endsWith("/api/ai/stack/licences")) return Promise.resolve(Response.json({ terms_version: "2026-11-25", accepted: true, accepted_at: "2026-11-25T00:00:00.000Z", by: null, licences: [] }));
+    if (route.endsWith("/api/ai/stack/disks")) return Promise.resolve(Response.json({ disks: [] }));
+    if (route.endsWith("/api/ai/stack/disks/features")) return Promise.resolve(Response.json({ features: [] }));
+    if (route.endsWith("/api/ai/stack/disks/moves")) return Promise.resolve(Response.json({ moves: [] }));
+    if (route.endsWith("/api/ai/stack/admin-link")) return Promise.resolve(Response.json({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null, reason: null }));
+    if (route.endsWith("/api/ai/stack/general")) return Promise.resolve(Response.json(stackGeneral));
     if (route.endsWith("/api/ai/stack/migration")) return Promise.resolve(Response.json({ done: true, done_at: "2026-11-22T00:00:00.000Z", accepted: 0, refused: [], dismissed: true }));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/search/web")) return Promise.resolve(Response.json({ address: "", works: null, stackOwned: false, sources: ["ddgs"], ddgsReady: true }));

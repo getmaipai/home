@@ -33,6 +33,7 @@ Rules that override everything: [../design/RULES.md](../design/RULES.md).
 ## Frontend (`frontend/src`)
 - `main.tsx`, `App.tsx` boot and routes; `shell/` the app frame (rail, dock, alarms, mini player, ambient companion).
 - `apps/<name>/` one folder per app: `chat`, `settings`, `home`, `library`, `memory`, `people`, `reminders`, `clock`, `code`, `notifications`, `privacy`, `setup`.
+- Settings, Stack (STACK-MENU-SYNC-01): the spec section `stack` in `areas.json` is drawn by `shell/pages/settings/SettingsAreaPage.tsx`; its views are registered in `shell/pages/settings/settingsViews.tsx` (`stack.general`, `home.engine_admin` for Models, `stack.monitor`, `stack.maintain`) and live in `apps/settings/stack/` (`StackGeneral`, `StackTabs`, `StackScreenStubs`, `stackScreens.ts` which reads `spec/stack/screens.json`). Models and Styles keep `AiModelsPage` and `StylesTab`. `StackAdminLink.tsx` is the one Open Stack admin button. Old `/settings/ai` and `/settings/media?tab=styles` addresses redirect through `movedSettingsTarget` in `settingsRedirects.ts`. Backend: `routes/aiStack.ts` `GET /api/ai/stack/general` over `lib/stackGeneral.ts`.
 - `lib/` API clients and helpers (`api.ts`, `assistantTurnStream.ts`); `kit/` Home's kit hooks (shared Elements come from `@maipai/ui`, never forked).
 - `i18n.ts` and `locales/` (en-US source, en-GB, es); `dev/` lint tests for UI rules (`bun run lint:ui-rules`).
 

@@ -151,8 +151,8 @@ Open **Settings**, **Pictures, videos and music**.
 
 - **Video making.** Turn it off to stop all video making, for children too.
 - **Level when nobody says.** The level chat uses when nobody asks for one: **Standard** or **Boost**. Adults can ask chat for another level for one video. Teens and children always get Standard.
-- **Video models.** Press **Choose models** to open **AI and models**, where you pick the models for Standard, Boost and Max videos and download them. Max is for the people you allow.
-- **Styles.** Press **Open Styles** to go to the **Styles** tab, the one place to add, share and remove styles for pictures and videos.
+- **Video models.** Press **Choose models** to open **Stack**, **Models**, where you pick the models for Standard, Boost and Max videos and download them. Max is for the people you allow.
+- **Styles.** Press **Open Styles** to go to **Settings**, **Stack**, **Styles**, the one place to add, share and remove styles for pictures and videos.
 
 ### Add a style for videos
 

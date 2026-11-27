@@ -227,7 +227,7 @@ function PageHeaderLayout() {
  * open it for details; the Home settings AI page already shows its own copy. */
 function ShellInstallStrip({ person }: { person: Roster }) {
   const { pathname } = useLocation();
-  if (pathname === "/settings/ai") return null;
+  if (pathname === "/settings/stack") return null;
   return <InstallDock admin={meetsMinRole(person.role, "admin")} />;
 }
 

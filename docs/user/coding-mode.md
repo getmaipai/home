@@ -23,11 +23,11 @@ A large coding model is smarter on hard tasks, but it is big. The usual chat mod
 
 ## What it needs
 
-An admin finishes a short checklist once. Open **Settings**, **AI and models**, **Coding**, and find **Max chat checklist**. Each row says **Ready**, **Needs setup** or **Needs a step from you**, and what to do. People cannot pick Max until every row is **Ready**. Home checks eight things.
+An admin finishes a short checklist once. Open **Settings**, **Stack**, **Maintain**, **Coding**, and find **Max chat checklist**. Each row says **Ready**, **Needs setup** or **Needs a step from you**, and what to do. People cannot pick Max until every row is **Ready**. Home checks eight things.
 
 ### Turn on coding
 
-Coding must be on. Open **Settings**, **AI and models**, **Coding** and turn **Coding** on.
+Coding must be on. Open **Settings**, **Stack**, **Maintain**, **Coding** and turn **Coding** on.
 
 ### Choose a coding engine
 

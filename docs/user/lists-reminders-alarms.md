@@ -60,7 +60,7 @@ Children and teens can add items to the shopping list for the home and tick them
 
 ## Choose how much MaiPai does on its own
 
-An owner or admin can change this. Open **Settings**, then **AI and models**, then **Advanced**. You will see three rows.
+An owner or admin can change this. Open **Settings**, then **Stack**, then **Maintain**. You will see three rows.
 
 - **Reminder actions**
 - **Timer actions**

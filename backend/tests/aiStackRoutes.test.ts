@@ -33,6 +33,8 @@ beforeEach(() => {
     calls.push({ method, path: url.pathname, body });
     if (url.pathname === "/stack/v1/choices/migrate") { migrated = true; return Response.json(migrateAnswer); }
     if (method === "GET" && url.pathname === "/stack/v1/choices") return Response.json(view);
+    if (url.pathname === "/healthz") return Response.json({ ok: true, version: "0.4.2", contract: 1, uptimeSeconds: 12 });
+    if (url.pathname === "/stack/v1/health") return Response.json({ health: [{ code: "disk_low", severity: "warning", title: "Low disk", text: "x", since: "2026-11-27T00:00:00Z", cause: "x" }] });
     if (url.pathname === "/stack/v1/licences") return Response.json({ terms_version: "2026-11-25", accepted: method === "POST", accepted_at: method === "POST" ? "now" : null, by: body?.by ?? null, licences: [] });
     if (method === "GET" && url.pathname === "/stack/v1/settings") return Response.json({ sections: [], settings: [{ key: "stack.admin.tailscale", in_effect: remoteOn }] });
     if (url.pathname.endsWith("/chat/standard") && method === "PUT") return Response.json({ error: "That model does not fit this computer. Pick a smaller one.", code: "does_not_fit" }, { status: 409 });
@@ -232,6 +234,28 @@ describe("the link to the Stack's own admin page", () => {
     expect(await res.json()).toMatchObject({ local_url: "http://127.0.0.1:8770/admin/", remote_url: null });
     demote(actor.id, "adult");
     expect((await client.get("/api/ai/stack/admin-link")).status).toBe(403);
+  });
+});
+
+describe("the General tab's read (STACK-MENU-SYNC-01)", () => {
+  test("an admin gets where it runs, the version and the problem count, all read from the Stack", async () => {
+    const { client } = await admin();
+    const res = await client.get("/api/ai/stack/general");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ where: "this_computer", reachable: true, version: "0.4.2", problems: 1, reason: null });
+  });
+  test("a Stack that does not answer is a plain answer with its sentence, never an error", async () => {
+    const { client } = await admin();
+    down = true;
+    const res = await client.get("/api/ai/stack/general");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ reachable: false, version: null, problems: null, reason: expect.stringContaining("engine") });
+  });
+  test("signed out, a guest-level adult, a teen and a child get a refusal and nothing reaches the Stack", async () => {
+    const { client, actor } = await admin();
+    expect((await new TestClient().get("/api/ai/stack/general")).status).toBe(401);
+    for (const role of ["adult", "teen", "child"] as const) { demote(actor.id, role); expect((await client.get("/api/ai/stack/general")).status).toBe(403); }
+    expect(calls).toEqual([]);
   });
 });
 

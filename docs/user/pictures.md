@@ -57,7 +57,7 @@ Open **Settings**, **Pictures, videos and music**.
 
 - **Adults can make pictures.** Turn it off to stop all picture making.
 - **Level when nobody says.** Choose **Standard** or **Boost** for the pictures chat makes when nobody names a level. Anyone can pick a level for one picture.
-- **Picture models.** Press **Choose models** to open **AI and models**, where you choose which models make Standard and Boost pictures. Installing a model happens there and in **Models and storage**, not on this page.
+- **Picture models.** Press **Choose models** to open **Stack**, **Models**, where you choose which models make Standard and Boost pictures. Installing a model happens there and in **Models and storage**, not on this page.
 - **Children and teens.** Choose whether children can make cartoons, and how many a day. See [cartoon controls](people.md#cartoon-pictures-and-videos).
 
 - **Styles.** A style gives pictures and videos a look, like old film or clay. Styles have their own tab, **Styles**. Only admins add them. A new style is for admins only until you choose **All adults** or **Chosen people** for it. Adult-only styles stay behind one **Locked items** row until you enter your own passcode. They lock again when you leave the tab or after 2 minutes without a touch. The **Adult-only styles** choice on that tab can hide every adult-only style from all adults until you switch it back. Nothing is deleted.
@@ -79,7 +79,7 @@ The picture engine checks that the file is supported and safe to process. Conten
 | What you see | Why | What to do |
 |---|---|---|
 | Home says it cannot make pictures for you | You are a guest, or you are on a shared screen or a spoken chat, or a parent turned cartoon pictures off for you | Ask an adult, or use your own written chat |
-| "No picture model is installed" | The model is not on this computer | An owner or admin chooses and installs a picture model in Settings, AI and models |
+| "No picture model is installed" | The model is not on this computer | An owner or admin chooses and installs a picture model in Settings, Stack, Models |
 | "The picture engine isn't answering", or Home says it cannot reach the engine | The AI engine is restarting or stopped | Wait a minute and ask again. If it stays, open **Repairs** |
 | "Waiting for memory to free up" | A video or another big job holds the memory | Wait. It starts by itself |
 | "Something went wrong while making it" | The job failed | Press **Try again**, or change the words |

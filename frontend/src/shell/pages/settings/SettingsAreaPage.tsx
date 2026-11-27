@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
+import { movedSettingsTarget } from "@/shell/pages/settings/settingsRedirects";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -45,6 +46,7 @@ import { StatusCard } from "@maipai/ui/src/elements/status-card";
 /** The kit's `lg` breakpoint: from here the column and the content sit side
  * by side; below it the shell drills in (the column alone, then a section). */
 const DESKTOP_MIN_WIDTH = 960;
+const CODING_GROUPS = ["household.coding", "household.coding_people", "household.coding_limits"];
 
 /** `/settings/:area/:section?`: one settings area in the kit's one settings
  * shell (RULES S4). This page holds data only: the area from the spec, who is
@@ -54,6 +56,8 @@ const DESKTOP_MIN_WIDTH = 960;
 export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
   useHeaderExtra(PageHeaderTitle);
   const { section: areaId } = useParams();
+  const [search] = useSearchParams();
+  const location = useLocation();
   const { areas: packageAreas, ready } = usePackageAreas();
   const central = settingsArea("settings");
   const packageArea = packageAreas.find((candidate) => candidate.id === areaId);
@@ -62,6 +66,9 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
     ? central
     : homeArea ?? packageArea;
   // A package's area is known only once the app list has answered: wait for it, never bounce to Account first.
+  // STACK-MENU-SYNC-01: an address that moved into Settings, Stack (the old AI and models section, the Styles tab of Media) goes to its new place.
+  const movedTo = movedSettingsTarget(areaId, search.get("tab") ?? undefined, location.hash.length > 1 ? location.hash.slice(1) : undefined);
+  if (movedTo) return <Navigate to={movedTo} replace />;
   if (!area && !ready) return <Progress mode="spinner" label={i18n._({ id: "Loading settings", message: "Loading settings" })} />;
   if (!area) return <Navigate to={settingsPath("profile")} replace />;
   const routeViewer = { ...baseViewer(person), role: person.role === "owner" ? "admin" as const : person.role as SettingsViewer["role"] };
@@ -224,10 +231,9 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageA
       ? <SettingsView view={active.detail.view} person={person} onPersonChange={onPersonChange} tab={tab} detailId={detailId} />
       : active.kind === "view"
       ? <>{(active.tabs?.find((item) => item.id === currentTab)?.view ?? active.view) ? <SettingsView view={(active.tabs?.find((item) => item.id === currentTab)?.view ?? active.view)!} person={person} onPersonChange={onPersonChange} tab={currentTab} /> : null}</>
-      : area.id === "settings" && active.id === "ai" && tab === "coding"
-        ? <CodingAdminSettings viewer={person} />
-        : area.id === "settings" && active.id === "ai"
-          ? <><SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />{(viewer.role === "owner" || viewer.role === "admin") && !["overview","performance"].includes(currentTab ?? "") ? <AssistantKeysSettings /> : null}</>
+      : area.id === "settings" && active.id === "stack" && currentTab === "maintain"
+        // STACK-MENU-SYNC-01: Maintain keeps the coding admin and the assistant keys that were tabs of AI and models; the coding cards are drawn by the admin page, not twice.
+        ? <><SettingsSectionContent section={{ ...active, cards: active.cards?.filter((card) => !CODING_GROUPS.includes(card.group ?? "")) }} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} /><CodingAdminSettings viewer={person} /><AssistantKeysSettings /></>
           : <SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />;
   }
 

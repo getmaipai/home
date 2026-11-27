@@ -13,14 +13,12 @@ export const SETTINGS_AREAS = [...(areasFile.areas as unknown as SettingsAreaDef
   sections: area.sections.map((section) => ({
     ...section,
     ...(section.kind === "keys" && (!(section.cards?.length) && section.tabs?.some((tab) => tab.view)) ? { kind: "view" as const } : {}),
-    // MEM-SPACE-04: the Performance tab (admins only), drawn by the ai.performance view; before Coding. Owed to the settings spec's area file.
-    ...(section.id === "ai" && section.tabs ? { tabs: [...section.tabs.filter((tab) => tab.id !== "coding"), { id: "performance", label: "Performance", min_role: "admin" as const, view: "ai.performance" }, ...section.tabs.filter((tab) => tab.id === "coding")].map((tab) => ({ ...tab, ...(tab.id === "overview" ? { label: "Features" } : {}), ...(["overview", "models", "engines", "advanced"].includes(tab.id) ? { view: "home.engine_admin" } : {}) })) } : {}),
-    ...(section.id === "ai" && section.cards ? { cards: section.cards.filter((card) => card.view !== "ai.glance" && (card.tab !== "overview" || card.group === "household.chat_pause")).map((card) => ["household.coding", "household.coding_people", "household.coding_limits"].includes(card.group ?? "") ? { ...card, tab: "coding" } : card) } : {}),
     ...(section.id === "apps" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(tab.id === "robot" ? { view: "home.devices_admin" } : {}) })) } : {}),
     ...(section.id === "household" && section.tabs ? { tabs: section.tabs.map((tab) => tab.id === "people" ? { ...tab, view: "home.users_admin" } : tab) } : {}),
     ...(section.id === "advanced" ? { tabs: section.tabs?.map((tab) => tab.id === "developer" ? { ...tab, view: "home.routing_stats" } : tab) } : {}),
     ...(section.id === "data" ? { tabs: section.tabs?.map((tab) => tab.id === "data" ? { ...tab, view: "account.memories" } : tab) } : {}),
-    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news" && !(section.id === "ai" && ["ai.glance", "ai.always_on"].includes(card.view ?? ""))).map((card) => ({
+    // STACK-MENU-SYNC-01: the Models tab draws the AI and models page itself (`home.engine_admin`), so its glance and always-on cards are not drawn a second time.
+    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news" && !(section.id === "stack" && ["ai.glance", "ai.always_on"].includes(card.view ?? ""))).map((card) => ({
       ...card,
       ...(card.links ? { links: card.links.map((link) => link.label === "Memories" ? { ...link, href: "/settings/data?tab=data" } : link) } : {}),
     })) } : {}),

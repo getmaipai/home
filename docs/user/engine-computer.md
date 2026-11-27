@@ -22,7 +22,7 @@ MaiPai Home can use a second computer for its AI engines. Home keeps your family
    ```
 
    If asked to install OpenSSH, type `y` and press Enter.
-2. In Home, open **Settings**, then **AI and models**, then the **Engines** tab. Under **Where the engine runs**, choose **Another computer** and enter the engine computer's name or home network address.
+2. In Home, open **Settings**, then **Stack**, then the **Models** tab. Under **Where the engine runs**, choose **Another computer** and enter the engine computer's name or home network address.
 3. On the same tab, under **Engine computer link**, select **Pair engine computer**. Copy the one-time code. On the engine computer, run:
 
    ```sh
