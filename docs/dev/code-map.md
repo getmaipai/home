@@ -265,6 +265,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/stack/StackGeneral.tsx` | StackGeneral |
 | `frontend/src/apps/settings/stack/StackScreenStubs.tsx` | StackScreenStubs |
 | `frontend/src/apps/settings/stack/StackTabs.tsx` | StackMonitor, StackMaintain |
+| `frontend/src/apps/settings/stack/StackUsage.tsx` | STACK_STATUS_KEY, STACK_MEMORY_KEY, StackUsage |
 | `frontend/src/apps/settings/styles/StylesTab.tsx` | StylesTab |
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
