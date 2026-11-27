@@ -12950,7 +12950,7 @@ msgid "Included skills"
 msgstr "Included skills"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:999
+#: src/apps/chat/chatModelAdapter.ts:1031
 msgid "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
 msgstr "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
 
@@ -18818,7 +18818,7 @@ msgid "One moment. Back soon."
 msgstr "One moment. Back soon."
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:993
+#: src/apps/chat/chatModelAdapter.ts:1025
 #: src/lib/hubReachability.ts:12
 msgid "One moment. Home will be back in about a minute."
 msgstr "One moment. Home will be back in about a minute."
@@ -26179,7 +26179,7 @@ msgid "that device"
 msgstr "that device"
 
 #. js-lingui-explicit-id
-#: src/apps/chat/chatModelAdapter.ts:1002
+#: src/apps/chat/chatModelAdapter.ts:1034
 msgid "That did not send. Try again."
 msgstr "That did not send. Try again."
 
@@ -28162,6 +28162,11 @@ msgstr "This removes the item from Home for good. You cannot undo this."
 #: src/shell/pages/status/StatusBoard.tsx:133
 msgid "This replaces the note everyone can see now."
 msgstr "This replaces the note everyone can see now."
+
+#. js-lingui-explicit-id
+#: src/apps/chat/chatModelAdapter.ts:258
+msgid "This reply was cut off. Send your message again."
+msgstr "This reply was cut off. Send your message again."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:216

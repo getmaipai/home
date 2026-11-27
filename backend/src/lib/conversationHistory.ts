@@ -497,6 +497,13 @@ export function insertProvisionalTurn(actor: PersonRow, surface: Surface, conver
     .run();
 }
 
+/** CHAT-RESUME-01: a turn still "running" when the hub starts was cut off by the restart (its reply buffer and its model call lived in the
+ * old process's memory), so it can never finish. It becomes a "failed" turn, which the thread keeps with its retry, instead of a "running" row
+ * that every reader skips for ever. Counts only: no id, person or text is read or logged. */
+export function failInterruptedTurns(): number {
+  return sqlite.query("UPDATE conversation_turns SET status = 'failed' WHERE status = 'running'").run().changes;
+}
+
 /** getmaipai/home#60: `supersedes` reaches here from `POST /api/turn(/
  * stream)`'s own request body (`routes/turn.ts`) by way of `runTurn()`/
  * `runTurnStream()`'s opts, with nothing in between actually checking it

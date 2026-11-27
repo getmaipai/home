@@ -1874,6 +1874,82 @@ describe("createChatModelAdapter errors", () => {
     } finally { env.restore(); }
   });
 
+  // CHAT-RESUME-01: what the person sees when the hub restarts in the middle of a reply. A killed hub breaks the open body with a
+  // network error; the buffered reply lived only in the hub's memory, so after the restart the resume is refused (503
+  // turn_resume_unavailable). Before this row the person got the generic "unreachable" line and a dead reconnect.
+  describe("CHAT-RESUME-01: the hub restarts during a reply", () => {
+    const META = { type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" };
+    const value = { reply: { text: "Hello world." }, source: "model", safety: SAFETY, turn_id: "turn-resume123", conversation_id: "conv-resume123" };
+    type Step = "hub_down" | "session_gone" | ReadableStream<Uint8Array>;
+    /** First request: the reply starts and the connection then breaks. Later requests follow `steps`; /api/health answers once the hub is "back". */
+    function restartEnvironment(steps: Step[]) {
+      const env = stubEnvironment(ndjsonStream([META, { type: "delta", text: "Hello", sequence: 1 }]));
+      const stubbed = globalThis.fetch;
+      const broken = (): ReadableStream<Uint8Array> => {
+        const source = ndjsonStream([META, { type: "delta", text: "Hello", sequence: 1 }]).getReader();
+        return new ReadableStream<Uint8Array>({ async start(controller) { for (;;) { const { done, value: chunk } = await source.read(); if (done) break; controller.enqueue(chunk); } controller.error(new TypeError("network error")); } });
+      };
+      let streamCalls = 0;
+      const requests: unknown[] = [];
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/health")) return Promise.resolve(new Response("{}", { status: 200 }));
+        if (!url.includes("/api/turn/stream")) return stubbed(input, init);
+        requests.push(JSON.parse(String(init?.body ?? "{}")));
+        const call = streamCalls++;
+        if (call === 0) return Promise.resolve(new Response(broken(), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+        const step = steps[call - 1];
+        if (step === "hub_down") return Promise.reject(new TypeError("Failed to fetch"));
+        if (step === "session_gone") return Promise.resolve(new Response(JSON.stringify({ error: "The turn stream is no longer available.", code: "turn_resume_unavailable" }), { status: 503, headers: { "content-type": "application/json" } }));
+        return Promise.resolve(new Response(step!, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+      }) as unknown as typeof fetch;
+      return { requests, restore: env.restore };
+    }
+
+    test("a connection broken mid-reply resumes from the sequence it had", async () => {
+      const env = restartEnvironment([ndjsonStream([META, { type: "delta", text: " world.", sequence: 2 }, { type: "done", value }])]);
+      try {
+        const result = await collect([fakeUserMessage("hi")]);
+        expect(result.error).toBeUndefined();
+        expect(lastText(result.yields)).toBe("Hello world.");
+        expect(env.requests[1]).toMatchObject({ resume_token: "resume-token-test", resume_from: 1 });
+      } finally { env.restore(); }
+    });
+
+    test("while the hub is down the resume waits for it, then picks the reply up", async () => {
+      const connection: string[] = [];
+      const env = restartEnvironment(["hub_down", ndjsonStream([META, { type: "delta", text: " world.", sequence: 2 }, { type: "done", value }])]);
+      try {
+        const result = await collect([fakeUserMessage("hi")], undefined, () => {}, undefined, undefined, (state) => connection.push(state.phase));
+        expect(result.error).toBeUndefined();
+        expect(lastText(result.yields)).toBe("Hello world.");
+        expect(env.requests).toHaveLength(3);
+        expect(connection.filter((phase) => phase === "reconnecting").length).toBeGreaterThanOrEqual(2);
+      } finally { env.restore(); }
+    });
+
+    test("after a restart the hub no longer holds the reply: the person is told it was cut off, plainly", async () => {
+      const env = restartEnvironment(["hub_down", "session_gone"]);
+      try {
+        const { error } = await collect([fakeUserMessage("hi")]);
+        expect(error).toBeInstanceOf(ChatTurnError);
+        expect(error).toMatchObject({ message: "This reply was cut off. Send your message again.", code: "reply_cut_off", turnId: "turn-resume123" });
+        // No generic "unreachable" wording, no retry loop against a reply that is gone.
+        expect((error as Error).message).not.toBe(failureLine("unreachable", false));
+        expect(env.requests).toHaveLength(3);
+      } finally { env.restore(); }
+    });
+
+    test("a reply the hub no longer holds (the buffer ended) says the same thing straight away", async () => {
+      const env = restartEnvironment(["session_gone"]);
+      try {
+        const { error } = await collect([fakeUserMessage("hi")]);
+        expect(error).toMatchObject({ code: "reply_cut_off" });
+        expect(env.requests).toHaveLength(2);
+      } finally { env.restore(); }
+    });
+  });
+
   test("an unreachable hub becomes a ChatTurnError with code hub_unreachable and the restarting line", async () => {
     const env = stubEnvironment(() => Promise.reject(new TypeError("Failed to fetch")));
     try {

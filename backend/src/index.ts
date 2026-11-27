@@ -283,6 +283,8 @@ registerAllPackageNotificationTypes();
 // manifest + plan.json becomes a real, registered project type before
 // the first turn could ever offer start_project.
 registerAllPackageProjectTypes();
+// CHAT-RESUME-01: a reply a restart cut off ends as a failed turn (the chat says so plainly), not a "running" row for ever.
+try { const { failInterruptedTurns } = await import("@/lib/conversationHistory"); const cut = failInterruptedTurns(); if (cut > 0) console.log(`[boot] ${cut} reply(ies) cut off by the restart ended as failed turns`); } catch { /* the sweep is disposable */ }
 // IMGGEN-HOME-01: a picture a restart interrupted either finishes now or ends with an honest line.
 resumePictureJobs();
 // VIDEO-GEN-05: and a clip a restart interrupted.

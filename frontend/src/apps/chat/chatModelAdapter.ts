@@ -4,7 +4,7 @@ import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadA
 import { offerCarry, withdrawCarry } from "./chatCarry";
 import { MAX_CHAT_IMAGES, CHAT_IMAGE_REFUSAL } from "@maipai/home-backend/src/wire";
 import { api, ApiError } from "@/lib/api";
-import { readAssistantTurnStream } from "@/lib/assistantTurnStream";
+import { readAssistantTurnStream, type AssistantTurnEvent } from "@/lib/assistantTurnStream";
 import { SentenceSpeechScheduler, type FirstSentencePlaybackTiming } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
@@ -18,7 +18,7 @@ import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
-import { isHubUnreachable } from "@/lib/hubReachability";
+import { isHubUnreachable, waitForHub } from "@/lib/hubReachability";
 import { askFormFailureMessage, failureMessage } from "@maipai/home-backend/src/lib/failureCopy";
 import { translateDescriptor } from "@/apps/chat/serverLines";
 import { isFormAnswer, parseTurnAsk, type AskAnswerArm } from "@/apps/chat/chatAsk";
@@ -253,6 +253,21 @@ function isStoredPicture(attachment: { file?: File; content?: readonly { type: s
   return !attachment.file && (attachment.content ?? []).some((part) => part.type === "image" && typeof part.image === "string" && part.image.startsWith("/api/attachments/"));
 }
 
+/** CHAT-RESUME-01: the one line when a reply cannot be picked up again (the hub restarted, or the buffered reply expired). */
+export const REPLY_CUT_OFF_CODE = "reply_cut_off";
+export const replyCutOffLine = (): string => i18n._({ id: "This reply was cut off. Send your message again.", message: "This reply was cut off. Send your message again." });
+/** The most waits for the hub to come back during one reply (a restart takes a minute or two; each wait is up to its own probe cycle). */
+const MAX_HUB_WAITS = 3;
+
+/** A read that breaks mid-stream (the hub went away) ends the stream quietly when the reply can be resumed, so the reconnect loop runs. */
+async function* readUntilBreak(response: Response, canResume: () => boolean): AsyncGenerator<AssistantTurnEvent, void, void> {
+  try {
+    yield* readAssistantTurnStream(response);
+  } catch (err) {
+    if (!canResume() || !(isHubUnreachable(err) || err instanceof TypeError)) throw err;
+  }
+}
+
 export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal, runConfig, unstable_parentId, unstable_assistantMessageId }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
@@ -336,6 +351,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let crisisSupport: CrisisSupport | undefined;
       let lastAcknowledgedSequence = 0;
       let reconnectAttempts = 0;
+      let hubWaits = 0;
       const MAX_RECONNECT_ATTEMPTS = 3;
       let awaitingResume = false;
       let resumedDeltaCount = 0;
@@ -484,7 +500,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           const perRunModel = (runConfig as { custom?: { model?: unknown } } | undefined)?.custom?.model;
           const runModel = deps.getAgeBand?.() === "adult" && typeof perRunModel === "string" ? perRunModel : undefined;
           const currentLocation = reconnectAttempts === 0 && !bare ? await deps.getCurrentLocation?.() : undefined;
-          const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? (imageAttached ? "Please look at the attached picture." : "Please read the attached document."), abortSignal, {
+          // CHAT-RESUME-01: a resume that cannot reach the hub waits for it (a restart), and a resume the hub no longer holds
+          // (it restarted, or the 60 s buffer ended) says plainly that the reply was cut off; neither burns a reconnect attempt.
+          let response: Response | null;
+          try {
+            response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? (imageAttached ? "Please look at the attached picture." : "Please read the attached document."), abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
             max,
             model: !bare ? (runModel ?? selectedModel) : undefined,
@@ -522,11 +542,21 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             images: imageParts.length > 0 ? imageParts : undefined,
             audio: audioParts.length > 0 ? audioParts : undefined,
           }));
+          } catch (openError) {
+            if (reconnectAttempts === 0 || !resumeToken || abortSignal.aborted) throw openError;
+            if (openError instanceof ApiError && openError.code === "turn_resume_unavailable") throw new ChatTurnError(replyCutOffLine(), REPLY_CUT_OFF_CODE, resumeTurnId);
+            if (isHubUnreachable(openError) && hubWaits < MAX_HUB_WAITS) {
+              hubWaits++;
+              deps.onConnection?.({ phase: "reconnecting", attempt: reconnectAttempts });
+              if (await waitForHub(abortSignal)) { response = null; } else throw openError;
+            } else throw openError;
+          }
+          if (!response) continue;
           if (askForm && !askFormSettled) {
             askFormSettled = true;
             askForm.onSettled?.({ ok: true });
           }
-          for await (const event of readAssistantTurnStream(response)) {
+          for await (const event of readUntilBreak(response, () => Boolean(resumeToken && resumeTurnId))) {
           // A review caught this: `safeParse` ran on every event
           // unconditionally, including every `delta` - the hottest path
           // in this loop, once per streamed chunk. `t` is exclusive to
@@ -989,7 +1019,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // id-bearing error string.
         const hubDown = isHubUnreachable(e);
         const message =
-          hubDown
+          e instanceof ChatTurnError && e.code === REPLY_CUT_OFF_CODE
+            ? e.message
+          : hubDown
             ? i18n._({ id: "One moment. Home will be back in about a minute.", message: "One moment. Home will be back in about a minute." })
           : e instanceof AudioUploadError
             ? e.message
@@ -1000,7 +1032,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             : e instanceof ApiError
               ? e.message
               : i18n._({ id: "That did not send. Try again.", message: "That did not send. Try again." });
-        const code = hubDown ? "hub_unreachable" : e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
+        const code = e instanceof ChatTurnError && e.code === REPLY_CUT_OFF_CODE ? REPLY_CUT_OFF_CODE : hubDown ? "hub_unreachable" : e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
         throw new ChatTurnError(message, code, resumeTurnId, code === "safety_refused" ? crisisSupport : undefined);
       }
     },
