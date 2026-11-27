@@ -414,6 +414,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/performance/ToolsOfferedBody.tsx` | ToolsOfferedBody |
 | `frontend/src/shell/pages/performance/TurnsByEngineBody.tsx` | TurnsByEngineBody |
 | `frontend/src/shell/pages/performance/TurnsChartBody.tsx` | TurnsChartBody |
+| `frontend/src/shell/pages/performance/WaterfallBody.tsx` | spansOf, WaterfallBody |
 | `frontend/src/shell/pages/settings/ChatShortcutsView.tsx` | ChatShortcutsView |
 | `frontend/src/shell/pages/settings/ChatSkillsSection.tsx` | ChatSkillsSection |
 | `frontend/src/shell/pages/settings/ClockCardRenderer.tsx` | ClockCardRenderer |
@@ -1419,6 +1420,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | adviceOf, EVERYDAY_IMPERATIVES, carriesNoTask, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal |
 | `backend/src/lib/turnStats.ts` | firstTokenFromGenerations, buildTurnStats |
+| `backend/src/lib/turnWaterfall.ts` | offsetsOf, medianOffsets, turnWaterfall |
 | `backend/src/lib/uiFixtureBlocks.ts` | SHOWCASE_BLOCKS |
 | `backend/src/lib/uiFixtures.ts` | fixtureListing, DEFAULT_PACE, remaining, UI_FIXTURES, findFixture |
 | `backend/src/lib/unknownNames.ts` | pronounFamiliesIn, relationFramesIn, properNounsIn, resolveNames, framedName, looksLikeWhoAnswer |

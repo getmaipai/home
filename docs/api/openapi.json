@@ -26696,6 +26696,124 @@
         }
       }
     },
+    "/api/performance/waterfall": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "Where a reply's time went: the viewer's own recent turns and household medians",
+        "description": "Numbers only (ms from turn start). No turn id, person id, date or text beside a timing (rule 6a).",
+        "responses": {
+          "200": {
+            "description": "Offsets per stage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "context_end_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "prefill_end_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "first_token_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "first_sentence_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "first_audio_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "total_ms": {
+                            "type": "number",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "context_end_ms",
+                          "prefill_end_ms",
+                          "first_token_ms",
+                          "first_sentence_ms",
+                          "first_audio_ms",
+                          "total_ms"
+                        ]
+                      }
+                    },
+                    "median": {
+                      "type": "object",
+                      "properties": {
+                        "context_end_ms": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "prefill_end_ms": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "first_token_ms": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "first_sentence_ms": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "first_audio_ms": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "total_ms": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "context_end_ms",
+                        "prefill_end_ms",
+                        "first_token_ms",
+                        "first_sentence_ms",
+                        "first_audio_ms",
+                        "total_ms"
+                      ]
+                    },
+                    "turns": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "recent",
+                    "median",
+                    "turns"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dev/ui-fixtures": {
       "get": {
         "tags": [
