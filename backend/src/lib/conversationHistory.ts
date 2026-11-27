@@ -501,7 +501,10 @@ export function insertProvisionalTurn(actor: PersonRow, surface: Surface, conver
  * old process's memory), so it can never finish. It becomes a "failed" turn, which the thread keeps with its retry, instead of a "running" row
  * that every reader skips for ever. Counts only: no id, person or text is read or logged. */
 export function failInterruptedTurns(): number {
-  return sqlite.query("UPDATE conversation_turns SET status = 'failed' WHERE status = 'running'").run().changes;
+  const interrupted = (sqlite.query("SELECT COUNT(*) AS count FROM conversation_turns WHERE status = 'running'").get() as { count: number }).count;
+  if (interrupted === 0) return 0;
+  sqlite.query("UPDATE conversation_turns SET status = 'failed', reply_text = 'This reply was cut off. Send your message again.' WHERE status = 'running'").run();
+  return interrupted;
 }
 
 /** getmaipai/home#60: `supersedes` reaches here from `POST /api/turn(/

@@ -7,7 +7,7 @@ import { restoreDefaultScriptedStack } from "./stackFixture";
 import { resetDb } from "./reset-db";
 import { owner, teen } from "./support/testAuth";
 import { db } from "@/db";
-import { people, appUpdateState } from "@/db/schema";
+import { people, appUpdateState, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { raiseIssue, __resetFixHandlersForTests } from "@/lib/issues";
@@ -15,6 +15,8 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, type StackFixture } from "./stackFixture";
 import type { PersonRow } from "@/types";
+import { newConversationTurnId } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
 
 beforeEach(() => {
   resetDb();
@@ -32,6 +34,23 @@ async function child(ownerClient: TestClient): Promise<{ client: TestClient; row
 }
 
 describe("GET /api/dashboard", () => {
+  test("recent activity and daily counts skip a running provisional turn", async () => {
+    const { client, row } = await owner();
+    const turnId = newConversationTurnId();
+    const createdAt = new Date().toISOString();
+    db.insert(conversationTurns).values({
+      id: turnId, personId: row.id, surface: "chat", conversationId: null,
+      userText: "pending words", replyText: "", source: "model", safetyAction: "allow",
+      createdAt, hlc: nextHlc(), status: "running",
+    }).run();
+
+    const response = await client.get("/api/dashboard");
+    expect(response.status).toBe(200);
+    const body = await response.json() as { recent_activity: Array<{ turn_id: string }>; turns_per_day: Array<{ date: string; count: number }> };
+    expect(body.recent_activity.some((turn) => turn.turn_id === turnId)).toBe(false);
+    expect(body.turns_per_day.find((day) => day.date === createdAt.slice(0, 10))?.count).toBe(0);
+  });
+
   test("requires a signed-in person", async () => {
     const client = new TestClient();
     const res = await client.get("/api/dashboard");

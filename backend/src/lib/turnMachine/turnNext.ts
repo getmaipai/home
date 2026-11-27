@@ -37,7 +37,7 @@ import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import { trackChatLease } from "@/lib/jobs/householdQueue";
 import { trackFamilyTurn } from "@/lib/familyActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
-import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, takePendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, takePendingAsk, logTurn, appendTemporaryTurn, insertProvisionalTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues } from "@/lib/askForm";
@@ -617,7 +617,14 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
       return { ok: false, result: { ok: false, status: 403, code: "ask_not_allowed", error } };
     }
   }
+  const rawUserText = text;
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], !mayRetain("attachment", { temporary, band }) || opts.ephemeral === true);
+  // CHAT-RESUME-02: keep the person's words on disk before the model starts.
+  // Document turns already made this same row after validating their files.
+  if (!temporary && opts.ephemeral !== true && mayRetain("transcript", { temporary, band })
+    && (opts.documentAttachments?.length ?? 0) === 0) {
+    insertProvisionalTurn(actor, surface, conversation.id, turnId, rawUserText);
+  }
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",

@@ -7,7 +7,7 @@
 // live against DB rows rather than depending on that weekly script
 // having run), and the Stack client - the same shape lib/dashboard.ts's
 // getDashboard() already takes for GET /api/dashboard.
-import { and, desc, gte, isNotNull, sql } from "drizzle-orm";
+import { and, desc, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { sqlite, db } from "@/db";
 import { conversationTurns, entities, pendingEmbeddings, pendingMemoryWork } from "@/db/schema";
 import { listActivePeople } from "@/lib/access";
@@ -90,7 +90,7 @@ function statsRows(since: string): Array<{ createdAt: string; stats: TurnStats }
   const rows = db
     .select({ createdAt: conversationTurns.createdAt, stats: conversationTurns.stats })
     .from(conversationTurns)
-    .where(and(isNotNull(conversationTurns.stats), gte(conversationTurns.createdAt, since)))
+    .where(and(isNotNull(conversationTurns.stats), ne(conversationTurns.status, "running"), gte(conversationTurns.createdAt, since)))
     .all();
   const parsed: Array<{ createdAt: string; stats: TurnStats }> = [];
   for (const row of rows) {
@@ -110,7 +110,7 @@ export function recentTurnStats(limit: number): Array<{ id: string; createdAt: s
   const rows = db
     .select({ id: conversationTurns.id, createdAt: conversationTurns.createdAt, source: conversationTurns.source, stats: conversationTurns.stats })
     .from(conversationTurns)
-    .where(isNotNull(conversationTurns.stats))
+    .where(and(isNotNull(conversationTurns.stats), ne(conversationTurns.status, "running")))
     .orderBy(desc(conversationTurns.createdAt))
     .limit(limit)
     .all();
@@ -146,7 +146,7 @@ function turnsPanel(days: number, rows: readonly { createdAt: string; stats: Tur
   // invent, the same reason turnsPerDay() counts straight off an
   // existing column rather than deriving one.
   const since = windowStart(days);
-  const routeRows = sqlite.query("SELECT source, COUNT(*) AS count FROM conversation_turns WHERE created_at >= ? GROUP BY source").all(since) as Array<{ source: string; count: number }>;
+  const routeRows = sqlite.query("SELECT source, COUNT(*) AS count FROM conversation_turns WHERE created_at >= ? AND status != 'running' GROUP BY source").all(since) as Array<{ source: string; count: number }>;
   const byRoute = routeRows.map((r) => ({ route: r.source, count: r.count })).sort((a, b) => b.count - a.count);
 
   const offered = rows.flatMap((row) => row.stats.tools_offered ? [row.stats.tools_offered] : []);
@@ -208,7 +208,7 @@ function labelsPanel(days: number): PerformanceLabels {
       correctedNextTurn: conversationTurns.correctedNextTurn,
     })
     .from(conversationTurns)
-    .where(gte(conversationTurns.createdAt, since))
+    .where(and(gte(conversationTurns.createdAt, since), ne(conversationTurns.status, "running")))
     .all();
   const people = listActivePeople().map((p) => p.displayName);
   const registry = db
