@@ -37,8 +37,8 @@ describe("every persistence point is listed and guarded", () => {
   const all = files(SRC);
   test("each listed point's guard file calls mayRetain with its class", () => {
     for (const point of RETENTION_POINTS) {
-      const text = readFileSync(join(SRC, point.guard), "utf8");
-      expect(text.includes(`mayRetain("${point.class}"`), `${point.id}: ${point.guard} must call mayRetain("${point.class}", ...)`).toBe(true);
+      const text = readFileSync(join(SRC, point.guard), "utf8").split("\n").filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join("\n");
+      expect(text.includes(`mayRetain("${point.class}", {`), `${point.id}: ${point.guard} must call mayRetain("${point.class}", ...)`).toBe(true);
     }
   });
   test("a file that writes a chat-data table is a listed writer (a new saving path fails here)", () => {
@@ -49,7 +49,8 @@ describe("every persistence point is listed and guarded", () => {
       if (rel.startsWith("db/") || rel.startsWith("lib/gate/retention.ts")) continue;
       const text = readFileSync(file, "utf8");
       for (const table of RETENTION_TABLES) {
-        if (new RegExp(`\\.insert\\(${table}\\)`).test(text) && !listed.has(rel)) unlisted.push(`${rel} writes ${table}`);
+        // Any receiver (db, tx, a transaction handle): the table name is what counts.
+        if (new RegExp(`\\.insert\\(\\s*${table}\\s*\\)`).test(text) && !listed.has(rel)) unlisted.push(`${rel} writes ${table}`);
       }
     }
     expect(unlisted).toEqual([]);
