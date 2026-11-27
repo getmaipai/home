@@ -2341,7 +2341,7 @@ msgstr "Añade un lugar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:118
+#: src/shell/pages/settings/settingsViews.tsx:119
 msgid "Add a robot"
 msgstr ""
 
@@ -3454,9 +3454,10 @@ msgid "setting.engines.stack.where.option_label.another_computer"
 msgstr "Otra computadora"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:37
+#: src/apps/settings/stack/StackGeneral.tsx:28
+#, needs-review
 msgid "Another computer, over your home network or tailnet"
-msgstr ""
+msgstr "Otro equipo, por tu red doméstica o tu tailnet"
 
 #. js-lingui-explicit-id
 #: src/apps/code/codeTranscript.ts:146
@@ -3857,8 +3858,9 @@ msgstr "Preguntar primero"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1915
+#, needs-review
 msgid "area.Ask in plain words. Nothing changes until you approve."
-msgstr ""
+msgstr "Pregunta con palabras sencillas. Nada cambia hasta que lo apruebes."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:788
@@ -5679,10 +5681,11 @@ msgid "Check my computers again"
 msgstr "Revisa mis computadoras de nuevo"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:32
-#: src/apps/settings/stack/StackGeneral.tsx:63
+#: src/apps/settings/stack/StackDown.tsx:30
+#: src/apps/settings/stack/StackGeneral.tsx:54
+#, needs-review
 msgid "Check now"
-msgstr ""
+msgstr "Revisar ahora"
 
 #. js-lingui-explicit-id
 #: ../backend/src/lib/failureCopy.ts:187
@@ -7194,8 +7197,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1927
+#, needs-review
 msgid "area.Connections"
-msgstr ""
+msgstr "Conexiones"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:361
@@ -9864,8 +9868,9 @@ msgstr "Aviso de almacenamiento de documentos (%)"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1933
+#, needs-review
 msgid "area.Does anything need fixing?"
-msgstr ""
+msgstr "¿Hay algo que arreglar?"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:111
@@ -10105,8 +10110,9 @@ msgstr "Dibujando tu personaje..."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1934
+#, needs-review
 msgid "area.Drives"
-msgstr ""
+msgstr "Unidades"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/FilesPage.tsx:416
@@ -11379,8 +11385,9 @@ msgstr "Bien"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1939
+#, needs-review
 msgid "area.Fine tuning. The defaults are fine for most people."
-msgstr ""
+msgstr "Ajustes finos. Los valores predeterminados sirven para la mayoría."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:812
@@ -12652,8 +12659,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1941
+#, needs-review
 msgid "area.Health"
-msgstr ""
+msgstr "Estado"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/ReferenceLibrarySettings.tsx:38
@@ -12708,8 +12716,9 @@ msgstr "Ayudar al chat a recordar buscar en la web"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1942
+#, needs-review
 msgid "area.Helper"
-msgstr ""
+msgstr "Ayudante"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HelperStatusRow.tsx:27
@@ -13312,16 +13321,6 @@ msgstr "Home no pudo llegar al motor de chat."
 #, needs-review
 msgid "failure.advice.engine_computer.cause"
 msgstr "Home no pudo llegar al ordenador del motor."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:32
-msgid "Home could not reach the Stack. Start it, then check again."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:32
-msgid "Home could not read the Stack"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:84
@@ -14902,18 +14901,21 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1947
+#, needs-review
 msgid "area.Is anything out of date?"
-msgstr ""
+msgstr "¿Hay algo desactualizado?"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1948
+#, needs-review
 msgid "area.Is everything working?"
-msgstr ""
+msgstr "¿Todo funciona?"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1949
+#, needs-review
 msgid "area.Is there enough memory?"
-msgstr ""
+msgstr "¿Hay memoria suficiente?"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/AddVoiceForm.tsx:104
@@ -15270,7 +15272,7 @@ msgid "Keep things as they are"
 msgstr "Dejar las cosas como están"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:159
+#: src/shell/pages/settings/settingsViews.tsx:160
 #, needs-review
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr "Deja esta app en la barra lateral para tenerla a un toque."
@@ -15606,7 +15608,7 @@ msgstr "LAN"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:67
+#: src/shell/pages/settings/settingsViews.tsx:68
 #, needs-review
 msgid "Language"
 msgstr "Idioma"
@@ -16280,8 +16282,9 @@ msgstr "Licencia"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1952
+#, needs-review
 msgid "area.Licences"
-msgstr ""
+msgstr "Licencias"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:348
@@ -17191,8 +17194,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1957
+#, needs-review
 msgid "area.Looks you add to pictures and video, and where their files live."
-msgstr ""
+msgstr "Estilos que agregas a imágenes y video, y dónde se guardan sus archivos."
 
 #. js-lingui-explicit-id
 #: src/apps/chat/MusicCardView.tsx:111
@@ -17416,8 +17420,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1958
+#, needs-review
 msgid "area.Maintain"
-msgstr ""
+msgstr "Mantenimiento"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBanner.tsx:22
@@ -18002,9 +18007,10 @@ msgid "area.Manage"
 msgstr "Gestionar"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:59
+#: src/apps/settings/stack/StackGeneral.tsx:50
+#, needs-review
 msgid "Manage"
-msgstr ""
+msgstr "Administrar"
 
 #. js-lingui-explicit-id
 #: src/apps/chat/chatHeaderBar.tsx:172
@@ -18561,8 +18567,9 @@ msgstr "Modelo:"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1963
+#, needs-review
 msgid "area.Models"
-msgstr ""
+msgstr "Modelos"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1510
@@ -18572,8 +18579,9 @@ msgstr "Moderado"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1964
+#, needs-review
 msgid "area.Modes"
-msgstr ""
+msgstr "Modos"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:28
@@ -18583,8 +18591,9 @@ msgstr "Lun"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1965
+#, needs-review
 msgid "area.Monitor"
-msgstr ""
+msgstr "Supervisión"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/status/StatusBoard.tsx:111
@@ -20249,8 +20258,9 @@ msgstr "El modo Normal está activo. El chat, las imágenes, los videos y las ca
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1969
+#, needs-review
 msgid "area.Normal or Max coding, and which features are on."
-msgstr ""
+msgstr "Programación Normal o Max, y qué funciones están activadas."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/UiShowcasePage.tsx:32
@@ -20310,9 +20320,10 @@ msgid "Not installed"
 msgstr "No instalado"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:55
+#: src/apps/settings/stack/StackGeneral.tsx:46
+#, needs-review
 msgid "Not known while it is not answering"
-msgstr ""
+msgstr "Se desconoce mientras no responde"
 
 #. js-lingui-explicit-id
 #: src/apps/code/SessionTabs.tsx:41
@@ -21483,8 +21494,9 @@ msgstr "Abrir en Biblioteca"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/stack/StackScreenStubs.tsx:13
+#, needs-review
 msgid "Open in Stack admin"
-msgstr ""
+msgstr "Abrir en la administración del Stack"
 
 #. js-lingui-explicit-id
 #: src/shell/music/MusicPlayerBar.tsx:97
@@ -21584,9 +21596,10 @@ msgid "setting.news.reader_open.option.site"
 msgstr "Abre el sitio web del editor."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:43
+#: src/apps/settings/stack/StackGeneral.tsx:34
+#, needs-review
 msgid "Open the Stack admin to see them."
-msgstr ""
+msgstr "Abre la administración del Stack para verlos."
 
 #. js-lingui-explicit-id
 #: src/shell/pages/CompanionsPage.tsx:423
@@ -21834,7 +21847,7 @@ msgid "Pair"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:118
+#: src/shell/pages/settings/settingsViews.tsx:119
 msgid "Pair a robot with this home."
 msgstr ""
 
@@ -22714,7 +22727,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:71
+#: src/shell/pages/settings/settingsViews.tsx:72
 #: src/shell/sessionLockContext.tsx:99
 #, needs-review
 msgid "PIN or password"
@@ -23239,7 +23252,7 @@ msgstr "Profesional"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:223
-#: src/shell/pages/settings/settingsViews.tsx:61
+#: src/shell/pages/settings/settingsViews.tsx:62
 #, needs-review
 msgid "Profile"
 msgstr "Perfil"
@@ -24448,8 +24461,9 @@ msgstr "Resuelto el {date}"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1983
+#, needs-review
 msgid "area.Resources"
-msgstr ""
+msgstr "Recursos"
 
 #. js-lingui-explicit-id
 #: src/apps/setup/preview/SetupPreviewBar.tsx:43
@@ -24489,8 +24503,9 @@ msgstr "Reiniciar el Mac cuando deja de responder"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1984
+#, needs-review
 msgid "area.Restart, check, and repair."
-msgstr ""
+msgstr "Reiniciar, revisar y reparar."
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:49
@@ -26905,8 +26920,8 @@ msgid "Show in Library"
 msgstr "Mostrar en Biblioteca"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:158
-#: src/shell/pages/settings/settingsViews.tsx:161
+#: src/shell/pages/settings/settingsViews.tsx:159
+#: src/shell/pages/settings/settingsViews.tsx:162
 #, needs-review
 msgid "Show in the sidebar"
 msgstr "Mostrar en la barra lateral"
@@ -27158,7 +27173,7 @@ msgstr "Conversación lateral"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:154
+#: src/shell/pages/settings/settingsViews.tsx:155
 #, needs-review
 msgid "Sidebar"
 msgstr "Barra lateral"
@@ -28140,8 +28155,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1996
+#, needs-review
 msgid "area.Stack"
-msgstr ""
+msgstr "Stack"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/DiskHardwareBody.tsx:33
@@ -28156,9 +28172,10 @@ msgid "Stack contract:"
 msgstr "Contrato de Stack:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:54
+#: src/apps/settings/stack/StackGeneral.tsx:45
+#, needs-review
 msgid "Stack version"
-msgstr ""
+msgstr "Versión del Stack"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:139
@@ -28308,6 +28325,12 @@ msgstr "Vuelve a iniciar sesión con tu PIN o passkey."
 #, needs-review
 msgid "failure.advice.stopped.next_step"
 msgstr "Inicia el motor de chat en Reparaciones."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackDown.tsx:25
+#, needs-review
+msgid "Start the Stack on its computer, then check again."
+msgstr "Inicia el Stack en su equipo y vuelve a revisar."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1766
@@ -31049,19 +31072,22 @@ msgid "The sound is longer than asked: this computer has no audio tool to cut it
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:41
+#: src/apps/settings/stack/StackDown.tsx:28
+#, needs-review
 msgid "The Stack is not answering"
-msgstr ""
+msgstr "El Stack no responde"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:44
+#: src/apps/settings/stack/StackGeneral.tsx:35
+#, needs-review
 msgid "The Stack is running"
-msgstr ""
+msgstr "El Stack está en marcha"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:43
+#: src/apps/settings/stack/StackGeneral.tsx:34
+#, needs-review
 msgid "The Stack is running and lists {count} to look at"
-msgstr ""
+msgstr "El Stack está en marcha y muestra {count} por revisar"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:98
@@ -31471,7 +31497,7 @@ msgstr "Este niño puede crear dibujos animados y videos"
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:234
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
-#: src/apps/settings/stack/StackGeneral.tsx:36
+#: src/apps/settings/stack/StackGeneral.tsx:27
 #, needs-review
 msgid "This computer"
 msgstr "Este equipo"
@@ -32075,8 +32101,9 @@ msgstr "Herramientas"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:2007
+#, needs-review
 msgid "area.Tools"
-msgstr ""
+msgstr "Herramientas"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/performance/ToolsOfferedBody.tsx:11
@@ -32641,7 +32668,7 @@ msgid "Two computers"
 msgstr "Dos ordenadores"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:74
+#: src/shell/pages/settings/settingsViews.tsx:75
 #, needs-review
 msgid "Two-step sign-in"
 msgstr "Inicio de sesión en dos pasos"
@@ -33725,7 +33752,7 @@ msgstr ""
 #: src/shell/pages/CompanionsPage.tsx:371
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:175
+#: src/shell/pages/settings/settingsViews.tsx:176
 #: src/shell/pages/status/StatusComponents.tsx:30
 #, needs-review
 msgid "Voice"
@@ -33870,7 +33897,7 @@ msgstr "Doblaje"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/pages/settings/settingsViews.tsx:95
+#: src/shell/pages/settings/settingsViews.tsx:96
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 #, needs-review
@@ -34295,8 +34322,9 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:2020
+#, needs-review
 msgid "area.What is doing the work behind the scenes?"
-msgstr ""
+msgstr "¿Qué hace el trabajo entre bastidores?"
 
 #. js-lingui-explicit-id
 #: src/shell/media/NowPlayingStage.tsx:136
@@ -34551,9 +34579,10 @@ msgid "Where"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:48
+#: src/apps/settings/stack/StackGeneral.tsx:39
+#, needs-review
 msgid "Where it runs"
-msgstr ""
+msgstr "Dónde se ejecuta"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1515
@@ -34583,8 +34612,9 @@ msgstr "Dónde están los archivos de conocimiento offline del hogar: una carpet
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:2021
+#, needs-review
 msgid "area.Where the Stack keeps its files, and how full each drive is."
-msgstr ""
+msgstr "Dónde guarda el Stack sus archivos y qué tan llena está cada unidad."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:754
@@ -34647,13 +34677,15 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:2023
+#, needs-review
 msgid "area.Which features are on, and which model does each one use?"
-msgstr ""
+msgstr "¿Qué funciones están activadas y qué modelo usa cada una?"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:2022
+#, needs-review
 msgid "area.Which Homes and tools can use this Stack?"
-msgstr ""
+msgstr "¿Qué Homes y herramientas pueden usar este Stack?"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:10
@@ -34699,8 +34731,9 @@ msgstr "Qué modelo crea imágenes Rápidas. ERNIE sigue tus palabras de cerca. 
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:2024
+#, needs-review
 msgid "area.Which model terms have been accepted?"
-msgstr ""
+msgstr "¿Qué términos de modelos se han aceptado?"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/CapabilityTable.tsx:42

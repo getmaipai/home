@@ -20,6 +20,7 @@ import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { AiModelsPage } from "@/apps/settings/AiModelsPage";
 import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
+import { withStackDown } from "@/apps/settings/stack/StackDown";
 import { StackGeneral } from "@/apps/settings/stack/StackGeneral";
 import { StackScreenStubs } from "@/apps/settings/stack/StackScreenStubs";
 import { StackMaintain, StackMonitor } from "@/apps/settings/stack/StackTabs";
@@ -126,10 +127,10 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "account.voice": AccountVoiceControls,
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
-  "home.engine_admin": HomeEngineAdminSettings,
+  "home.engine_admin": withStackDown(HomeEngineAdminSettings),
   "stack.general": StackGeneral,
-  "stack.monitor": StackMonitor,
-  "stack.maintain": StackMaintain,
+  "stack.monitor": withStackDown(StackMonitor),
+  "stack.maintain": withStackDown(StackMaintain),
   "ai.glance": AiModelsPage,
   "ai.always_on": AiAlwaysOnView,
   "home.users_admin": HomeUsersAdminSettings,
@@ -140,7 +141,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.media_pictures": MediaPicturesView,
   "home.media_videos": MediaVideosView,
   "home.media_music": MediaMusicView,
-  "home.media_styles": MediaStylesView,
+  "home.media_styles": withStackDown(MediaStylesView),
   "home.media_kids": MediaKidsView,
   "account.device_appearance": DeviceAppearanceSettings,
   "chat.skills": ChatSkillsSettings,

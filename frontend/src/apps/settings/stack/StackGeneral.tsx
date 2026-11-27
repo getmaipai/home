@@ -7,29 +7,20 @@ import { useQuery } from "@tanstack/react-query";
 import { StatusCard } from "@maipai/ui/src/elements/status-card";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
-import { requestJson } from "@/lib/api";
-import { errorLine } from "@/lib/hubReachability";
 import { stackAdminButton, useStackAdminLink } from "@/apps/settings/StackAdminLink";
+import { readStackGeneral, STACK_GENERAL_KEY, stackDownProps } from "@/apps/settings/stack/StackDown";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
-
-interface StackGeneralView {
-  where: "this_computer" | "another_computer";
-  reachable: boolean;
-  version: string | null;
-  problems: number | null;
-  reason: string | null;
-}
 
 const NOT_ADULT = "Only an adult admin can manage the Stack.";
 
 export function StackGeneral({ person }: SettingsViewProps) {
   const allowed = person.role === "owner" || person.role === "admin";
-  const general = useQuery({ queryKey: ["ai-stack-general"], queryFn: () => requestJson<StackGeneralView>("/api/ai/stack/general"), enabled: allowed, refetchInterval: 15_000 });
+  const general = useQuery({ queryKey: STACK_GENERAL_KEY, queryFn: readStackGeneral, enabled: allowed, refetchInterval: 15_000 });
   const link = useStackAdminLink();
   const checkNow = () => void general.refetch();
   const wrap = (children: ReactNode) => <div className="flex min-w-0 flex-col gap-4" data-testid="stack-general">{children}</div>;
   if (!allowed) return wrap(<StatusCard kind="info" title={i18n._({ id: NOT_ADULT, message: NOT_ADULT })} />);
-  if (general.isError) return wrap(<StatusCard kind="problem" title={i18n._({ id: "Home could not read the Stack", message: "Home could not read the Stack" })} line={errorLine(general.error, i18n._({ id: "Home could not reach the Stack. Start it, then check again.", message: "Home could not reach the Stack. Start it, then check again." }))} action={{ label: i18n._({ id: "Check now", message: "Check now" }), onSelect: checkNow }} />);
+  if (general.isError) return wrap(<StatusCard {...stackDownProps({ reason: null, error: general.error, onCheck: checkNow })} />);
   if (!general.data) return null;
   const data = general.data;
   const where = data.where === "this_computer"
@@ -38,7 +29,7 @@ export function StackGeneral({ person }: SettingsViewProps) {
   return wrap(
     <>
       {!data.reachable
-        ? <StatusCard kind="problem" title={i18n._({ id: "The Stack is not answering", message: "The Stack is not answering" })} line={data.reason ?? undefined} />
+        ? <StatusCard {...stackDownProps({ reason: data.reason, onCheck: checkNow })} />
         : data.problems
           ? <StatusCard kind="attention" title={i18n._({ id: "The Stack is running and lists {count} to look at", message: "The Stack is running and lists {count} to look at", values: { count: data.problems } })} line={i18n._({ id: "Open the Stack admin to see them.", message: "Open the Stack admin to see them." })} />
           : <StatusCard kind="done" title={i18n._({ id: "The Stack is running", message: "The Stack is running" })} />}

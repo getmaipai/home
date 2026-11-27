@@ -2048,7 +2048,7 @@ msgstr "Add a place"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/HouseholdRobotsSection.tsx:86
-#: src/shell/pages/settings/settingsViews.tsx:118
+#: src/shell/pages/settings/settingsViews.tsx:119
 msgid "Add a robot"
 msgstr "Add a robot"
 
@@ -3043,7 +3043,7 @@ msgid "setting.engines.stack.where.option_label.another_computer"
 msgstr "Another Computer"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:37
+#: src/apps/settings/stack/StackGeneral.tsx:28
 msgid "Another computer, over your home network or tailnet"
 msgstr "Another computer, over your home network or tailnet"
 
@@ -5018,8 +5018,8 @@ msgid "Check my computers again"
 msgstr "Check my computers again"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:32
-#: src/apps/settings/stack/StackGeneral.tsx:63
+#: src/apps/settings/stack/StackDown.tsx:30
+#: src/apps/settings/stack/StackGeneral.tsx:54
 msgid "Check now"
 msgstr "Check now"
 
@@ -11774,16 +11774,6 @@ msgid "failure.advice.engine_computer.cause"
 msgstr "Home could not reach the engine computer."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:32
-msgid "Home could not reach the Stack. Start it, then check again."
-msgstr "Home could not reach the Stack. Start it, then check again."
-
-#. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:32
-msgid "Home could not read the Stack"
-msgstr "Home could not read the Stack"
-
-#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:84
 msgid "Home could not read the web search settings. Reload the page, and check that Home is running."
 msgstr "Home could not read the web search settings. Reload the page, and check that Home is running."
@@ -13488,7 +13478,7 @@ msgid "Keep things as they are"
 msgstr "Keep things as they are"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:159
+#: src/shell/pages/settings/settingsViews.tsx:160
 msgid "Keep this app in the sidebar so it is one tap away."
 msgstr "Keep this app in the sidebar so it is one tap away."
 
@@ -13776,7 +13766,7 @@ msgstr "Lan"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceManagerSection.tsx:106
-#: src/shell/pages/settings/settingsViews.tsx:67
+#: src/shell/pages/settings/settingsViews.tsx:68
 msgid "Language"
 msgstr "Language"
 
@@ -15901,7 +15891,7 @@ msgid "area.Manage"
 msgstr "Manage"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:59
+#: src/apps/settings/stack/StackGeneral.tsx:50
 msgid "Manage"
 msgstr "Manage"
 
@@ -17953,7 +17943,7 @@ msgid "Not installed"
 msgstr "Not installed"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:55
+#: src/apps/settings/stack/StackGeneral.tsx:46
 msgid "Not known while it is not answering"
 msgstr "Not known while it is not answering"
 
@@ -19088,7 +19078,7 @@ msgid "setting.news.reader_open.option.site"
 msgstr "Open the publisher's website."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:43
+#: src/apps/settings/stack/StackGeneral.tsx:34
 msgid "Open the Stack admin to see them."
 msgstr "Open the Stack admin to see them."
 
@@ -19303,7 +19293,7 @@ msgid "Pair"
 msgstr "Pair"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:118
+#: src/shell/pages/settings/settingsViews.tsx:119
 msgid "Pair a robot with this home."
 msgstr "Pair a robot with this home."
 
@@ -20098,7 +20088,7 @@ msgstr "Pin example: {phrase}"
 
 #. js-lingui-explicit-id
 #: src/apps/people/NewPersonForm.tsx:134
-#: src/shell/pages/settings/settingsViews.tsx:71
+#: src/shell/pages/settings/settingsViews.tsx:72
 #: src/shell/sessionLockContext.tsx:99
 msgid "PIN or password"
 msgstr "PIN or password"
@@ -20559,7 +20549,7 @@ msgstr "Professional"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PersonProfilePage.tsx:223
-#: src/shell/pages/settings/settingsViews.tsx:61
+#: src/shell/pages/settings/settingsViews.tsx:62
 msgid "Profile"
 msgstr "Profile"
 
@@ -23809,8 +23799,8 @@ msgid "Show in Library"
 msgstr "Show in Library"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:158
-#: src/shell/pages/settings/settingsViews.tsx:161
+#: src/shell/pages/settings/settingsViews.tsx:159
+#: src/shell/pages/settings/settingsViews.tsx:162
 msgid "Show in the sidebar"
 msgstr "Show in the sidebar"
 
@@ -24037,7 +24027,7 @@ msgstr "Side chat"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/packageAreas.ts:17
-#: src/shell/pages/settings/settingsViews.tsx:154
+#: src/shell/pages/settings/settingsViews.tsx:155
 msgid "Sidebar"
 msgstr "Sidebar"
 
@@ -24932,7 +24922,7 @@ msgid "Stack contract:"
 msgstr "Stack contract:"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:54
+#: src/apps/settings/stack/StackGeneral.tsx:45
 msgid "Stack version"
 msgstr "Stack version"
 
@@ -25064,6 +25054,11 @@ msgstr "Start signing in again with your PIN or passkey."
 #: ../backend/src/lib/failureCopy.ts:404
 msgid "failure.advice.stopped.next_step"
 msgstr "Start the chat engine in Repairs."
+
+#. js-lingui-explicit-id
+#: src/apps/settings/stack/StackDown.tsx:25
+msgid "Start the Stack on its computer, then check again."
+msgstr "Start the Stack on its computer, then check again."
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1766
@@ -27529,17 +27524,17 @@ msgid "The sound is longer than asked: this computer has no audio tool to cut it
 msgstr "The sound is longer than asked: this computer has no audio tool to cut it. Install ffmpeg, then make it again."
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:41
+#: src/apps/settings/stack/StackDown.tsx:28
 msgid "The Stack is not answering"
 msgstr "The Stack is not answering"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:44
+#: src/apps/settings/stack/StackGeneral.tsx:35
 msgid "The Stack is running"
 msgstr "The Stack is running"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:43
+#: src/apps/settings/stack/StackGeneral.tsx:34
 msgid "The Stack is running and lists {count} to look at"
 msgstr "The Stack is running and lists {count} to look at"
 
@@ -27898,7 +27893,7 @@ msgstr "This child can make cartoon pictures and videos"
 #. js-lingui-explicit-id
 #: src/apps/settings/EngineLinkCredentialSection.tsx:234
 #: src/apps/settings/ReferenceLibrarySettings.tsx:194
-#: src/apps/settings/stack/StackGeneral.tsx:36
+#: src/apps/settings/stack/StackGeneral.tsx:27
 msgid "This computer"
 msgstr "This computer"
 
@@ -28925,7 +28920,7 @@ msgid "Two computers"
 msgstr "Two computers"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/settings/settingsViews.tsx:74
+#: src/shell/pages/settings/settingsViews.tsx:75
 msgid "Two-step sign-in"
 msgstr "Two-step sign-in"
 
@@ -29888,7 +29883,7 @@ msgstr "Vocals, drums, bass and the rest. This takes a minute or two. The rows a
 #: src/shell/pages/CompanionsPage.tsx:371
 #: src/shell/pages/musicComposerMode.ts:136
 #: src/shell/pages/MusicSpeechPage.tsx:56
-#: src/shell/pages/settings/settingsViews.tsx:175
+#: src/shell/pages/settings/settingsViews.tsx:176
 #: src/shell/pages/status/StatusComponents.tsx:30
 msgid "Voice"
 msgstr "Voice"
@@ -30017,7 +30012,7 @@ msgstr "Voiceover"
 
 #. js-lingui-explicit-id
 #: src/shell/pageHeaderTitle.tsx:105
-#: src/shell/pages/settings/settingsViews.tsx:95
+#: src/shell/pages/settings/settingsViews.tsx:96
 #: src/shell/pages/VoicesPage.tsx:14
 #: src/shell/pages/VoicesPage.tsx:18
 msgid "Voices"
@@ -30619,7 +30614,7 @@ msgid "Where"
 msgstr "Where"
 
 #. js-lingui-explicit-id
-#: src/apps/settings/stack/StackGeneral.tsx:48
+#: src/apps/settings/stack/StackGeneral.tsx:39
 msgid "Where it runs"
 msgstr "Where it runs"
 
