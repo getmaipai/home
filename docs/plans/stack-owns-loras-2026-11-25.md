@@ -2,6 +2,18 @@
 
 Status: APPROVED by the architect with five edits (applied below). Item: STACK-LORAS-01.
 
+## Status (2026-11-27)
+
+- Slice 0, spec: done. Shipped as `spec-v0.1.486`.
+- Slices 1 and 2, Stack catalog, installs and moves: done, on Stack main.
+- Slice 3, kit: done. `StackLorasPage` shipped in `ui-v0.5.755`, plus the Stack Styles screen.
+- Slice 4, Home reader: done.
+- Design change after Jesse's 2026-11-26 answer: the Stack tags each style nsfw or not, from the site flag or set by an admin; no Stack ticket verifier and no callback; Home keeps its own ticket when lowering through Home; unflagged installs stay untagged (C11, no `RULES.md` change).
+- Slice 5, migration: dry run passed on copies; live import done, 3 records, 0 conflicts; second run unchanged; file sha256 identical; backup kept; live on Home `sha-973dd97` pinned to Stack `bcf6d63`.
+- Slice 6, Home removal: NOT started, waiting for Jesse to confirm all 3 styles show in the live Styles tab.
+
+Note: the live Styles tab was not yet checked by a person.
+
 ## Supersedes
 
 - Home's ownership of LoRAs. The `loras` table and `backend/src/lib/loras/` stop being the store. Home keeps no LoRA table, no copy and no cache on disk after migration.
