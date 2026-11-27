@@ -10,7 +10,7 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { forwardToStack, refusalStatus, StackChoicesError, type Forwarded } from "@/lib/stackChoicesForward";
 import { dismissMigrationNotice, ensureChoicesMigrated, HOME_FEATURE_SWITCHES, readMigrationRecord } from "@/lib/stackChoicesMigration";
-import { readAdminLink } from "@/lib/stackAdminLink";
+import { readAdminLink, turnOnRemoteAdmin } from "@/lib/stackAdminLink";
 import { readStackGeneral } from "@/lib/stackGeneral";
 import { refreshStackChoiceSnapshot } from "@/lib/stackChoiceSnapshot";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -115,6 +115,10 @@ aiStackRoutes.openapi(createRoute({ method: "post", path: "/migration/dismiss", 
 aiStackRoutes.openapi(createRoute({ method: "get", path: "/admin-link", tags: ["AI"], summary: "Where the Stack's own admin page is", middleware: [requireRole("owner", "admin")] as const, responses: ok("The link and the plain reason.") }),
   async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readAdminLink(), 200) as never; });
 
+// One click on the General tab: turn on the Stack's "Admin page over Tailscale" setting. The Stack keeps it as pending until its next start and says so.
+aiStackRoutes.openapi(createRoute({ method: "post", path: "/admin-link/turn-on", tags: ["AI"], summary: "Turn on the Stack's admin page over Tailscale (takes effect at the Stack's next start)", middleware: [requireRole("owner", "admin")] as const, responses: ok("The new link state: restart pending until the Stack restarts.") }),
+  async (c) => pass(c, "admin.tailscale.on", async () => ({ status: 200, body: await turnOnRemoteAdmin() })));
+
 // Settings, Stack, General (STACK-MENU-SYNC-01): where the Stack runs, whether it answers, its version and its problem count, read from the Stack on every call.
 aiStackRoutes.openapi(createRoute({ method: "get", path: "/general", tags: ["AI"], summary: "Where the Stack runs, whether it answers, its version and problem count", middleware: [requireRole("owner", "admin")] as const, responses: ok("The Stack's state; a Stack that does not answer is reachable false with a plain reason.") }),
   async (c) => { const denied = gate(c); if (denied) return denied as never; return c.json(await readStackGeneral(), 200) as never; });
@@ -125,6 +129,14 @@ aiStackRoutes.openapi(createRoute({ method: "get", path: "/status", tags: ["AI"]
   (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/status")));
 aiStackRoutes.openapi(createRoute({ method: "get", path: "/memory", tags: ["AI"], summary: "The Stack's memory ledger (the Stack's GET /stack/v1/memory)", middleware: [requireRole("owner", "admin")] as const, responses: ok("What is loaded and how much each part holds.") }),
   (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/memory")));
+
+// The colored memory breakdown on General (the same shared component the Stack's admin draws): the Stack's own resource readings, passed through unchanged.
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/resources/summary", tags: ["AI"], summary: "The Stack's latest memory reading (the Stack's GET /stack/v1/resources/summary)", middleware: [requireRole("owner", "admin")] as const, responses: ok("The current reading of the computer and the last hour.") }),
+  (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/resources/summary")));
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/resources/engines", tags: ["AI"], summary: "What each of the Stack's engines holds (the Stack's GET /stack/v1/resources/engines)", middleware: [requireRole("owner", "admin")] as const, responses: ok("Every engine with its memory, and the memory budget.") }),
+  (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/resources/engines")));
+aiStackRoutes.openapi(createRoute({ method: "get", path: "/components", tags: ["AI"], summary: "The Stack's parts with plain names (the Stack's GET /stack/v1/components)", middleware: [requireRole("owner", "admin")] as const, responses: ok("Each component with its label.") }),
+  (c) => pass(c, "read", () => forwardToStack("GET", "/stack/v1/components")));
 
 // Drives (multi-disk, 2026-11-25): which drives hold the models, where each feature's files are, and the Move button. The Stack does the work;
 // these pass the calls through unchanged (`/api/ai/stack/disks...` is `/stack/v1/disks...`).

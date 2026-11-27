@@ -1,62 +1,45 @@
-// Settings, Stack, General: the live use of the Stack's computer, read from the Stack's own status and memory ledger (`/api/ai/stack/status` and
-// `/api/ai/stack/memory`, passed through unchanged; Home keeps no copy and no logic of its own). It shows the memory share the Stack may use, what is
-// loaded and how much each part holds, and the jobs. Drawn from shipped kit primitives only (Item, Progress); Monitor links to the full screens.
+// Settings, Stack, General: the live use of the Stack's computer. The colored memory breakdown is the one shared kit component the Stack's own admin page
+// draws (`StackMemoryNow`), fed the Stack's own readings through Home's forwarder (`/api/ai/stack/resources/summary`, `/resources/engines`, `/components`,
+// `/choices` for the feature order, all passed through unchanged); Home keeps no copy and no logic of its own. The jobs line reads the Stack's status.
 import { i18n } from "@lingui/core";
 import { useQuery } from "@tanstack/react-query";
-import { Progress } from "@maipai/ui/src/ui/progress";
-import { formatBytes } from "@maipai/ui/src/format";
+import { StackMemoryNow } from "@maipai/ui/src/stack/StackMemoryNow";
+import type { StackMemoryEngine, StackMemoryReading } from "@maipai/ui/src/stack/stackMemory";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { requestJson } from "@/lib/api";
 
 export interface StackStatusView {
   busy?: { running?: number; waiting?: number };
-  memory?: { total_bytes?: number; free_bytes?: number; budget_bytes?: number; pressure?: string };
   jobs?: Array<{ id: string; kind: string; state: string; percent?: number | null }>;
 }
-export interface StackMemoryView {
-  ledger?: { reserved_bytes?: number; warm_bytes?: number; budget_bytes?: number; items?: Array<{ id: string; class?: string; live_bytes?: number | null }> };
-}
+interface ResourcesSummary { current: (StackMemoryReading & Record<string, unknown>) | null }
+interface ResourcesEngines { budget?: { cap_bytes?: number }; engines: Array<StackMemoryEngine & Record<string, unknown>> }
+interface ComponentsView { components: Array<{ id: string; label: string; kind: string }> }
+interface ChoicesView { categories: Array<{ role: string | null }> }
 
 export const STACK_STATUS_KEY = ["ai-stack-status"] as const;
-export const STACK_MEMORY_KEY = ["ai-stack-memory"] as const;
-
-const PART_NAMES: Record<string, string> = { chat: "Chat", embed: "Search and memory", judge: "Safety check", stt: "Voice in", tts: "Voice out", "image-pool": "Pictures", video: "Video", music: "Music", vision: "Vision" };
-const partName = (id: string) => PART_NAMES[id] ?? id;
+export const STACK_RESOURCES_KEY = ["ai-stack-resources-summary"] as const;
+export const STACK_ENGINES_KEY = ["ai-stack-resources-engines"] as const;
 const ACTIVE_JOB = new Set(["running", "waiting", "queued", "paused"]);
 
 export function StackUsage() {
   const status = useQuery({ queryKey: STACK_STATUS_KEY, queryFn: () => requestJson<StackStatusView>("/api/ai/stack/status"), refetchInterval: 5_000 });
-  const memory = useQuery({ queryKey: STACK_MEMORY_KEY, queryFn: () => requestJson<StackMemoryView>("/api/ai/stack/memory"), refetchInterval: 5_000 });
-  if (!status.data) return null;
-  const budget = memory.data?.ledger?.budget_bytes ?? status.data.memory?.budget_bytes ?? 0;
-  const held = (memory.data?.ledger?.reserved_bytes ?? 0) + (memory.data?.ledger?.warm_bytes ?? 0);
-  const percent = budget > 0 ? Math.min(100, Math.round((held / budget) * 100)) : 0;
-  const loaded = (memory.data?.ledger?.items ?? []).filter((item) => (item.live_bytes ?? 0) > 0);
+  const summary = useQuery({ queryKey: STACK_RESOURCES_KEY, queryFn: () => requestJson<ResourcesSummary>("/api/ai/stack/resources/summary"), refetchInterval: 5_000 });
+  const engines = useQuery({ queryKey: STACK_ENGINES_KEY, queryFn: () => requestJson<ResourcesEngines>("/api/ai/stack/resources/engines"), refetchInterval: 5_000 });
+  const parts = useQuery({ queryKey: ["ai-stack-components"], queryFn: () => requestJson<ComponentsView>("/api/ai/stack/components"), staleTime: 5 * 60_000 });
+  const order = useQuery({ queryKey: ["ai-stack-feature-order"], queryFn: () => requestJson<ChoicesView>("/api/ai/stack/choices"), staleTime: 5 * 60_000 });
+  const names = new Map((parts.data?.components ?? []).filter((part) => part.kind === "model").map((part) => [part.id, part.label]));
+  const modelName = (id: string | null) => (id ? names.get(id) ?? null : null);
+  if (!status.data || !summary.data) return null;
   const running = status.data.busy?.running ?? 0;
   const waiting = status.data.busy?.waiting ?? 0;
   const active = (status.data.jobs ?? []).filter((job) => ACTIVE_JOB.has(job.state));
-  const label = i18n._({ id: "Memory the Stack may use", message: "Memory the Stack may use" });
+  const featureOrder = (order.data?.categories ?? []).flatMap((category) => (category.role ? [category.role] : []));
   return (
     <section aria-label={i18n._({ id: "Use right now", message: "Use right now" })} className="flex flex-col gap-3" data-testid="stack-usage">
       <h3 className="text-row font-semibold">{i18n._({ id: "Use right now", message: "Use right now" })}</h3>
+      <StackMemoryNow current={summary.data.current} engines={engines.data?.engines ?? null} budgetBytes={engines.data?.budget?.cap_bytes ?? null} modelName={modelName} featureOrder={featureOrder} />
       <ItemGroup variant="card">
-        <Item size="setting">
-          <ItemContent>
-            <ItemTitle>{label}</ItemTitle>
-            <ItemDescription clamp={false}>{i18n._({ id: "{held} of {budget} in use", message: "{held} of {budget} in use", values: { held: formatBytes(held), budget: formatBytes(budget) } })}</ItemDescription>
-            <Progress value={percent} aria-label={label} />
-          </ItemContent>
-        </Item>
-        <Item size="setting">
-          <ItemContent>
-            <ItemTitle>{i18n._({ id: "Loaded now", message: "Loaded now" })}</ItemTitle>
-            <ItemDescription clamp={false}>
-              {loaded.length === 0
-                ? i18n._({ id: "Nothing is loaded.", message: "Nothing is loaded." })
-                : loaded.map((item) => `${partName(item.id)} ${formatBytes(item.live_bytes ?? 0)}`).join(", ")}
-            </ItemDescription>
-          </ItemContent>
-        </Item>
         <Item size="setting">
           <ItemContent>
             <ItemTitle>{i18n._({ id: "Jobs", message: "Jobs" })}</ItemTitle>
