@@ -4,6 +4,7 @@ import {
   approveQuickConnect,
   consumeQuickConnect,
   isQuickConnectPending,
+  recordQuickConnectWrongGuess,
   __resetQuickConnectForTests,
 } from "@/lib/quickConnect";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -70,6 +71,37 @@ describe("the approve -> poll flow", () => {
 
   test("an unknown code cannot be approved", () => {
     expect(approveQuickConnect("ZZZZZZ", "person-abc123")).toBe(false);
+  });
+
+  test("five wrong guesses lock only that code with the same refusal as a wrong code", () => {
+    const a = createQuickConnect("192.0.2.1", "A TV", "tv")!;
+    const b = createQuickConnect("192.0.2.1", "B TV", "tv")!;
+    for (let i = 0; i < 5; i++) recordQuickConnectWrongGuess(a.code, "192.0.2.1");
+    expect(approveQuickConnect(a.code, "person-abc123", "192.0.2.2")).toBe(false);
+    expect(approveQuickConnect(b.code, "person-abc123", "192.0.2.2")).toBe(true);
+  });
+
+  test("ten wrong guesses lock their source but not another source", () => {
+    const req = createQuickConnect("192.0.2.1", "TV", "tv")!;
+    const other = createQuickConnect("192.0.2.2", "Other TV", "tv")!;
+    for (let i = 0; i < 10; i++) recordQuickConnectWrongGuess("ZZZZZZ", "192.0.2.1");
+    expect(approveQuickConnect(req.code, "person-abc123", "192.0.2.1")).toBe(false);
+    expect(approveQuickConnect(other.code, "person-abc123", "192.0.2.2")).toBe(true);
+  });
+
+  test("wrong-guess lock state is swept when its code expires", () => {
+    const req = createQuickConnect("192.0.2.1", "TV", "tv")!;
+    for (let i = 0; i < 5; i++) recordQuickConnectWrongGuess(req.code, "192.0.2.1");
+    req.expiresAt = Date.now() - 1;
+    expect(approveQuickConnect("ZZZZZZ", "person-abc123", "192.0.2.2")).toBe(false);
+  });
+
+  test("refusals do not reveal the code", () => {
+    const req = createQuickConnect("192.0.2.1", "TV", "tv")!;
+    const answers: unknown[] = [];
+    for (let i = 0; i < 5; i++) recordQuickConnectWrongGuess(req.code, "192.0.2.1");
+    answers.push(approveQuickConnect(req.code, "person-abc123", "192.0.2.1"));
+    expect(JSON.stringify(answers)).not.toContain(req.code);
   });
 });
 

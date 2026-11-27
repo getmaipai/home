@@ -46,6 +46,11 @@ export interface QuickConnectRequest {
 const TTL_MS = 5 * 60_000;
 const requestsByCode = new Map<string, QuickConnectRequest>();
 const requestsByPollToken = new Map<string, QuickConnectRequest>();
+const wrongByCode = new Map<string, number>();
+const wrongBySource = new Map<string, { count: number; expiresAt: number; locked: boolean }>();
+const MAX_WRONG_PER_CODE = 5;
+const MAX_WRONG_PER_SOURCE = 10;
+const WRONG_GUESS_WINDOW_MS = 5 * 60_000;
 
 // No 0/O/1/I: these get read aloud across a room off a TV screen.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -71,8 +76,10 @@ function sweep(): void {
     if (r.expiresAt < now) {
       requestsByCode.delete(code);
       requestsByPollToken.delete(r.pollToken);
+      wrongByCode.delete(code);
     }
   }
+  for (const [source, lock] of wrongBySource) if (lock.expiresAt <= now) wrongBySource.delete(source);
 }
 
 // A code review of the legacy version's own history (docs/BACKLOG.md:
@@ -133,12 +140,29 @@ function getByPollToken(pollToken: string): QuickConnectRequest | null {
 /** Approve a code as `personId`. False for unknown/expired/already-approved
  * codes - the approving phone gets an honest "that code's no longer
  * valid" rather than silently doing nothing. */
-export function approveQuickConnect(code: string, personId: string): boolean {
+export function approveQuickConnect(code: string, personId: string, sourceAddress = "unknown"): boolean {
   if (!tryConsume("quick-connect:approve", CODE_RATE_LIMIT)) return false;
-  const req = getByCode(code);
-  if (!req || req.approvedPersonId || req.consumed) return false;
+  sweep();
+  const sourceLock = wrongBySource.get(sourceAddress);
+  if (sourceLock?.locked && sourceLock.expiresAt > Date.now()) return false;
+  const normalized = code.trim().toUpperCase();
+  const req = requestsByCode.get(normalized);
+  if (!req || req.expiresAt <= Date.now() || req.approvedPersonId || req.consumed || (wrongByCode.get(normalized) ?? 0) >= MAX_WRONG_PER_CODE) return false;
   req.approvedPersonId = personId;
   return true;
+}
+
+/** Records a failed code comparison only for a live pending code. */
+export function recordQuickConnectWrongGuess(code: string, sourceAddress = "unknown"): void {
+  sweep();
+  const sourceLock = wrongBySource.get(sourceAddress);
+  if (sourceLock?.locked && sourceLock.expiresAt > Date.now()) return;
+  const normalized = code.trim().toUpperCase();
+  const req = requestsByCode.get(normalized);
+  if (req && !req.approvedPersonId && !req.consumed) wrongByCode.set(normalized, (wrongByCode.get(normalized) ?? 0) + 1);
+  const previous = wrongBySource.get(sourceAddress);
+  const count = previous && previous.expiresAt > Date.now() ? previous.count + 1 : 1;
+  wrongBySource.set(sourceAddress, { count, expiresAt: Date.now() + WRONG_GUESS_WINDOW_MS, locked: count >= MAX_WRONG_PER_SOURCE });
 }
 
 /** The waiting device polls with its poll_token, exactly once claiming
@@ -167,4 +191,6 @@ export function quickConnectKindForCode(code: string): DeviceKind | null {
 export function __resetQuickConnectForTests(): void {
   requestsByCode.clear();
   requestsByPollToken.clear();
+  wrongByCode.clear();
+  wrongBySource.clear();
 }

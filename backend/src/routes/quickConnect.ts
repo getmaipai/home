@@ -7,7 +7,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { issueSession, sessionSignInSource } from "@/lib/session";
 import { issueDeviceToken } from "@/lib/deviceTokens";
-import { createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode } from "@/lib/quickConnect";
+import { createQuickConnect, approveQuickConnect, recordQuickConnectWrongGuess, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode } from "@/lib/quickConnect";
 import { isTotpEnabled, verifyTotp } from "@/lib/totp";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -185,6 +185,10 @@ quickConnectRoutes.openapi(approveRoute, (c) => {
     }
   }
 
-  if (!approveQuickConnect(code, actor.id)) return c.json({ error: "That code is no longer valid" }, 400);
+  const sourceAddress = getClientIp(c);
+  if (!approveQuickConnect(code, actor.id, sourceAddress)) {
+    recordQuickConnectWrongGuess(code, sourceAddress);
+    return c.json({ error: "That code is no longer valid. Ask for a new code on the TV." }, 400);
+  }
   return c.json({ success: true as const }, 200);
 });
