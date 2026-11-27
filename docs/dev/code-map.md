@@ -1346,7 +1346,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/timerStatus.ts` | timerStatusReply |
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
-| `backend/src/lib/toolAudit.ts` | recordToolAudit, listOwnToolAudit, toolAuditCounts |
+| `backend/src/lib/toolAudit.ts` | recordToolAudit, recordToolIntent, recordToolResult, toolOutcomeUnknown, listOwnToolAudit, toolAuditCounts |
 | `backend/src/lib/toolBrake.ts` | brakeFor |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |
 | `backend/src/lib/toolUndo.ts` | purgeExpiredUndo, recordListContext, recordUndo, undoBlockFor, undoPropsFor, runUndo |
