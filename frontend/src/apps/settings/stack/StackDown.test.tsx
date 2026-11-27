@@ -29,3 +29,12 @@ describe("Stack tabs when the Stack is down", () => {
     await waitFor(() => expect(view.getByText("the real page")).toBeTruthy());
   });
 });
+
+describe("status cards draw their state icon (no blank circle)", () => {
+  test("the down card's lead circle holds an icon", async () => {
+    const view = mount({ where: "this_computer", reachable: false, version: null, problems: null, reason: "The Stack is stopped." });
+    await waitFor(() => expect(view.getByTestId("stack-down")).toBeTruthy());
+    const card = view.getByRole("alert");
+    expect(card.querySelector("svg")).not.toBeNull();
+  });
+});

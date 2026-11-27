@@ -25,6 +25,7 @@ export function stackDownProps({ reason, error, onCheck }: { reason: string | nu
   const fallback = i18n._({ id: "Start the Stack on its computer, then check again.", message: "Start the Stack on its computer, then check again." });
   return {
     kind: "problem" as const,
+    textStyle: "status" as const,
     title: i18n._({ id: "The Stack is not answering", message: "The Stack is not answering" }),
     line: error ? errorLine(error, fallback) : (reason ?? fallback),
     action: { label: i18n._({ id: "Check now", message: "Check now" }), onSelect: onCheck },

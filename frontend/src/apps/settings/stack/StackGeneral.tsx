@@ -19,7 +19,7 @@ export function StackGeneral({ person }: SettingsViewProps) {
   const link = useStackAdminLink();
   const checkNow = () => void general.refetch();
   const wrap = (children: ReactNode) => <div className="flex min-w-0 flex-col gap-4" data-testid="stack-general">{children}</div>;
-  if (!allowed) return wrap(<StatusCard kind="info" title={i18n._({ id: NOT_ADULT, message: NOT_ADULT })} />);
+  if (!allowed) return wrap(<StatusCard kind="info" textStyle="status" title={i18n._({ id: NOT_ADULT, message: NOT_ADULT })} />);
   if (general.isError) return wrap(<StatusCard {...stackDownProps({ reason: null, error: general.error, onCheck: checkNow })} />);
   if (!general.data) return null;
   const data = general.data;
@@ -31,8 +31,8 @@ export function StackGeneral({ person }: SettingsViewProps) {
       {!data.reachable
         ? <StatusCard {...stackDownProps({ reason: data.reason, onCheck: checkNow })} />
         : data.problems
-          ? <StatusCard kind="attention" title={i18n._({ id: "The Stack is running and lists {count} to look at", message: "The Stack is running and lists {count} to look at", values: { count: data.problems } })} line={i18n._({ id: "Open the Stack admin to see them.", message: "Open the Stack admin to see them." })} />
-          : <StatusCard kind="done" title={i18n._({ id: "The Stack is running", message: "The Stack is running" })} />}
+          ? <StatusCard kind="attention" textStyle="status" title={i18n._({ id: "The Stack is running and lists {count} to look at", message: "The Stack is running and lists {count} to look at", values: { count: data.problems } })} line={i18n._({ id: "Open the Stack admin to see them.", message: "Open the Stack admin to see them." })} />
+          : <StatusCard kind="done" textStyle="status" title={i18n._({ id: "The Stack is running", message: "The Stack is running" })} />}
       <ItemGroup variant="card">
         <Item size="setting">
           <ItemContent>

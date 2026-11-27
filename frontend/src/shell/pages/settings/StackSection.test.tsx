@@ -107,6 +107,8 @@ describe("General", () => {
   test("says where the Stack runs, its version and that it is running, with the Open and Check now buttons", async () => {
     const view = open(makePerson("owner"), "/settings/stack");
     expect(await view.findByText("The Stack is running")).toBeTruthy();
+    // The lead circle of the status card holds its check icon, not an empty circle.
+    expect(view.getByText("The Stack is running").closest("section")!.querySelector("svg")).not.toBeNull();
     expect(view.getByText("This computer")).toBeTruthy();
     expect(view.getByText("0.4.2")).toBeTruthy();
     expect((await view.findByRole("link", { name: "Open Stack admin" })).getAttribute("target")).toBe("_blank");
@@ -125,6 +127,7 @@ describe("General", () => {
   test("a Stack that lists problems says so and sends the person to the Stack admin", async () => {
     const view = open(makePerson("owner"), "/settings/stack", { stackGeneral: { where: "another_computer", reachable: true, version: "0.4.2", problems: 2, reason: null } });
     expect(await view.findByText("The Stack is running and lists 2 to look at")).toBeTruthy();
+    expect(view.getByText("The Stack is running and lists 2 to look at").closest("section")!.querySelector("svg")).not.toBeNull();
     expect(view.getByText("Another computer, over your home network or tailnet")).toBeTruthy();
   });
 });
