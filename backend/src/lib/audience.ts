@@ -11,6 +11,11 @@ export function audienceBand(person: Pick<PersonRow, "id" | "role" | "controls">
   return "adult";
 }
 
+/** True only for the plain "adult" band. An unknown or missing band is not adult (fails toward the minor protections). */
+export function isAdultBand(band: string | null | undefined): boolean {
+  return band === "adult";
+}
+
 const RANK: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 
 export function stricterBand(a: AgeBand, b: AgeBand): AgeBand {

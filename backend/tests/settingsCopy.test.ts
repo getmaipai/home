@@ -90,8 +90,9 @@ describe("settings guard agreement metadata", () => {
       const value = writableValue(key, owner.id);
       for (const [band, person] of [["child", child], ["teen", teen], ["adult", adult]] as const) {
         const result = setValue(person, `person:${person.id}`, key.key, value);
+        const adminOverride = key.key.startsWith("access.") || key.key.startsWith("content.ceiling") || key.key.startsWith("content.unrated") || key.key === "content.filters";
         const childVoiceGuard = key.key === "tts.voice_id" && band === "child";
-        expect(result.ok, `${key.key} ${band} self write`).toBe(childVoiceGuard ? false : key.control?.[band] === "self");
+        expect(result.ok, `${key.key} ${band} self write`).toBe(adminOverride || childVoiceGuard ? false : key.control?.[band] === "self");
         // Topic levels exist for a child only; assertCanSetChildTopic refuses a teen or adult target (topicSettingsAccess.test.ts).
         if (key.key.startsWith("topics.") && band !== "child") continue;
         if (key.control?.[band] === "guardian") {
@@ -103,11 +104,11 @@ describe("settings guard agreement metadata", () => {
       const expectedDefaults = {
         child: key.key === "media.allowlist_only" ? true : key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("child"), band: "child" })
           : key.key === "chat.photo_uploads" || key.key === "reference.images" || key.key === "person.robot.may_address" || key.key === "person.robot.follow_up" ? false : key.key.startsWith("news.") || key.key === "ui.home_layout" ? key.band_default?.child
-          : key.key === "search.page_text_cleaning" ? true : key.default,
+          : key.key === "search.page_text_cleaning" ? true : (key.key.startsWith("access.") || key.key.startsWith("content.ceiling") || key.key.startsWith("content.unrated") || key.key === "content.filters") ? key.band_default?.child : key.default,
         teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("teen"), band: "teen" })
-          : key.key === "search.page_text_cleaning" ? true : key.default,
+          : key.key === "search.page_text_cleaning" ? true : (key.key.startsWith("access.") || key.key.startsWith("content.ceiling") || key.key.startsWith("content.unrated") || key.key === "content.filters") ? key.band_default?.teen : key.default,
         // TALENT-00: an adult is never gated by synths.real_people, so the adult band default is "all" while the key default is "ask".
-        adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("adult"), band: "adult" }) : key.key === "synths.real_people" ? "all" : key.default,
+        adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", { actor: surfaceActor("adult"), band: "adult" }) : key.key === "synths.real_people" ? "all" : (key.key.startsWith("access.") || key.key.startsWith("content.ceiling") || key.key.startsWith("content.unrated") || key.key === "content.filters") ? key.band_default?.adult : key.default,
       };
       // Ease of use is comfort, not protection: only the preset and reading level differ for a child (EASE-OF-USE-01).
       const coding = CODING_PERSON_BAND_DEFAULTS[key.key];

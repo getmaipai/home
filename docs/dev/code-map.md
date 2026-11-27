@@ -493,7 +493,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/assistWidened.ts` | WIDENED_SETTING_KEY, WIDENED_PACKAGE_IDS, readWidenedFile, widenedAssistOn, applyWidenedAssist |
 | `backend/src/lib/assistantStreamWire.ts` | createAssistantStreamSink |
 | `backend/src/lib/attachments.ts` | checkAttachmentCapacity, attachmentFilePath, storedFileIntact, toRecord, createAttachment, storeFile |
-| `backend/src/lib/audience.ts` | audienceBand, stricterBand, isMinorBand, controlsForNewPerson, isGuestRole |
+| `backend/src/lib/audience.ts` | audienceBand, isAdultBand, stricterBand, isMinorBand, controlsForNewPerson, isGuestRole |
 | `backend/src/lib/backgroundPriority.ts` | atBackgroundPriority |
 | `backend/src/lib/backgroundWork.ts` | trackBackgroundWork, __drainBackgroundWorkForTests |
 | `backend/src/lib/backup.ts` | cleanupStaleSnapshots, listBackups, runBackup, restoreBackup, pruneBackups, getBackupHealth |

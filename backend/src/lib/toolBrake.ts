@@ -1,3 +1,4 @@
+import { isAdultBand } from "@/lib/audience";
 export type BrakeTool = "remind" | "timer" | "lists" | "house" | "code";
 /** CODE-BRAKE-01: what a Code agent action does, as an effect class. `action` carries one of these when `tool` is "code". */
 export type CodeEffect = "read" | "file_write" | "command" | "host_new" | "push" | "pull_request" | "delete_session";
@@ -86,6 +87,6 @@ export interface BackgroundToolInput {
 /** Closed by default: a read-list tool runs; a granted tool runs only for an adult on a run with no outside content. */
 export function backgroundToolDecision(input: BackgroundToolInput): { allow: true } | { allow: false; reason: "background_not_allowed" } {
   if (BACKGROUND_READ_TOOLS.has(input.tool)) return { allow: true };
-  if (input.band === "adult" && !input.tainted && input.grants.includes(input.tool)) return { allow: true };
+  if (isAdultBand(input.band) && !input.tainted && input.grants.includes(input.tool)) return { allow: true };
   return { allow: false, reason: "background_not_allowed" };
 }

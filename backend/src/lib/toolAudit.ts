@@ -3,12 +3,13 @@ import { db } from "@/db";
 import { toolAudit } from "@/db/schema";
 import { newConversationTurnId } from "@/lib/id";
 import { mayRetain } from "@/lib/gate/retention";
+import { isAdultBand } from "@/lib/audience";
 
 export type ToolAuditDecision = "do" | "ask" | "answered_yes" | "answered_no" | "never" | "undo" | "intent" | "result";
 export function recordToolAudit(input: { personId: string; tool: string; action: string; decision: ToolAuditDecision; band: string; count?: number; temporary?: boolean }): void {
   // PRIVACY-LEVEL-PROOF-01: an adult's temporary chat leaves no audit row; a minor's stays (the safety trail).
   // Fails toward keeping the trail: only a plain "adult" band drops the row; an unknown band is treated as a minor.
-  const band = input.band === "adult" ? "adult" : "child";
+  const band = isAdultBand(input.band) ? "adult" : "child";
   if (!mayRetain("tool_audit", { temporary: input.temporary === true, band })) return;
   try {
     db.insert(toolAudit).values({ id: newConversationTurnId(), personId: input.personId, tool: input.tool, action: input.action, decision: input.decision, band: input.band, count: input.count ?? 1, at: new Date().toISOString() }).run();
