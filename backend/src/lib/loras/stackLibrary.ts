@@ -41,12 +41,13 @@ export const __setLorasFetchForTests = stack.__setFetchForTests;
 export const FRESH_MS = 3_000;
 export const MAX_AGE_MS = 15_000;
 
-let snapshot: { at: number; ok: boolean; items: Lora[]; views: StackLoraView[] } | null = null;
+/** `items` are the styles every picker, tool and suggestion reads; `library` is the admin's list: every record the Stack lists, the engine part included. */
+let snapshot: { at: number; ok: boolean; items: Lora[]; library: Lora[]; views: StackLoraView[] } | null = null;
 let inflight: Promise<boolean> | null = null;
 export function dropLoraSnapshot(): void { snapshot = null; }
 export function __resetLoraSnapshotForTests(): void { snapshot = null; inflight = null; }
 /** Test seam: the snapshot as if the Stack had just answered with these views. */
-export function __primeLoraSnapshotForTests(views: readonly StackLoraView[]): void { snapshot = { at: Date.now(), ok: true, items: mapViews(stylesOnly(views)), views: stylesOnly(views) }; }
+export function __primeLoraSnapshotForTests(views: readonly StackLoraView[]): void { snapshot = { at: Date.now(), ok: true, items: mapViews(stylesOnly(views)), library: mapViews(views), views: [...views] }; }
 
 const BASES: readonly string[] = ALL_BASE_IDS;
 const PERSON = /^person-[a-z0-9]{6,}$/;
@@ -130,7 +131,10 @@ export function loraFromStack(view: StackLoraView, people: ReadonlyMap<string, s
   } as Lora;
 }
 
-/** The Ingredients adapter is an engine part for "make a video from pictures", not a style: it never reaches a list or a picker. */
+/**
+ * The Ingredients adapter is an engine part for "make a video from pictures", not a style: it never reaches a picker, the chat tool or a suggestion
+ * (`items`). The admin's Styles page still lists it, because it lists exactly what the Stack lists (`library`, `listStackViews`, `getLibraryRecord`).
+ */
 const stylesOnly = (views: readonly StackLoraView[]): StackLoraView[] => views.filter((view) => view.name !== INGREDIENTS_LIBRARY_NAME);
 
 function mapViews(views: readonly StackLoraView[]): Lora[] {
@@ -161,11 +165,10 @@ async function load(): Promise<boolean> {
   try {
     const [live, trash] = await Promise.all([callStack("GET", "/stack/v1/loras"), callStack("GET", "/stack/v1/loras?removed=true")]);
     const views = [...((live.body as { loras?: StackLoraView[] }).loras ?? []), ...((trash.body as { loras?: StackLoraView[] }).loras ?? [])];
-    const kept = stylesOnly(views);
-    snapshot = { at: Date.now(), ok: true, items: mapViews(kept), views: kept };
+    snapshot = { at: Date.now(), ok: true, items: mapViews(stylesOnly(views)), library: mapViews(views), views };
     return true;
   } catch {
-    snapshot = { at: Date.now(), ok: false, items: [], views: [] };
+    snapshot = { at: Date.now(), ok: false, items: [], library: [], views: [] };
     return false;
   }
 }
@@ -186,9 +189,14 @@ function current(): Lora[] { return snapshot && snapshot.ok && Date.now() - snap
 /** Every record in the snapshot (removed ones included). Empty when the Stack could not be read: fail closed. */
 export function listLoraRecords(): Lora[] { return current(); }
 export function getLoraRecord(id: string): Lora | null { return current().find((lora) => lora.id === id) ?? null; }
+/**
+ * One record of the Stack's whole library by id, the engine part (the Ingredients adapter) included. Only the admin's Styles page and its actions read it,
+ * and each record still goes through `loraAccess` first; every picker, tool and suggestion reads `getLoraRecord`, which leaves the engine part out. Null when unreadable.
+ */
+export function getLibraryRecord(id: string): Lora | null { return snapshot && snapshot.ok && Date.now() - snapshot.at <= MAX_AGE_MS ? snapshot.library.find((lora) => lora.id === id) ?? null : null; }
 /** The Stack's own flat record of one style (the facts Home does not copy into a `Lora`, such as a picture style's base family). Null when unreadable: fail closed. */
 export function stackViewOf(id: string): StackLoraView | null { return snapshot && snapshot.ok && Date.now() - snapshot.at <= MAX_AGE_MS ? snapshot.views.find((v) => v.id === id) ?? null : null; }
-/** Every Stack record in the snapshot (live and trash), for a pass-through that redacts each one by `loraAccess` before it leaves Home. Empty when the Stack cannot be read. */
+/** Every Stack record in the snapshot (live and trash, the engine part included), for a pass-through that redacts each one by `loraAccess` before it leaves Home. Empty when the Stack cannot be read. */
 export function listStackViews(): StackLoraView[] { return snapshot && snapshot.ok && Date.now() - snapshot.at <= MAX_AGE_MS ? snapshot.views : []; }
 /** Whether the last read of the Stack worked and is still fresh. */
 export function loraLibraryReadable(): boolean { return snapshot !== null && snapshot.ok && Date.now() - snapshot.at <= MAX_AGE_MS; }

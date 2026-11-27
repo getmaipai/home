@@ -17,8 +17,8 @@ import { requireAuth, requireRole } from "@/middleware/auth";
 import { requestProof, sessionKeyOf, unlockedFor } from "@/lib/adultLock";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
-import { loraAccess, readLora, type LoraSurface } from "@/lib/loras/access";
-import { callStack, getLoraRecord, listStackViews, LorasStackError, refreshLoras, stackPreview, type StackLoraView } from "@/lib/loras/stackLibrary";
+import { loraAccess, type LoraSurface } from "@/lib/loras/access";
+import { callStack, getLibraryRecord, listStackViews, LorasStackError, refreshLoras, stackPreview, type StackLoraView } from "@/lib/loras/stackLibrary";
 import { lowerToAllAges, markAdultOnly, patchLoraOnStack, purgeLora, removeLora, restoreLora, NOT_HERE_LINE } from "@/lib/loras/stackAdmin";
 import type { PersonRow } from "@/types";
 
@@ -53,8 +53,8 @@ const outward = (view: StackLoraView): Omit<StackLoraView, "home"> => { const { 
 /** The style as this admin may act on it now, or false (missing, hidden and locked answer alike). Reads the library first. */
 async function actable(c: Ctx, id: string): Promise<boolean> {
   await refreshLoras();
-  const found = readLora(person(c), id, surfaceOf(c));
-  return found !== null && found.state === "open";
+  const lora = getLibraryRecord(id);
+  return lora !== null && loraAccess(person(c), lora, surfaceOf(c)) === "open";
 }
 const viewAfter = (id: string): Omit<StackLoraView, "home"> | null => { const view = listStackViews().find((v) => v.id === id); return view ? outward(view) : null; };
 
@@ -72,7 +72,7 @@ lorasSourceRoutes.openapi(createRoute({
   let locked = false;
   for (const view of listStackViews()) {
     if ((view.removed_at !== null) !== trash) continue;
-    const lora = getLoraRecord(view.id);
+    const lora = getLibraryRecord(view.id);
     if (!lora) continue;
     const access = loraAccess(who, lora, surface);
     if (access === "open") loras.push(outward(view));

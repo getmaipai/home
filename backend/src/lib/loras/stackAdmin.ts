@@ -9,7 +9,7 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { consumeTicket, lockItemOfProvenance, peekTicket } from "@/lib/adultLock";
 import { logMark, setItemLock } from "@/lib/adultMarks";
 import { isAdult } from "@/lib/loras/access";
-import { getLoraRecord, callStack, LorasStackError, refreshLoras, setLoraPeople, stackViewOf, type Lora } from "@/lib/loras/stackLibrary";
+import { getLibraryRecord, callStack, LorasStackError, refreshLoras, setLoraPeople, stackViewOf, type Lora } from "@/lib/loras/stackLibrary";
 import { clipsUsingStyle } from "@/lib/loras/usage";
 import type { PersonRow } from "@/types";
 
@@ -25,7 +25,7 @@ function must(admin: PersonRow): void {
   if (!isOwnerOrAdmin(admin)) throw stackRefusal(403, "not_admin", NOT_ADMIN_LINE);
 }
 function present(id: string): Lora {
-  const lora = getLoraRecord(id);
+  const lora = getLibraryRecord(id);
   if (!lora) throw stackRefusal(404, "unknown_lora", NOT_HERE_LINE);
   return lora;
 }
@@ -39,7 +39,7 @@ function notAdults(ids: readonly string[]): string[] {
 const patchStack = async (id: string, body: Record<string, unknown>): Promise<void> => { await callStack("PATCH", `/stack/v1/loras/${encodeURIComponent(id)}`, body); };
 async function after(id: string): Promise<Lora> {
   await refreshLoras(true);
-  return getLoraRecord(id) ?? present(id);
+  return getLibraryRecord(id) ?? present(id);
 }
 
 export interface LoraPatch {

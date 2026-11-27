@@ -215,3 +215,36 @@ describe("installing as All ages needs the open Adult lock", () => {
     expect(open.status).not.toBe(403);
   });
 });
+
+describe("STACK-LORAS-01: the admin sees every record the Stack lists (the engine part included)", () => {
+  const INGREDIENTS = "ltx-2.5-22b-ic-lora-ingredients-0.9";
+
+  test("the Styles page lists the video-from-pictures adapter for an admin, with the Stack's status, and no picker, tool or suggestion offers it", async () => {
+    const { owner, adult, teen, child, row } = await household();
+    const sage = row("Sage");
+    const style = putLora(sage.id, { name: "Clay animation", base_model: "ltx-2.5", compatible_with: ["ltx-2.5"] });
+    const adapter = putLora(sage.id, {
+      name: INGREDIENTS, base_model: "ltx-2.5", compatible_with: ["ltx-2.5"], file: { sha256: "ff".repeat(32), bytes: 1_308_787_472, rank: 128, modules: [], format: "safetensors" },
+      source: { site: "huggingface", url: "https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Ingredients", remote_id: null, version_id: null, token_ref: null },
+    });
+    // The admin's page lists exactly what the Stack lists, same status.
+    const body = (await (await owner.get(STYLES)).json()) as { loras: Array<{ id?: string; name?: string; media?: string; base_model?: string; bytes?: number; status?: string; classification?: string }> };
+    expect(body.loras.map((l) => l.id)).toEqual([style.id, adapter.id]);
+    expect(body.loras.find((l) => l.id === adapter.id)).toMatchObject({ name: INGREDIENTS, media: "video", base_model: "ltx-2.5", bytes: 1_308_787_472, status: "ready", classification: "all-ages" });
+    // Its admin actions resolve (a 404 here would mean the page lists a style it cannot act on).
+    expect((await owner.request(`${STYLES}/${adapter.id}`, { method: "PATCH", body: { strength_default: 0.8 } })).status).toBe(200);
+    // Everything that is not the admin's library keeps leaving it out: the picker, the chat tool's names, suggestions, the available list.
+    await refreshLoras(true);
+    expect(getLoraRecord(adapter.id)).toBeNull();
+    expect(listLoraRecords().map((l) => l.id)).toEqual([style.id]);
+    expect(readLoras(row("Sage"), "own_written").items.map((l) => l.id)).toEqual([style.id]);
+    // A non-admin of any age gets no name, id or hint of it.
+    for (const client of [adult.client, teen.client, child.client]) {
+      const res = await client.get(STYLES);
+      expect(res.status).toBe(403);
+      const text = await textOf(res);
+      expect(text).not.toContain(INGREDIENTS);
+      expect(text).not.toContain(adapter.id);
+    }
+  });
+});
