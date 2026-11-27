@@ -14,7 +14,8 @@ export function recordToolAudit(input: { personId: string; tool: string; action:
 
 /** TOOL-INTENT-LINE-01: "about to run X" before a tool that changes something. Tool name and step id only; never arguments or a hash of them (rule 6a). */
 export function recordToolIntent(input: { personId: string; tool: string; stepId: string; band: string }): void {
-  recordToolAudit({ personId: input.personId, tool: input.tool, action: `step:${input.stepId}`, decision: "intent", band: input.band });
+  // Not recordToolAudit: that swallows errors, and a tool must never run with no intent row.
+  db.insert(toolAudit).values({ id: newConversationTurnId(), personId: input.personId, tool: input.tool, action: `step:${input.stepId}`, decision: "intent", band: input.band, count: 1, at: new Date().toISOString() }).run();
 }
 
 /** The matching "it finished" row, written whether the tool succeeded or failed; only a missing row means the outcome is unknown. */

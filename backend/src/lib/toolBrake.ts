@@ -69,3 +69,23 @@ export function brakeFor(input: ToolBrakeInput): ToolBrakeResult {
   if (input.tainted || bulk || destructive) return { decision: "ask", reason: "confirmation_required" };
   return { decision: "do" };
 }
+
+/** ACT-POLICY-ALLOWLIST-01: the tools an unattended (scheduled or background) run may always call: they only look something up or read a status.
+ * Anything not named here, a new tool included, is refused in a background turn unless the person granted it for that run. */
+export const BACKGROUND_READ_TOOLS: ReadonlySet<string> = new Set(["websearch", "weather", "news", "currency", "convert", "media-lookup", "shows", "uptime"]);
+
+export interface BackgroundToolInput {
+  tool: string;
+  /** The tools the person granted for this run, read fresh by the caller on every call. */
+  grants: readonly string[];
+  band: "child" | "teen" | "adult";
+  /** Search results or a page are in view: outside content never widens what an unattended run may do. */
+  tainted: boolean;
+}
+
+/** Closed by default: a read-list tool runs; a granted tool runs only for an adult on a run with no outside content. */
+export function backgroundToolDecision(input: BackgroundToolInput): { allow: true } | { allow: false; reason: "background_not_allowed" } {
+  if (BACKGROUND_READ_TOOLS.has(input.tool)) return { allow: true };
+  if (input.band === "adult" && !input.tainted && input.grants.includes(input.tool)) return { allow: true };
+  return { allow: false, reason: "background_not_allowed" };
+}

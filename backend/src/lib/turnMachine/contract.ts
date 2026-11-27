@@ -109,7 +109,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "not_available" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor" | "item_not_here" | "format_not_here";
+      reason: "min_role" | "not_available" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor" | "item_not_here" | "format_not_here" | "background_not_allowed";
       ask?: PendingAskInfo;
     };
 
@@ -174,6 +174,8 @@ export interface TurnBudget {
 }
 
 export interface TurnState {
+  /** ACT-POLICY-ALLOWLIST-01: set only for an unattended (scheduled or background) turn. `grants` is called on every tool call, never cached. */
+  background?: { grants: () => readonly string[] };
   /** RESEARCH-TIER-01: the answer style the person picked for this message (research.ts). Absent reads as instant. */
   answerStyle?: import("./research").AnswerStyle;
   /** RESEARCH-TIER-01: the page budget the rounds of a Thinking or Max turn share (created by the tool node on its first round). */

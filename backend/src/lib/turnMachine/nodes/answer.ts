@@ -90,7 +90,8 @@ export const NOT_AVAILABLE_LINE = NOT_AVAILABLE_HERE;
 export const PARENT_REQUIRED_LINE = "That needs a grown-up at home to decide. Ask one of them, or ask me something else.";
 export const HOUSEHOLD_SUBJECT_NEVER_LINE = "I don't search the web for people in our family. I can tell you what I already know, or you can ask me about something else.";
 
-function policyRefusalLine(reason: PolicyRefusedReason): string {
+export function policyRefusalLine(reason: PolicyRefusedReason): string {
+  if (reason === "background_not_allowed") return "I can't do that while running on my own. Don't try it again in this run; I'll tell you what I couldn't do so you can ask me directly.";
   if (reason === "parent_required") return PARENT_REQUIRED_LINE;
   if (reason === "household_subject_never") return HOUSEHOLD_SUBJECT_NEVER_LINE;
   if (reason === "picture_not_here") return PICTURE_NOT_HERE_LINE;

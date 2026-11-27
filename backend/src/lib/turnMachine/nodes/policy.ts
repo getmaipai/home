@@ -32,7 +32,7 @@ import { MAKE_FILM_TOOL_ID } from "@/lib/films/tool";
 import { MAKE_REFERENCE_VIDEO_TOOL_ID } from "@/lib/videos/referenceToolId";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
-import { brakeFor, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
+import { brakeFor, backgroundToolDecision, type BrakeTool, type BrakeMode } from "@/lib/toolBrake";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { recordToolAudit } from "@/lib/toolAudit";
 import { LIST_ACTIONS } from "@/lib/listActions";
@@ -307,6 +307,17 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
   const conversationTexts = conversationGroundingTexts(state.context);
 
   for (const call of input.calls) {
+    // ACT-POLICY-ALLOWLIST-01: an unattended turn is closed by default. The grant is read on this call, not once per turn; the band and
+    // taint are the same ones the brake below uses. Checked before any tool-specific branch so a new tool cannot slip past it.
+    if (state.background) {
+      const taintedRun = state.context.some((item) => item.source === "search_result" || item.source === "page");
+      const bg = backgroundToolDecision({ tool: call.tool, grants: state.background.grants(), band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), tainted: taintedRun });
+      if (!bg.allow) {
+        noteRefusal(bg.reason, call.tool);
+        entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: bg.reason } });
+        continue;
+      }
+    }
     // PROJECT-START-01: `start_project` is never a real package (tool.ts's
     // own header), so it never goes through loadManifestOnly() below -
     // its classification comes from the NAMED project type's own registry

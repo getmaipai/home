@@ -62,15 +62,16 @@ async function runOneStep(project: Project, step: PlanStep): Promise<void> {
   state.startedAt = new Date().toISOString();
   // TOOL-INTENT-LINE-01: a tool step changes something, so the intent is written first; the result row closes it.
   const toolLine = step.kind === "tool" ? { personId: project.provenance.person, tool: step.params.tool, stepId: `${project.id}:${step.id}`, band: "project" } : null;
-  if (toolLine) recordToolIntent(toolLine);
   try {
-    await withTimeout(executeStep(project, step), STEP_DEADLINE_MS, () => new Error(`the "${step.id}" step exceeded its ${STEP_DEADLINE_MS / 1000}s deadline`));
+    // Fails closed: if the intent row cannot be written the tool does not run.
+    if (toolLine) recordToolIntent(toolLine);
+    // The result row is written when the tool itself settles, not when the deadline race ends: a timed-out tool may still be running.
+    await withTimeout(executeStep(project, step).finally(() => { if (toolLine) recordToolResult(toolLine); }), STEP_DEADLINE_MS, () => new Error(`the "${step.id}" step exceeded its ${STEP_DEADLINE_MS / 1000}s deadline`));
     state.state = "done";
   } catch (err) {
     state.state = "failed";
     state.error = err instanceof Error ? err.message : String(err);
   } finally {
-    if (toolLine) recordToolResult(toolLine);
     state.endedAt = new Date().toISOString();
   }
 }
