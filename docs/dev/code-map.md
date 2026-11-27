@@ -703,6 +703,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/fpcalcPath.ts` | findFpcalc |
 | `backend/src/lib/gate/decide.ts` | approverFor, assertGated, registeredCapabilities, decide |
 | `backend/src/lib/gate/pendingAskMigration.ts` | decidePendingAsk, migratePendingAsksThroughGate |
+| `backend/src/lib/gate/retention.ts` | mayRetain, RETENTION_POINTS, RETENTION_TABLES |
 | `backend/src/lib/gazetteer.ts` | searchLocalPlaces, nearestLocalPlace |
 | `backend/src/lib/genLive.ts` | getLive, clearLive, previewVersionOf, updateLive, liveCardFields |
 | `backend/src/lib/generationFailure.ts` | classifyGenerationFailure, RETRY_BACKOFF_MS |
