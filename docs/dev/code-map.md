@@ -254,13 +254,16 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/SafetyChangesSection.tsx` | SafetyChangesSection |
 | `frontend/src/apps/settings/SignInSecretSection.tsx` | SignInSecretSection |
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
-| `frontend/src/apps/settings/StackAdminLink.tsx` | StackAdminLink |
+| `frontend/src/apps/settings/StackAdminLink.tsx` | useStackAdminLink, stackAdminButton, StackAdminLink |
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
 | `frontend/src/apps/settings/StagedApplyBar.tsx` | StagedApplyBar |
 | `frontend/src/apps/settings/TwoStepSignInSection.tsx` | TwoStepSignInSection |
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
 | `frontend/src/apps/settings/VoiceManagerSection.tsx` | VoiceManagerSection |
+| `frontend/src/apps/settings/stack/StackGeneral.tsx` | StackGeneral |
+| `frontend/src/apps/settings/stack/StackScreenStubs.tsx` | StackScreenStubs |
+| `frontend/src/apps/settings/stack/StackTabs.tsx` | StackMonitor, StackMaintain |
 | `frontend/src/apps/settings/styles/StylesTab.tsx` | StylesTab |
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
@@ -1284,6 +1287,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
 | `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent, listTierCandidates |
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, isStackRoleEnabled, getHomeOwnedRoles |
+| `backend/src/lib/stackGeneral.ts` | readStackGeneral |
 | `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues, syncHostGuardIssue |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
 | `backend/src/lib/stackLookSheet.ts` | stackLookSheetEnabled, LOOK_SHEET_BLOCKED_LINE, STACK_SHEET_MAX_REFERENCES, __setStackLookToolsForTests, useStackLookSheet, makeStackLookSheet |
