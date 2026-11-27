@@ -54,6 +54,58 @@ All slices depend on an architect-approved `media-segments` spec in commons. Siz
 | HOME-ADSKIP-04 | M | Episode segment list and held review; `backend/src/routes/podcastApp.ts`, Podcasts package episode page, review tests. Confirm/reject calls Stack PUT; child receives no review data or action. |
 | HOME-ADSKIP-05 | S | Honest processing/empty/offline states and seeded-hub verification; Podcasts package pages and focused UI tests. Verify desktop and phone, plus no outbound Home request. |
 
+## Features the Podcasts app gains
+
+Use shipped kit primitives only: `Player`, `Badge`, `Pill`, `Toast`, `Progress`, and `Dialog`, plus existing episode, chapter, show, settings, and Stack status components. Do not add a design-system part or wrap a kit Element. Phone layouts stack controls and allow horizontal timeline scrolling; desktop keeps the player and detail list side by side. Every state names what happened and the next action.
+
+### Visual features
+
+1. **Scrubber and mini-timeline.** The existing `Player` scrubber renders ranges for ad, sponsor, bumper, intro, outro, self-promo, and recap, with distinct colour and pattern per kind, a visible text legend, and labels available to screen readers. Colour is never the only cue. Tapping a range previews its start in mark mode or jumps over it in skip mode; range preview has a `Toast` action to return to the prior position. On phone the mini-timeline stays in the player and can be scrolled; desktop shows the full-width timeline. No plan shows the normal scrubber; stale plans hide all ranges and say “Skip plan needs processing” with a retry action; children see playback ranges but no review actions.
+
+2. **Skip confirmation and sound.** A `Pill` over the player says “Skipped a break, 2:53 saved” and offers Undo for the current skip window. It includes the associated bumper when paired with an ad. A Podcasts setting toggles a quiet skip sound, with haptic feedback on supported phones; sound and haptic default off. The pill moves above controls on phone and sits beside the transport controls on desktop. If there is no active skip it is absent; failed playback stays audible and shows a `Toast` with retry guidance.
+
+3. **Intro and recap actions.** “Skip intro” and “Skip recap” buttons appear only while playback is inside that marked range and the resolved policy is `mark`. They use existing `Player` controls and disappear at range end or after activation. Both work in the phone control sheet and desktop transport area. Outside a range they are not rendered; children may use these playback actions.
+
+4. **Episode row badges.** Existing `Badge` on each episode row shows one state: Processing, Ready, N breaks skipped, No ads found, Skipping off, Needs review, or Stack offline. Counts include only active ad/sponsor/break skips, not marked ranges. On phone the badge follows the episode title; desktop aligns it with duration. Empty shows omit episode badges; a failed state includes a plain next step in the row detail; child rows omit Needs review.
+
+5. **Two durations and time display.** Episode page shows original duration and estimated duration with resolved skips. The `Player` elapsed and remaining values use skipped time; one tap on the time display opens a `Dialog` with the corresponding original source position and duration. This works at both widths, with the dialog full-screen on phone. With no plan, both durations match; with a stale plan, only original duration is shown with a processing explanation.
+
+6. **Segment timeline and review.** Episode page uses the existing `Progress` timeline plus a list of kind, source start/end, source, confidence, and status. Each row has Play this range; adults with review permission also get Confirm and Reject. “Add a missing break” enters mark-start then mark-end mode while listening; saving creates a segment with source `person`. The timeline/list stack on phone and sit beside episode details on desktop. No segments shows “No breaks found”; a failed Stack request names the failure and offers retry; children receive playback only, with no list or marking/review controls.
+
+7. **Chapters.** The existing chapter list includes break rows as collapsed rows labelled by kind and source-time span. Expanding reveals the range and available player action. On phone rows use the same disclosure; desktop keeps breaks inline with chapters. No breaks leaves the chapter list unchanged; failed or stale plans do not add rows; children can expand playback rows but see no report or review action.
+
+8. **Show settings and summary.** Show page has “Skip settings for this show” in the existing settings view. Each kind displays its inherited resolved value in grey, an override selector, and Reset to inherit. A summary shows ads skipped, time saved, and last processed. Phone stacks settings and summary; desktop places summary beside settings. A show with no data says “Nothing skipped yet”; a processing failure says Stack offline and offers retry. Children see effective playback state only, not controls or personal stats.
+
+9. **Time saved.** A Podcasts page or existing summary card uses `Progress` and text for this week, this month, per show, and household total. Household totals are aggregate and never name a child; no per-person child totals are stored or shown. Phone uses stacked cards; desktop shows the same periods in a compact grid. No activity says “No listening time saved yet”; unavailable data shows the cause and retry; child accounts see household totals without member breakdown.
+
+10. **Global settings layout.** The Podcasts settings page shows the person's global layer and, for admins, household defaults, using the existing settings components. Include all seven kinds, the bumper toggle, and plain-language explanation: “A bumper is a short sound or spoken tag around an ad break.” Explain that a bumper next to a skipped ad is skipped with it by default. Phone stacks sections; desktop uses the existing settings column layout. Empty values show built-in defaults; save errors identify the value that did not save and offer retry; children see no admin defaults or editing controls.
+
+### Functional features
+
+11. **Processing queue.** Enabling skipping processes eligible saved episodes on follow and each new fetched episode, during idle time only. An adult can backfill the latest N episodes of a followed show and open the existing queue view to see position/state and cancel a job. Phone queue is a stacked list; desktop adds progress in a side column. Empty queue says nothing is waiting; errors identify the episode and retry option; children cannot start backfill or cancel review work.
+
+12. **Cross-device resume mapping.** Store resume position against the original source timeline and map it to the current skipped timeline on every device. A position saved before or after a skip resumes at the same source time elsewhere. If the source hash changed, discard the old map and resume at the last valid source position with “Episode changed; skip plan is processing.”
+
+13. **Hear it anyway and Play original.** During the Undo window or by long-pressing a skipped-break control, “Hear it anyway” plays that range once. “Play original” disables skipping for the whole episode without changing policy. On phone long-press exposes these actions in a `Dialog` or player menu; desktop exposes the same actions in the pill/menu. Missing range offers no action; stale/offline plan falls back to original playback and explains why; children may hear a range or play original.
+
+14. **Correction and learning.** Adults can choose “This was wrong” for a skipped break or “Missed an ad” to mark a range. Both submit the correction to Stack for that show; a person mark has source `person`. Confirm success with a `Toast`; on failure preserve the range and offer retry. Controls use the phone menu and desktop row actions. Children get neither correction action nor review controls.
+
+15. **Saved and downloaded copies.** Ship the skip list with each saved copy; do not create cut copies during ordinary saving. Offline playback uses that list against the saved source bytes. A cut copy may be rendered only on explicit export. If a copy lacks its list, play original and show “Skip plan unavailable offline”; if its source hash differs, suppress the list until reprocessed. Phone and desktop expose identical saved-copy behavior; child access follows the same policy and hides export/review controls.
+
+16. **Go and robot parity.** Apple TV and phone Go clients and the robot receive the same resolved skip plan through Home, including source hash, ranges, kind, and policy version. Home remains the plan authority; clients map resume positions as in item 12. If Home is unreachable, clients play the saved copy without skipping and report the connection state. Go uses its native Player surface; robot announces a skip in its existing playback voice/status. No client invents a plan.
+
+17. **Child behavior.** Children use the same resolved skipping policy, Undo, Hear it anyway, and Play original. They receive no confirm/reject, missing-break marking, correction, processing queue, or per-person time-saved controls. Household aggregates never name them. These restrictions apply on phone, desktop, Go, and robot.
+
+18. **Privacy disclosure.** Existing Podcasts privacy page row states that Stack fetches/analyzes episodes itself from the feed host and lists the host. Show the actual Home request `User-Agent` value and explain it identifies Home's fetcher. This row appears at phone and desktop widths. If a feed host is unknown, say it is unavailable; do not claim no request occurred after a fetch failure.
+
+19. **Admin Stack status.** Existing Stack status page adds the segments queue, learned bumper count per show, and “Clear learned bumpers” for a selected show. Clearing calls the Stack-owned operation and confirms completion or failure in a `Toast`; no new kit part. Phone stacks the status rows; desktop uses the existing status grid. Empty queue/count show zero; offline identifies Stack and offers retry; only admins see the action.
+
+20. **Failure honesty.** Every processing, playback, correction, save, queue, and offline state says what happened and what to do next. Reuse row text, `Badge`, `Toast`, and `Dialog`: for example “Analysis timed out. Play without skipping or retry.” Empty is distinct from failed, and stale plans are never labelled Ready. Phone and desktop use the same wording; child copy gives the safe next action without review controls.
+
+21. **Accessibility.** All controls work by keyboard and screen reader, have names and visible focus, and announce skips, for example “Skipped a 2 minute break.” Timeline ranges expose kind, start/end, and action without relying on colour. Phone and desktop use the same accessible names and action order. Empty and error messages are announced; child restrictions do not remove playback control labels.
+
+22. **First-run explainer.** The first time skipping is turned on, show one existing `Dialog` explaining skip ads, mark only, and off, plus what a bumper is and that it may skip beside an ad. Remember dismissal per person; it does not change policy beyond the selected choice. Phone uses a full-screen dialog; desktop uses the standard dialog. Reopen from Podcasts settings; if loading fails, defaults remain unchanged and the person can close or retry. Children do not get the setup dialog and inherit the resolved policy.
+
 ## Build boundary
 
 No frontend work is authorized by this first-slice brief. The backend slice is gated on the shared spec-first/architect review and should be started only after that contract exists; this note does not mark any item approved or complete.
