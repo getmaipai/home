@@ -4,7 +4,7 @@ import { i18n } from "@lingui/core";
 // is playing that same item. Audio gets a soft audio-reactive strip and a Now playing stage; video gets Picture in picture and Full screen.
 // The kit Player's `mini` layout is the bar itself, as shipped; this file only places it and adds the actions. The kit's docked bar sits
 // at z-30, so the art wash and the visualizer strip draw above it (z-40) and let clicks through.
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Player } from "@maipai/ui/src/primitives/Player";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -79,15 +79,22 @@ export function GlobalMiniPlayer() {
   // Hooks stay above the early return below so their order never changes between renders.
   const skip = useSkipPlan(held?.appId === "podcasts" ? held.id : null);
   const [skipped, setSkipped] = useState<SkipRange | null>(null);
+  const el = held?.el ?? null;
+  useEffect(() => {
+    if (!el || held?.appId !== "podcasts") return;
+    const announce = (event: Event) => { const detail = (event as CustomEvent<SkipRange & { savedSeconds?: number }>).detail; if (detail) setSkipped({ ...detail, endSec: detail.startSec + (detail.savedSeconds ?? detail.endSec - detail.startSec) }); };
+    el.addEventListener("podcast-skip-announced", announce);
+    return () => el.removeEventListener("podcast-skip-announced", announce);
+  }, [el, held?.appId]);
   if (!held || !held.started || onPlayPageOf(held, pathname, search, stateId)) return null;
 
   const PipIcon = getIcon("picture-in-picture"), FullIcon = getIcon("maximize");
-  const el = held.el;
+  const playerEl = held.el;
   const activeRange = held.appId === "podcasts" ? applySkip(skip.plan, position) : null;
   const skipRange = activeRange?.kind === "intro" || activeRange?.kind === "recap" || activeRange?.kind === "sponsor" ? activeRange : null;
-  const doSkip = (range: SkipRange | null) => { if (!range) return; setSkipped(range); el.currentTime = range.endSec; };
-  const undoSkip = () => { if (skipped) { el.currentTime = skipped.startSec; setSkipped(null); } };
-  const pictureInPicture = typeof document !== "undefined" && "pictureInPictureEnabled" in document && document.pictureInPictureEnabled && el instanceof HTMLVideoElement;
+  const doSkip = (range: SkipRange | null) => { if (!range) return; setSkipped(range); playerEl.currentTime = range.endSec; };
+  const undoSkip = () => { if (skipped) { playerEl.dispatchEvent(new Event("podcast-skip-undo")); setSkipped(null); } };
+  const pictureInPicture = typeof document !== "undefined" && "pictureInPictureEnabled" in document && document.pictureInPictureEnabled && playerEl instanceof HTMLVideoElement;
   // News Listen (NEWS-04) holds a story being read aloud: expanding opens the story, and its place is not a media position to save.
   const listenStory = storyIdOfListen(held.appId, held.id);
   const listening = listenStory !== null;
@@ -100,7 +107,7 @@ export function GlobalMiniPlayer() {
       <div className="pointer-events-auto surface-float relative overflow-hidden">
         <Player
           key={held.id}
-          media={el}
+          media={playerEl}
           src={held.src}
           kind={held.kind}
           layout="mini"
@@ -119,7 +126,7 @@ export function GlobalMiniPlayer() {
           }}
           actionsSlot={
             <>
-              {held.appId === "podcasts" ? <><SkippedPill range={skipped} onUndo={undoSkip} /><SkipButton range={skipRange} onSkip={() => doSkip(skipRange)} onHear={() => { if (skipRange) el.currentTime = skipRange.startSec; }} /></> : null}
+              {held.appId === "podcasts" ? <><SkippedPill range={skipped} onUndo={undoSkip} /><SkipButton range={skipRange} onSkip={() => doSkip(skipRange)} onHear={() => { if (skipRange) playerEl.currentTime = skipRange.startSec; }} /></> : null}
               {waiting.loading ? (
                 <span role="status" data-testid="mini-loading" className="flex items-center gap-2 pe-2 text-base text-muted-foreground">
                   <Spinner aria-hidden="true" role="presentation" />
@@ -135,7 +142,7 @@ export function GlobalMiniPlayer() {
                 <span className="flex items-center gap-2 pe-2 text-base tabular-nums text-muted-foreground" data-testid="mini-time">
                   <span>{clock(position)}</span>
                   <div className="w-28 lg:w-40">
-                    <Slider aria-label={i18n._({ id: "Seek", message: "Seek" })} min={0} max={duration} step={1} value={[Math.min(position, duration)]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") el.currentTime = next; }} />
+                    <Slider aria-label={i18n._({ id: "Seek", message: "Seek" })} min={0} max={duration} step={1} value={[Math.min(position, duration)]} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") playerEl.currentTime = next; }} />
                   </div>
                   <span>{clock(duration)}</span>
                 </span>
@@ -143,12 +150,12 @@ export function GlobalMiniPlayer() {
               {isAudio ? <VisualizerMenu /> : null}
               {isAudio ? <SleepMenu /> : null}
               {isAudio ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen visualizer", message: "Full screen visualizer" })} onClick={() => setStage(true)}><FullIcon aria-hidden="true" /></Button> : null}
-              {pictureInPicture ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Picture in picture", message: "Picture in picture" })} onClick={() => void withVideoShown(el, () => (el as HTMLVideoElement).requestPictureInPicture(), "leavepictureinpicture")}><PipIcon aria-hidden="true" /></Button> : null}
-              {held.kind === "video" ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen", message: "Full screen" })} onClick={() => void withVideoShown(el, () => el.requestFullscreen(), "fullscreenchange")}><FullIcon aria-hidden="true" /></Button> : null}
+              {pictureInPicture ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Picture in picture", message: "Picture in picture" })} onClick={() => void withVideoShown(playerEl, () => (playerEl as HTMLVideoElement).requestPictureInPicture(), "leavepictureinpicture")}><PipIcon aria-hidden="true" /></Button> : null}
+              {held.kind === "video" ? <Button variant="ghost" size="icon" aria-label={i18n._({ id: "Full screen", message: "Full screen" })} onClick={() => void withVideoShown(playerEl, () => playerEl.requestFullscreen(), "fullscreenchange")}><FullIcon aria-hidden="true" /></Button> : null}
             </>
           }
         />
-        {held.appId === "podcasts" ? <div className="absolute inset-x-2 bottom-1 pointer-events-auto"><SkipRanges plan={skip.plan} duration={duration} onSeek={(p) => { el.currentTime = p; }} /></div> : null}
+        {held.appId === "podcasts" ? <div className="absolute inset-x-2 bottom-1 pointer-events-auto"><SkipRanges plan={skip.plan} duration={duration} onSeek={(p) => { playerEl.currentTime = p; }} /></div> : null}
         {isAudio && vizOn ? <AudioVisualizer variant={variant} mode="strip" getAnalyser={getAnalyser} palette={palette} active={playing} opacity={0.4} fade className="pointer-events-none absolute inset-0 z-40 size-full grayscale" /> : null}
       </div>
       {stage ? <NowPlayingStage media={held} onClose={closeStage} /> : null}

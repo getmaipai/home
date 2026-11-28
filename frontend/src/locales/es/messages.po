@@ -2325,7 +2325,7 @@ msgid "Activity was not cleared"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Ad"
 msgstr ""
@@ -2341,7 +2341,7 @@ msgid "setting.podcasts.skip.ad.shows.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:45
+#: src/shell/pages/PodcastSegmentsPage.tsx:46
 msgid "Ad start marked. Listen to its end, then mark the end."
 msgstr ""
 
@@ -4085,7 +4085,7 @@ msgstr "Auto, por ejemplo Do mayor"
 #: src/apps/settings/CloseAppsSettings.tsx:97
 #: src/apps/setup/CloseAppsStep.tsx:74
 #: src/apps/setup/CloseAppsStep.tsx:74
-#: src/shell/pages/PodcastSegmentsPage.tsx:11
+#: src/shell/pages/PodcastSegmentsPage.tsx:12
 #, needs-review
 msgid "Automatic"
 msgstr "Automático"
@@ -4855,6 +4855,11 @@ msgid "setting.search.brave_api_key.label"
 msgstr "Clave de Brave Search (opcional)"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
+msgid "Break bumper"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:516
 #, needs-review
 msgid "setting.ease.motion.option.standard"
@@ -4910,7 +4915,7 @@ msgid "setting.companion.voice.buddy.label"
 msgstr "Voz de Buddy"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:126
+#: src/shell/GlobalMiniPlayer.tsx:133
 #, needs-review
 msgid "Buffering"
 msgstr "Cargando"
@@ -4929,7 +4934,6 @@ msgid "Built-in synth"
 msgstr "Synth integrado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Bumper"
 msgstr ""
@@ -5082,7 +5086,7 @@ msgstr ""
 #: src/shell/pages/CompanionAudienceDialog.tsx:64
 #: src/shell/pages/CompanionsPage.tsx:187
 #: src/shell/pages/FilesPage.tsx:436
-#: src/shell/pages/PodcastSegmentsPage.tsx:45
+#: src/shell/pages/PodcastSegmentsPage.tsx:46
 #: src/shell/pages/settings/SettingField.tsx:149
 #: src/shell/pages/settings/SettingField.tsx:268
 #: src/shell/pages/settings/SettingsRenderer.tsx:179
@@ -7232,7 +7236,7 @@ msgstr ""
 #: src/apps/code/SessionTabs.tsx:31
 #: src/apps/settings/TwoStepSignInSection.tsx:50
 #: src/shell/components/DataTableRowActions.tsx:57
-#: src/shell/pages/PodcastSegmentsPage.tsx:43
+#: src/shell/pages/PodcastSegmentsPage.tsx:44
 #: src/shell/pages/settings/HouseSettings.tsx:50
 #: src/shell/pages/settings/SettingsRenderer.tsx:189
 #: src/shell/pages/UpdatesPage.tsx:202
@@ -7258,7 +7262,7 @@ msgid "Confirm this change to make the automatically locked pictures visible aga
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:11
+#: src/shell/pages/PodcastSegmentsPage.tsx:12
 msgid "Confirmed"
 msgstr ""
 
@@ -7291,7 +7295,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:18
-#: src/shell/GlobalMiniPlayer.tsx:126
+#: src/shell/GlobalMiniPlayer.tsx:133
 #: src/shell/pages/StatusPage.tsx:26
 #, needs-review
 msgid "Connecting"
@@ -8153,7 +8157,7 @@ msgid "Could not load this article."
 msgstr "No se pudo cargar este artículo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:26
+#: src/shell/pages/PodcastSegmentsPage.tsx:27
 msgid "Could not load this episode’s segment details. Playback is still available; reload to try again."
 msgstr ""
 
@@ -9826,7 +9830,7 @@ msgid "Detect speakers"
 msgstr "Detectar oradores"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:38
+#: src/shell/pages/PodcastSegmentsPage.tsx:39
 msgid "Detected breaks"
 msgstr ""
 
@@ -10827,7 +10831,7 @@ msgid "Environment"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:37
+#: src/shell/pages/PodcastSegmentsPage.tsx:38
 msgid "Episode segments"
 msgstr ""
 
@@ -11434,7 +11438,7 @@ msgid "Fill in at least one thing to change."
 msgstr "Rellena al menos un cambio."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 msgid "Filler"
 msgstr ""
 
@@ -12165,14 +12169,14 @@ msgid "setting.robot.barge_in.open_mic.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:147
+#: src/shell/GlobalMiniPlayer.tsx:154
 #: src/shell/media/MusicVisualizerSection.tsx:74
 #, needs-review
 msgid "Full screen"
 msgstr "Pantalla completa"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:145
+#: src/shell/GlobalMiniPlayer.tsx:152
 #: src/shell/media/MusicVisualizerSection.tsx:74
 #, needs-review
 msgid "Full screen visualizer"
@@ -15194,7 +15198,7 @@ msgid "setting.status.internet_probe.tcp_port.label"
 msgstr "Puerto de comprobación de internet"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Intro"
 msgstr ""
@@ -17053,7 +17057,7 @@ msgid "Loading engines"
 msgstr "Cargando motores"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:25
+#: src/shell/pages/PodcastSegmentsPage.tsx:26
 msgid "Loading episode segments…"
 msgstr ""
 
@@ -18482,7 +18486,7 @@ msgid "Mark all-ages"
 msgstr "Marcar para todas las edades"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:33
+#: src/shell/pages/PodcastSegmentsPage.tsx:34
 msgid "Mark an end time after the start time, then send the range."
 msgstr ""
 
@@ -18498,7 +18502,7 @@ msgid "Mark ready"
 msgstr "Marcar como listo"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:45
+#: src/shell/pages/PodcastSegmentsPage.tsx:46
 msgid "Marked range cleared."
 msgstr ""
 
@@ -18965,12 +18969,12 @@ msgid "setting.host.guard.metal_minutes.label"
 msgstr "Minutos de fallo gráfico antes de un reinicio"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:22
+#: src/shell/pages/PodcastSegmentsPage.tsx:23
 msgid "Missed ad report sent to Stack."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:45
+#: src/shell/pages/PodcastSegmentsPage.tsx:46
 msgid "Missed an ad"
 msgstr ""
 
@@ -19637,7 +19641,7 @@ msgid "Needs restart"
 msgstr "Necesita reinicio"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:11
+#: src/shell/pages/PodcastSegmentsPage.tsx:12
 msgid "Needs review"
 msgstr ""
 
@@ -20144,7 +20148,7 @@ msgid "No book for children or teens is removed."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:44
+#: src/shell/pages/PodcastSegmentsPage.tsx:45
 msgid "No breaks were found in this episode."
 msgstr ""
 
@@ -22359,7 +22363,7 @@ msgid "Outbound connections"
 msgstr "Conexiones salientes"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Outro"
 msgstr ""
@@ -23209,7 +23213,7 @@ msgid "Picture"
 msgstr "Imagen"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:146
+#: src/shell/GlobalMiniPlayer.tsx:153
 #, needs-review
 msgid "Picture in picture"
 msgstr "Imagen en imagen"
@@ -23508,7 +23512,7 @@ msgid "setting.ui.enrollment_sounds.help"
 msgstr "Reproduce sonidos suaves durante el registro facial mientras la cámara encuentra tu cara, y luego un timbre cuando se toma una foto."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:43
+#: src/shell/pages/PodcastSegmentsPage.tsx:44
 msgid "Play this range"
 msgstr ""
 
@@ -23900,7 +23904,7 @@ msgid "setting.resources.quiet_timeout.option_label.proceed"
 msgstr "Continuar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:29
+#: src/shell/pages/PodcastSegmentsPage.tsx:30
 msgid "Processing. You can keep listening while Stack checks this saved copy."
 msgstr ""
 
@@ -24378,7 +24382,7 @@ msgid "setting.synths.real_people_allowed.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Recap"
 msgstr ""
@@ -24553,7 +24557,7 @@ msgid "Refresh Trash"
 msgstr "Actualizar la Papelera"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:11
+#: src/shell/pages/PodcastSegmentsPage.tsx:12
 msgid "Rejected"
 msgstr ""
 
@@ -25337,7 +25341,7 @@ msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así 
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:147
-#: src/shell/GlobalMiniPlayer.tsx:131
+#: src/shell/GlobalMiniPlayer.tsx:138
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:33
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:73
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -25348,7 +25352,7 @@ msgid "Retry"
 msgstr "Reintentar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:45
+#: src/shell/pages/PodcastSegmentsPage.tsx:46
 msgid "Retry missed-ad report"
 msgstr ""
 
@@ -26849,7 +26853,7 @@ msgid "Seed {seed}. Take {index} of {total}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:138
+#: src/shell/GlobalMiniPlayer.tsx:145
 #: src/shell/media/NowPlayingStage.tsx:179
 #: src/shell/music/MusicPlayerBar.tsx:151
 #, needs-review
@@ -26921,7 +26925,7 @@ msgid "setting.chat.model_id.label"
 msgstr "Modelo de chat seleccionado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Self-promotion"
 msgstr ""
@@ -26956,7 +26960,7 @@ msgid "api.error.file_edit_nothing"
 msgstr "Envía un nombre nuevo o una opción de conservación y guarda de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:45
+#: src/shell/pages/PodcastSegmentsPage.tsx:46
 msgid "Send marked range"
 msgstr ""
 
@@ -28290,6 +28294,7 @@ msgid "Skipped a {mins} minute break"
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/MediaPlayerRegistration.tsx:86
 #: src/shell/skip/SkipControls.tsx:22
 msgid "Skipped a break, {saved}"
 msgstr ""
@@ -28807,11 +28812,6 @@ msgid "Source"
 msgstr "Fuente"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:42
-msgid "Source: {source}; confidence {confidence}%"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:559
 #, needs-review
 msgid "setting.ease.spacing.label"
@@ -29024,7 +29024,7 @@ msgid "Spoken version, if different (optional)"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:10
+#: src/shell/pages/PodcastSegmentsPage.tsx:11
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Sponsor"
 msgstr ""
@@ -29074,17 +29074,17 @@ msgid "Stack contract:"
 msgstr "Contrato de Stack:"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:21
+#: src/shell/pages/PodcastSegmentsPage.tsx:22
 msgid "Stack could not save that correction. Check that it is online, then try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:22
+#: src/shell/pages/PodcastSegmentsPage.tsx:23
 msgid "Stack could not save that report. Retry to send the marked range."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:30
+#: src/shell/pages/PodcastSegmentsPage.tsx:31
 msgid "Stack is offline. Playback remains available; try again later."
 msgstr ""
 
@@ -32702,7 +32702,7 @@ msgid "This role requires a PIN or password. Enter one above, then try again."
 msgstr "Este rol requiere un PIN o contraseña. Ingresa uno arriba y luego inténtalo de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:28
+#: src/shell/pages/PodcastSegmentsPage.tsx:29
 msgid "This saved episode has not been analyzed yet. Save a copy to check for breaks."
 msgstr ""
 
@@ -32775,7 +32775,7 @@ msgid "This song's file is missing. Make it again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:131
+#: src/shell/GlobalMiniPlayer.tsx:138
 #, needs-review
 msgid "This station did not start. Check your connection, then press Retry."
 msgstr "La estación no empezó. Revisa tu conexión y luego pulsa Reintentar."
@@ -32809,7 +32809,7 @@ msgid "This voice engine has one built-in voice. To give this synth another, add
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:43
+#: src/shell/pages/PodcastSegmentsPage.tsx:44
 msgid "This was wrong"
 msgstr ""
 
@@ -33778,6 +33778,7 @@ msgstr "Entendió la solicitud"
 #: src/apps/code/sessionActions.ts:43
 #: src/apps/settings/AutoLocksSection.tsx:73
 #: src/shell/library/TranscriptPanel.tsx:428
+#: src/shell/MediaPlayerRegistration.tsx:86
 #: src/shell/pages/FilesPage.tsx:190
 #: src/shell/pages/MusicLibrary.tsx:169
 #: src/shell/pages/MusicStudioView.tsx:182
@@ -36662,7 +36663,7 @@ msgid "setting.content.own_ceiling.web.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSegmentsPage.tsx:21
+#: src/shell/pages/PodcastSegmentsPage.tsx:22
 msgid "Your correction was sent to Stack."
 msgstr ""
 

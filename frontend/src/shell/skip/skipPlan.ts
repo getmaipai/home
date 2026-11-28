@@ -2,6 +2,19 @@ export type SkipMode = "skip" | "mark" | "off";
 export type SkipRange = { startSec: number; endSec: number; kind: string; status?: string; id?: string; source?: string; confidence?: number; mode?: SkipMode; segmentIds?: string[] };
 export type SkipPlan = { state: string; reason?: string | null; ranges: SkipRange[]; modes?: Record<string, SkipMode>; recordId?: string; sourceHash?: string };
 
+export type SkipToastBatch = { startedAt: number; savedSeconds: number; undoRange: SkipRange; replayEnd: number };
+export function mergeSkipToast(batch: SkipToastBatch | null, range: SkipRange, now: number): SkipToastBatch {
+  if (!batch || now - batch.startedAt >= 3000) return { startedAt: now, savedSeconds: range.endSec - range.startSec, undoRange: range, replayEnd: range.endSec };
+  return { ...batch, savedSeconds: batch.savedSeconds + range.endSec - range.startSec, replayEnd: Math.max(batch.replayEnd, range.endSec) };
+}
+
+export type SkipSourceLabel = { id: "Found by the AI, {confidence}% sure"; values: { confidence: number } } | { id: "Found by you" } | { id: "Found by matching the same sound as other episodes" };
+export function skipSourceLabel(source: string, confidence: number): SkipSourceLabel {
+  if (source === "person") return { id: "Found by you" };
+  if (source === "fingerprint" || source === "alignment") return { id: "Found by matching the same sound as other episodes" };
+  return { id: "Found by the AI, {confidence}% sure", values: { confidence: Math.round(confidence * 100) } };
+}
+
 export function applySkip(plan: SkipPlan | null | undefined, positionSec: number, toleranceSec = 0.35): SkipRange | null {
   if (!plan || plan.state !== "ready") return null;
   return plan.ranges.find((range) => (range.status === undefined || range.status === "auto" || range.status === "confirmed") && (range.mode ?? plan.modes?.[range.kind] ?? "skip") === "skip" && positionSec >= range.startSec - toleranceSec && positionSec < range.endSec) ?? null;

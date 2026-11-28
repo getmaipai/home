@@ -2,13 +2,15 @@
 // across media and chat voice, the person's video speed applies, the sleep timer reaches it and the Media Session shows its title.
 // MEDIA-POLISH-01: the element is the media host's own (mediaHost.tsx), registered for as long as the host holds the item, on the
 // watch page, in the docked mini bar and while the person is in another app. It draws nothing.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAudioRegistration } from "@/shell/audioSessionContext";
 import type { AudioChapter, AudioItem, AudioKind } from "@/shell/audioSession";
 import { useSkipPlan } from "@/shell/skip/useSkipPlan";
-import { applySkip, type SkipRange } from "@/shell/skip/skipPlan";
+import { applySkip, formatTimeSaved, mergeSkipToast, type SkipRange, type SkipToastBatch } from "@/shell/skip/skipPlan";
+import { i18n } from "@lingui/core";
+import { useToast } from "@maipai/ui/src/primitives/Toast";
 
 interface PlayedItem {
   id: string;
@@ -47,14 +49,18 @@ interface RegistrationProps { appId: string; mediaId: string | null; element: HT
 
 function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<RegistrationProps, "adultOnly">) {
   const skip = useSkipPlan(appId === "podcasts" ? mediaId : null);
+  const refreshSkip = skip.refresh;
+  const { push } = useToast();
+  const pushRef = useRef(push); pushRef.current = push;
   const lastSkip = useRef<SkipRange | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [, setSkipNotice] = useState<SkipRange | null>(null);
+  const batch = useRef<SkipToastBatch | null>(null);
+  const replayEnd = useRef<number | null>(null);
+  const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undo = useCallback(() => {
-    if (!element || !lastSkip.current) return;
-    element.currentTime = lastSkip.current.startSec;
-    lastSkip.current = null;
-    setSkipNotice(null);
+    if (!element || !lastSkip.current || !batch.current) return;
+    element.currentTime = batch.current.undoRange.startSec;
+    replayEnd.current = batch.current.replayEnd;
+    lastSkip.current = null; batch.current = null;
     element.play().catch(() => {});
     element.dispatchEvent(new Event("podcast-skip-undone"));
   }, [element]);
@@ -67,23 +73,30 @@ function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<
   useEffect(() => {
     if (!element || appId !== "podcasts") return;
     const onTime = () => {
+      if (replayEnd.current !== null) {
+        if (element.currentTime >= replayEnd.current) replayEnd.current = null;
+        else return;
+      }
       const range = applySkip(skip.plan, element.currentTime);
       if (!range) return;
       lastSkip.current = range;
-      setSkipNotice(range);
+      batch.current = mergeSkipToast(batch.current, range, Date.now());
+      const currentBatch = batch.current;
+      element.dispatchEvent(new CustomEvent("podcast-skip-announced", { detail: { ...range, startSec: currentBatch.undoRange.startSec, endSec: currentBatch.replayEnd, savedSeconds: currentBatch.savedSeconds } }));
+      pushRef.current(i18n._({ id: "Skipped a break, {saved}", message: "Skipped a break, {saved}", values: { saved: formatTimeSaved(currentBatch.savedSeconds) } }), { kind: "recovery", action: { label: i18n._({ id: "Undo", message: "Undo" }), onSelect: () => element.dispatchEvent(new Event("podcast-skip-undo")) } });
+      if (batchTimer.current) clearTimeout(batchTimer.current);
+      batchTimer.current = setTimeout(() => { batch.current = null; lastSkip.current = null; }, 7000);
       element.currentTime = range.endSec;
-      if (undoTimer.current) clearTimeout(undoTimer.current);
-      undoTimer.current = setTimeout(() => { lastSkip.current = null; }, 7000);
     };
     element.addEventListener("timeupdate", onTime);
-    return () => { element.removeEventListener("timeupdate", onTime); if (undoTimer.current) clearTimeout(undoTimer.current); };
+    return () => { element.removeEventListener("timeupdate", onTime); if (batchTimer.current) clearTimeout(batchTimer.current); };
   }, [appId, element, skip.plan]);
   useEffect(() => {
     if (!element || appId !== "podcasts") return;
-    const onPlan = () => { void skip.refresh(); };
+    const onPlan = () => { void refreshSkip(); };
     element.addEventListener("podcast-skip-undo", onPlan as EventListener);
     return () => element.removeEventListener("podcast-skip-undo", onPlan as EventListener);
-  }, [appId, element, skip.refresh]);
+  }, [appId, element, refreshSkip]);
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {
