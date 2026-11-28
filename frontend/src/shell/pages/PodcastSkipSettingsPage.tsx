@@ -53,12 +53,12 @@ export function PodcastSkipSettingsPage({ person, showId }: { person: Roster; sh
   const options: Choice[] = ["skip", "mark", "off"];
   const Segmented = ({ label, value, onPick }: { label: string; value: Choice | undefined; onPick: (choice: Choice) => void }) => (
     <div role="group" aria-label={label} className="inline-flex rounded-full bg-muted p-1">
-      {options.map((choice) => <button key={choice} type="button" aria-pressed={value === choice} onClick={() => onPick(choice)} className={value === choice ? "rounded-full bg-background px-3 py-1 text-sm font-medium text-foreground shadow-sm" : "rounded-full px-3 py-1 text-sm text-muted-foreground hover:text-foreground"}>{choiceLabel(choice)}</button>)}
+      {options.map((choice) => <button key={choice} type="button" aria-pressed={value === choice} onClick={() => onPick(choice)} className={value === choice ? "rounded-full bg-background px-3 py-1 text-body font-medium text-foreground shadow-sm" : "rounded-full px-3 py-1 text-body text-muted-foreground hover:text-foreground"}>{choiceLabel(choice)}</button>)}
     </div>
   );
   const Switch = ({ label, hint, on, onToggle }: { label: string; hint: string; on: boolean; onToggle: () => void }) => (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
-      <div className="min-w-0"><p className="font-medium">{label}</p><p className="text-sm text-muted-foreground">{hint}</p></div>
+      <div className="min-w-0"><p className="font-medium">{label}</p><p className="text-body text-muted-foreground">{hint}</p></div>
       <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onToggle} className={on ? "relative h-6 w-11 shrink-0 rounded-full bg-primary" : "relative h-6 w-11 shrink-0 rounded-full bg-muted"}><span className={on ? "absolute left-6 top-1 h-4 w-4 rounded-full bg-background" : "absolute left-1 top-1 h-4 w-4 rounded-full bg-muted-foreground"} /></button>
     </div>
   );
@@ -66,14 +66,14 @@ export function PodcastSkipSettingsPage({ person, showId }: { person: Roster; sh
   return <section className="flex max-w-2xl flex-col gap-5" aria-label={title}>
     <div className="flex items-baseline justify-between gap-3">
       <h2 className="text-title font-semibold">{title}</h2>
-      <p role="status" className="text-sm text-muted-foreground">{saved ? i18n._({ id: "Saved", message: "Saved" }) : ""}</p>
+      <p role="status" className="text-body text-muted-foreground">{saved ? i18n._({ id: "Saved", message: "Saved" }) : ""}</p>
     </div>
-    {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+    {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
     <p className="text-body text-muted-foreground">{showId
       ? i18n._({ id: "Choose what happens to each kind of break in this show. Use default follows your own choice, then the household's.", message: "Choose what happens to each kind of break in this show. Use default follows your own choice, then the household's." })
       : i18n._({ id: "Skip jumps over the break. Mark shows it on the progress bar and lets you skip with one tap. Off leaves it alone.", message: "Skip jumps over the break. Mark shows it on the progress bar and lets you skip with one tap. Off leaves it alone." })}</p>
     {!showId && isAdmin ? <div role="group" aria-label={i18n._({ id: "Whose settings", message: "Whose settings" })} className="inline-flex self-start rounded-full bg-muted p-1">
-      {(["me", "household"] as const).map((v) => <button key={v} type="button" aria-pressed={viewScope === v} onClick={() => setViewScope(v)} className={viewScope === v ? "rounded-full bg-background px-4 py-1 text-sm font-medium shadow-sm" : "rounded-full px-4 py-1 text-sm text-muted-foreground"}>{v === "me" ? i18n._({ id: "For me", message: "For me" }) : i18n._({ id: "For the household", message: "For the household" })}</button>)}
+      {(["me", "household"] as const).map((v) => <button key={v} type="button" aria-pressed={viewScope === v} onClick={() => setViewScope(v)} className={viewScope === v ? "rounded-full bg-background px-4 py-1 text-body font-medium shadow-sm" : "rounded-full px-4 py-1 text-body text-muted-foreground"}>{v === "me" ? i18n._({ id: "For me", message: "For me" }) : i18n._({ id: "For the household", message: "For the household" })}</button>)}
     </div> : null}
     <div className="divide-y rounded-xl border">
       {rowKinds.map((kind) => {
@@ -87,7 +87,7 @@ export function PodcastSkipSettingsPage({ person, showId }: { person: Roster; sh
         const reset = () => showId ? (() => { const next = showOverrideMap(kind); delete next[showId]; void save("household", `${key}.shows`, JSON.stringify(next)); })() : editingHousehold ? void save("household", `${key}.default`, "inherit") : void save(scope, key, "inherit");
         return <div key={kind} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0"><p className="font-medium">{kindLabel(kind)}</p>
-            <p className="text-sm text-muted-foreground">{isDefault ? i18n._({ id: "Using default: {value}", message: "Using default: {value}", values: { value: choiceLabel(fallback) } }) : <button type="button" className="underline" onClick={reset}>{i18n._({ id: "Use default", message: "Use default" })}</button>}</p></div>
+            <p className="text-body text-muted-foreground">{isDefault ? i18n._({ id: "Using default: {value}", message: "Using default: {value}", values: { value: choiceLabel(fallback) } }) : <button type="button" className="underline" onClick={reset}>{i18n._({ id: "Use default", message: "Use default" })}</button>}</p></div>
           <Segmented label={kindLabel(kind)} value={isDefault ? undefined : current} onPick={pick} />
         </div>;
       })}
@@ -96,8 +96,8 @@ export function PodcastSkipSettingsPage({ person, showId }: { person: Roster; sh
     {!showId ? <div className="flex flex-col gap-2"><h3 className="text-title font-medium">{i18n._({ id: "Finding shows", message: "Finding shows" })}</h3>
       <div className="divide-y rounded-xl border">{isAdmin
         ? <Switch label={i18n._({ id: "Search the public podcast directory", message: "Search the public podcast directory" })} hint={i18n._({ id: "Lets adults find and follow shows. Only the words you type are sent.", message: "Lets adults find and follow shows. Only the words you type are sent." })} on={dirOn} onToggle={() => void save("household", "podcasts.directory.enabled", !dirOn)} />
-        : <p className="px-4 py-3 text-sm text-muted-foreground">{i18n._({ id: "Only an admin can change whether people can find shows in the directory.", message: "Only an admin can change whether people can find shows in the directory." })}</p>}</div></div> : null}
-    {showId ? <div className="rounded-xl border px-4 py-3"><p className="font-medium">{i18n._({ id: "This show", message: "This show" })}</p>{summary.isError ? <><p className="text-sm text-muted-foreground">{i18n._({ id: "Stack is offline. Retry to reload this show summary.", message: "Stack is offline. Retry to reload this show summary." })}</p><Button type="button" variant="outline" onClick={() => void summary.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : showStats ? <><p className="text-body">{i18n._({ id: "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}", message: "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}", values: { count: showStats.ads_skipped, saved: formatTimeSaved(showStats.seconds_saved) } })}</p>{lastProcessed ? <p className="text-sm text-muted-foreground">{i18n._({ id: "Last processed {when}", message: "Last processed {when}", values: { when: formatRelative(lastProcessed) } })}</p> : null}</> : <p className="text-sm text-muted-foreground">{i18n._({ id: "Nothing skipped yet.", message: "Nothing skipped yet." })}</p>}</div> : null}
+        : <p className="px-4 py-3 text-body text-muted-foreground">{i18n._({ id: "Only an admin can change whether people can find shows in the directory.", message: "Only an admin can change whether people can find shows in the directory." })}</p>}</div></div> : null}
+    {showId ? <div className="rounded-xl border px-4 py-3"><p className="font-medium">{i18n._({ id: "This show", message: "This show" })}</p>{summary.isError ? <><p className="text-body text-muted-foreground">{i18n._({ id: "Stack is offline. Retry to reload this show summary.", message: "Stack is offline. Retry to reload this show summary." })}</p><Button type="button" variant="outline" onClick={() => void summary.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : showStats ? <><p className="text-body">{i18n._({ id: "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}", message: "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}", values: { count: showStats.ads_skipped, saved: formatTimeSaved(showStats.seconds_saved) } })}</p>{lastProcessed ? <p className="text-body text-muted-foreground">{i18n._({ id: "Last processed {when}", message: "Last processed {when}", values: { when: formatRelative(lastProcessed) } })}</p> : null}</> : <p className="text-body text-muted-foreground">{i18n._({ id: "Nothing skipped yet.", message: "Nothing skipped yet." })}</p>}</div> : null}
   </section>;
 }
 
