@@ -148,3 +148,18 @@ Use shipped kit primitives only: `Player`, `Badge`, `Pill`, `Toast`, `Progress`,
 ## Build boundary
 
 No frontend work is authorized by this first-slice brief. Backend slices 01 and 02 proceed under the owner's ruling; this note does not mark any item approved or complete.
+
+## Visual references (owner mood board, 2026-11-27)
+
+Jesse shared six podcast app mock-ups as ideas. They are references only: the app keeps the shipped kit primitives and restyles by tokens, never copies a layout. What each one gives the skip feature:
+
+| Idea in the mock-ups | Use for skipping |
+|---|---|
+| Waveform scrubber with a bright played part (dark blue, yellow and orange mock-ups) | Draw ad, bumper, sponsor, intro and outro ranges as coloured stretches on the waveform; tap a range to preview or jump. |
+| Audio and Script tabs, and a live transcript panel with speaker names (dark blue and dark desktop mock-ups) | The Script view shows skipped lines greyed with a small kind tag (Ad, Sponsor, Bumper) and a Skipped chip; a person can tap a line to mark or correct a break. |
+| Episode rows with a Play pill, length and download state (white and yellow mock-up) | Add a quiet note on the row: skips 8 min, or Processing, or No ads found. |
+| Speed button and 15 and 30 second skip buttons (dark blue and neon mock-ups) | The Skip intro, Skip sponsor and Skipped pill sit beside these controls, not over the artwork. |
+| Big coloured show cards with a Now playing pill (first mock-up) | The show card shows a small Skipping on badge when the show has skipping enabled. |
+| Docked player bar with transcript and volume icons (first mock-up) | The docked mini player carries the Skipped pill and the Skip button, as the shared skip layer section says. |
+| An AI summary card under the player (neon mock-up) | Optional later feature: a summary made from the ad-free transcript by the chat role, never from the ads. |
+| Follow button on the player and show lists (several mock-ups) | Following a show is when its new episodes start processing, as the lifecycle section says. |
