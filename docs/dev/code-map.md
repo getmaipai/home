@@ -1322,7 +1322,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/storage.ts` | walkFiles, diskUsage, storageSummary, storageImpact, checkPersonQuota, levelOfDisk |
 | `backend/src/lib/storage/personFiles.ts` | personFilesFate, releaseFilesOfDeletedPerson, exportPersonFiles |
 | `backend/src/lib/storage/usage.ts` | kindForMediaType, personUsageBytes, householdUsageBytes, householdInheritedUsage, personUsageByKind, storageUsageOverview |
-| `backend/src/lib/store.ts` | fetchVerifiedIndex, install, rollback, uninstall, setChannel |
+| `backend/src/lib/store.ts` | installJournalRoot, recoverInterruptedPackageInstalls, fetchVerifiedIndex, install, rollback, uninstall |
 | `backend/src/lib/storeIndex.ts` | verifyEnvelopeSignature, fetchRawIndex, verifyIndex, verifyTargetHash |
 | `backend/src/lib/structuredPartIds.ts` | SPEC_SHEET_READY, SPEC_SHEET_BOUND |
 | `backend/src/lib/stt.ts` | transcribeUtterance, transcribeAudioClip |
