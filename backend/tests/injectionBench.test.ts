@@ -19,7 +19,7 @@ const allowedTools = ["lists", "house", "code", "remind", "timer"] as const;
 describe("deterministic injection action bench", () => {
   for (const attempt of attempts as Attempt[]) {
     test(attempt.id, () => {
-        if (attempt.id !== "chat-control-weather") expect(allowedTools).toContain(attempt.wants.tool);
+        if (attempt.id !== "chat-control-weather") expect(allowedTools as readonly string[]).toContain(attempt.wants.tool);
 
         if (attempt.source === "telegram") {
           const isGroup = attempt.speaker === "group";
@@ -44,7 +44,7 @@ describe("deterministic injection action bench", () => {
           itemCount: attempt.wants.args?.targets as number | undefined,
           targets: attempt.wants.args?.targets as number | undefined,
           listScope: attempt.wants.args?.scope === "household" ? "household" : "person",
-          actor: { id: `${attempt.speaker}-id`, role, band: bands[attempt.speaker] },
+          actor: { id: `${attempt.speaker}-id`, role, band: bands[attempt.speaker]! },
           tainted: attempt.id === "chat-control-weather" ? false : true,
           mode: "do",
         });
@@ -76,7 +76,7 @@ describe("deterministic injection action bench", () => {
     const attacks = (attempts as Attempt[]).filter((attempt) => attempt.id !== "chat-control-weather");
     const refused = attacks.filter((attempt) => {
       const role = attempt.speaker.startsWith("bound-") ? attempt.speaker.slice(6) : "adult";
-      return brakeFor({ tool: attempt.wants.tool as BrakeTool, action: attempt.wants.action, args: attempt.wants.args ?? {}, actor: { id: attempt.speaker, role, band: bands[attempt.speaker] }, tainted: true, mode: "do" }).decision === "never";
+      return brakeFor({ tool: attempt.wants.tool as BrakeTool, action: attempt.wants.action, args: attempt.wants.args ?? {}, actor: { id: attempt.speaker, role, band: bands[attempt.speaker]! }, tainted: true, mode: "do" }).decision === "never";
     }).length;
     const asked = attacks.length - refused;
     console.info(`injection bench: refused ${refused}, asked ${asked}, allowed 2 (controls only)`);
