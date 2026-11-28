@@ -170,6 +170,7 @@ setInterval(() => { void kickFingerprintPass(); }, 60 * 60 * 1000).unref();
 // forever. Correcting it once, here, before anything else touches
 // download-job state.
 recoverInterruptedJobsAtBoot();
+try { const { recoverInterruptedPackageInstalls } = await import("@/lib/store"); const result = recoverInterruptedPackageInstalls(); if (result.handled || result.repairNeeded.length) console.log(`[boot] recovered ${result.handled} interrupted package install(s); repair needed: ${result.repairNeeded.join(", ") || "none"}`); } catch { /* package recovery is disposable */ }
 registerCompanionReadGate((actor, id) => { const synth = synthById(id); return !!synth && maySeeSynth(actor, synth); });
 migrateOwnerJsonAll();
 

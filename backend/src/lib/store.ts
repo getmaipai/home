@@ -23,6 +23,7 @@ import { appPackageProblems } from "@/lib/apps";
 import { killLiveProcessForInstallChange } from "@/lib/denoHost";
 import { invalidateManifestStats } from "@/lib/manifestStat";
 import type { Result } from "@/lib/result";
+import { beginInstall, finishInstall, markInstallStep, recoverInterruptedInstalls } from "@/lib/installJournal";
 import {
   fetchRawIndex,
   verifyIndex,
@@ -41,6 +42,26 @@ import {
 // for "no such issue") or a real request problem (400). The function
 // that actually knows which case it hit is the one that should say so.
 export type StoreResult<T> = Result<T, 400 | 404>;
+
+export function installJournalRoot(): string {
+  const root = join(dataDir, "install-journal");
+  mkdirSync(root, { recursive: true });
+  return root;
+}
+
+export function recoverInterruptedPackageInstalls(): { handled: number; repairNeeded: string[] } {
+  try {
+    const result = recoverInterruptedInstalls(join(dataDir, "install-journal"), {
+      activeVersionOf: (id) => getActiveInstall(id)?.version ?? null,
+      dirHasManifest: (dir) => existsSync(join(dir, "manifest.json")),
+      exists: existsSync,
+      remove: (path) => rmSync(path, { recursive: true, force: true }),
+    });
+    return { handled: result.handled.length, repairNeeded: result.repairNeeded };
+  } catch {
+    return { handled: 0, repairNeeded: [] };
+  }
+}
 
 // Serializes every install()/rollback()/uninstall() call for the SAME
 // package id - a real gap found by code review: two concurrent installs
@@ -278,9 +299,19 @@ async function installLocked(opts: InstallOptions): Promise<InstallResult> {
   }
 
   const versionDir = installedPackageVersionDir(opts.id, manifest.version);
+  const journalRoot = installJournalRoot();
+  beginInstall(journalRoot, {
+    packageId: opts.id,
+    version: manifest.version,
+    previousVersion: previous?.version ?? null,
+    stagingDir: staging,
+    versionDir,
+  });
+  markInstallStep(journalRoot, opts.id, "staged");
   rmSync(versionDir, { recursive: true, force: true });
   mkdirSync(resolve(versionDir, ".."), { recursive: true });
   renameSync(staging, versionDir);
+  markInstallStep(journalRoot, opts.id, "swapped");
 
   // A reinstall of the SAME version (a retry, an admin "repair install")
   // must never overwrite a real previousVersion with itself - a third
@@ -314,6 +345,8 @@ async function installLocked(opts: InstallOptions): Promise<InstallResult> {
       },
     })
     .run();
+  markInstallStep(journalRoot, opts.id, "committed");
+  finishInstall(journalRoot, opts.id);
 
   // A live sandbox process for the OLD version must not keep running
   // against files this call just replaced - see
