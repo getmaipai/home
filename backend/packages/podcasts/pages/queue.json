@@ -12,7 +12,7 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
+      "item_subtitle_field": "{channel} · {summary}",
       "item_media_field": "thumbnail",
       "item_progress_field": "progress",
       "item_badge_field": "copy_label",
@@ -20,7 +20,7 @@
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",
-      "density": "compact",
+      "density": "default",
       "on_select": {
         "play": {
           "media_id": "{id}"

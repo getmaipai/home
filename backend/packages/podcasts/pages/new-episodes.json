@@ -9,13 +9,14 @@
       "bind": { "source": "package", "path": "latest" },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
+      "item_subtitle_field": "{date} · {channel} · {summary}",
+      "item_meta_field": "duration_s",
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
       "layout": "grid",
       "orientation": "vertical",
-      "density": "compact",
+      "density": "default",
       "on_select": { "navigate": { "to": "/apps/podcasts/episode", "state": { "id": "{id}" } } },
       "empty_state": { "type": "empty_state", "icon": "sparkles", "text": "No new episodes yet. Follow a show to see them here.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Find shows" }
     }

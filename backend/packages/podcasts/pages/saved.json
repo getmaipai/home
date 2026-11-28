@@ -62,8 +62,8 @@
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
-      "layout": "grid",
       "orientation": "vertical",
+      "density": "default",
       "on_select": {
         "play": {
           "media_id": "{id}"
@@ -97,8 +97,8 @@
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
-      "layout": "grid",
       "orientation": "vertical",
+      "density": "default",
       "hide_when_empty": true,
       "on_select": {
         "play": {

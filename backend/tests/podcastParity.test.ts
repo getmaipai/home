@@ -177,6 +177,7 @@ describe("the pages", () => {
     expect(boards.map((node) => node.primary.label)).toEqual(["Follow", "Following"]);
     expect(boards[1]!.primary.action.confirm.on_confirm.call.target).toBe("/api/plugins/podcasts/directory/remove");
     expect(boards.every((node) => node.hide_when_empty === true)).toBe(true);
+    expect(boards.map((node) => node.secondary[0])).toEqual(boards.map(() => expect.objectContaining({ label: "Skip settings", action: { navigate: { to: "/apps/podcasts/skip" } } })));
   });
 
   test("Library filters the shows, and Listen Now's Latest episodes are rows with three actions at most", () => {
@@ -189,14 +190,23 @@ describe("the pages", () => {
     expect(read("play").body.map((node: { type: string }) => node.type)).toEqual(["player", "media_shelf"]);
     expect(read("play").body[1]).toMatchObject({ heading: "Up next", orientation: "horizontal", layout: "rail" });
     expect(read("shows").body[1]).toMatchObject({ type: "media_shelf", layout: "grid" });
-    for (const file of ["episodes", "saved", "queue", "show"]) {
+    for (const file of ["episodes", "saved", "queue", "show", "new-episodes", "downloads", "history"]) {
       const visit = (node: any): void => {
         if (Array.isArray(node)) return node.forEach(visit);
         if (!node || typeof node !== "object") return;
-        if (node.type === "media_shelf" && node.heading === "Episodes") expect(node.density).toBe("compact");
+        if (node.type === "media_shelf" && node.heading === "Episodes") expect(node).toMatchObject({ orientation: "vertical", density: "default", on_select: { navigate: { to: "/apps/podcasts/episode" } } });
         Object.values(node).forEach(visit);
       };
       visit(read(file));
+    }
+    for (const file of ["episodes", "saved", "queue", "show", "new-episodes", "downloads", "history"]) {
+      const walk = (node: any): void => {
+        if (Array.isArray(node)) return node.forEach(walk);
+        if (!node || typeof node !== "object") return;
+        if (node.type === "media_shelf" && node.heading !== "Snips" && node.heading !== "Bookmarks") expect(node.orientation).toBe("vertical");
+        Object.values(node).forEach(walk);
+      };
+      walk(read(file));
     }
   });
 

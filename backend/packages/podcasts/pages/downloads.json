@@ -6,18 +6,35 @@
     {
       "type": "media_shelf",
       "heading": "Downloaded episodes",
-      "bind": { "source": "package", "path": "saved", "params": { "scope": "downloads" } },
+      "bind": {
+        "source": "package",
+        "path": "saved",
+        "params": {
+          "scope": "downloads"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
+      "item_meta_field": "duration_s",
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
-      "layout": "grid",
       "orientation": "vertical",
-      "density": "compact",
-      "on_select": { "navigate": { "to": "/apps/podcasts/episode", "state": { "id": "{id}" } } },
-      "empty_state": { "type": "empty_state", "icon": "download", "text": "No episodes are downloaded on this hub yet." }
+      "density": "default",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/podcasts/episode",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "download",
+        "text": "No episodes are downloaded on this hub yet."
+      }
     }
   ]
 }

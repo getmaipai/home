@@ -28,12 +28,13 @@
         "source": "package",
         "path": "episodes",
         "params": {
-          "channel": "$state.show"
+          "channel": "$state.show",
+          "scope": "all"
         }
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{channel} · {unplayed} · {skip_help}",
+      "item_subtitle_field": "{date} · {channel} · {summary}",
       "item_media_field": "thumbnail",
       "item_progress_field": "progress",
       "item_badge_field": "unplayed",
@@ -41,7 +42,7 @@
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",
-      "density": "compact",
+      "density": "default",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/episode",

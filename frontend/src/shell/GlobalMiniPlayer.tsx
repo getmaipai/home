@@ -103,7 +103,7 @@ export function GlobalMiniPlayer() {
   const openPlayPage = () => navigate(listening ? `/apps/news/story?id=${encodeURIComponent(listenStory!)}` : `/apps/${held.appId}/${live ? "station" : playPageOf(held.appId)}?id=${encodeURIComponent(held.id)}`, listening ? undefined : { state: { pageState: { id: held.id } } });
 
   return (
-    <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:start-14 md:ps-4 md:pe-4 md:pb-4 print:hidden">
+    <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-2 pb-2 md:inset-x-auto md:start-1/2 md:w-[min(690px,calc(100vw-7rem))] md:-translate-x-1/2 md:pb-[10px] print:hidden">
       <div className="pointer-events-auto surface-float relative overflow-hidden">
         <Player
           key={held.id}

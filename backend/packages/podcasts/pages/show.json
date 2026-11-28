@@ -59,7 +59,13 @@
         }
       },
       "hide_when_empty": true,
-      "secondary": [],
+      "secondary": [
+        {
+          "label": "Skip settings",
+          "icon": "skip-forward",
+          "action": { "navigate": { "to": "/apps/podcasts/skip" } }
+        }
+      ],
       "empty_state": { "type": "empty_state", "icon": "mic", "text": "This show is no longer available. Search for it again or choose another show.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Search podcasts" }
     },
     {
@@ -98,7 +104,13 @@
         }
       },
       "hide_when_empty": true,
-      "secondary": []
+      "secondary": [
+        {
+          "label": "Skip settings",
+          "icon": "skip-forward",
+          "action": { "navigate": { "to": "/apps/podcasts/skip" } }
+        }
+      ]
     },
     {
       "type": "media_shelf",
@@ -245,14 +257,14 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{date} · {description} · {skip_help}",
+      "item_subtitle_field": "{date} · {description}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
       "item_badge_field": "unplayed",
       "aspect": "wide",
       "variant": "plain",
       "orientation": "vertical",
-      "density": "compact",
+      "density": "default",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/episode",
