@@ -27,6 +27,7 @@
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
 import { markVoiceInterrupted } from "@/apps/chat/voiceInterrupted";
+import { decideVoiceEarlyStart } from "@/apps/chat/voiceEarlyStart";
 import { msSinceWakeCue, playWakeCue } from "@/lib/voice/wakeCue";
 import { playCallSound } from "@/lib/voice/callSounds";
 import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
@@ -553,10 +554,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               const edgeText = message.v.trim();
               if (isOwnVoice(edgeText)) { trace("echo_partial", { words: edgeText.split(/\s+/).length, edge: true }); if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = "echo"; }
               else if (isReaction(normalizedTranscript(edgeText), edgeText)) { /* reactions resume the reply; they do not start a held answer */ }
-              else if (!mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && !overlapPaused()) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, false);
-              // The session would not start early: the label names the real blocker (the mode value, a paused overlap, or the reply audio flag still set
-              // while the mode reads listening), never a catch-all, so a live record says why.
-              else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = mutedRef.current ? "muted" : overlapPaused() ? "refused_overlap_paused" : modeRef.current === "speaking" ? "refused_mode_speaking" : modeRef.current === "thinking" ? "refused_mode_thinking" : modeRef.current === "connecting" ? "refused_mode_connecting" : "refused_reply_speaking";
+              else {
+                const decision = decideVoiceEarlyStart({ mode: modeRef.current, muted: mutedRef.current, overlapPaused: overlapPaused(), replySpeaking: isReplySpeaking() });
+                if (decision.allow) startSpeculation(edgeText, "end" in message && message.end?.unfinished === true, false);
+                else if (speculativeOutcomeRef.current === "armed") speculativeOutcomeRef.current = decision.blocker;
+              }
             }
             edgePartialPendingRef.current = false;
             activeSpeechRef.current = true;
