@@ -28,7 +28,7 @@ import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { setShowAutoSave, setShowPlayed, showSaveRows, episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
-import { skipPlanFor, correctPodcastSegment, pollPodcastSegments, queuePodcastRows, cancelPodcastProcessing, backfillPodcastShow } from "@/lib/media/podcastSegments";
+import { skipPlanFor, correctPodcastSegment, podcastSkipAction, pollPodcastSegments, queuePodcastRows, cancelPodcastProcessing, backfillPodcastShow } from "@/lib/media/podcastSegments";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -169,6 +169,16 @@ export function podcastRoutes() {
     if (typeof body.record_id !== "string" || typeof body.segment_id !== "string" || body.rejected !== true) return c.json({ error: "Choose a detected segment to report as wrong." }, 400);
     try { await correctPodcastSegment(item.id, body.record_id, body.segment_id, true); return c.json({ ok: true }, 200); }
     catch { return c.json({ error: "The Stack could not save this correction. Check that it is online, then try again." }, 503); }
+  });
+  routes.post("/skip-action", requireAuth, async (c) => {
+    const person = c.get("person"), body = await jsonBody(c);
+    const mediaId = typeof body.media_id === "string" ? body.media_id : typeof body.id === "string" ? body.id : "";
+    const item = mediaId ? readableIn(person, "podcasts", mediaId) : null;
+    if (!item) return c.json({ error: "That episode is not in your Podcasts list." }, 404);
+    try {
+      const result = await podcastSkipAction(person, { mediaId, actionId: String(body.action_id ?? ""), id: typeof body.id === "string" ? body.id : undefined, startSec: typeof body.start_sec === "number" ? body.start_sec : undefined, endSec: typeof body.end_sec === "number" ? body.end_sec : undefined });
+      return c.json(result, 200);
+    } catch (error) { return c.json({ error: error instanceof Error ? error.message : "Could not apply this skip action." }, 400); }
   });
 
   // TALENT-04: the package's own doors to the show maker (a package page may only call routes under /api/plugins/podcasts/).

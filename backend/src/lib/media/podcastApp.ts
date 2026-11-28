@@ -17,6 +17,7 @@ import { isFollowed, showFilterOf, showMatches, withEpisodeFields, type ShowFilt
 import { podcastSummaryFor, searchPodcastTranscripts } from "./podcasts";
 import { podcastDirectoryRows } from "@/routes/podcastApp";
 import { loadFormats } from "@/lib/talent/formats";
+import { podcastPlayerSkipBindings, skipPlanFor } from "./podcastSegments";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -121,6 +122,7 @@ const clock = (seconds: number): string => {
 registerMediaAppData(APP, (person, dataId, params) => {
   const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
   switch (dataId) {
+    case "skip-plan": return params.id ? skipPlanFor(params.id, person) : { state: "not_processed", ranges: [] };
     case "shows": return params.scope === "new" ? [{ id: "new-show", title: "New show" }] : showRows(person, showFilterOf(params.scope));
     // PODCAST-PARITY-01: Listen Now's Latest episodes, newest first, not yet played; each row carries the date, queue and played fields its actions read.
     case "latest": {
@@ -156,12 +158,13 @@ registerItemView(APP, (person, item, view) => {
   const source = liveSourceById(item.source_id);
   const saved = !(item.location as { url?: string }).url;
   const out = { ...view, saved, queued: collectionIds(person, "queue").includes(item.id), copy_label: copyLabelOf(item) };
+  const skipBindings = item.kind === "podcast_episode" ? podcastPlayerSkipBindings(skipPlanFor(item.id, person)) : null;
   let summaryFacts: string | undefined;
   if (item.kind === "podcast_episode") {
     const generated = podcastSummaryFor(person, item.id);
     if (generated) summaryFacts = `Summary\n${generated.summary}\n\nTakeaways\n${generated.takeaways.map((line, index) => `${index + 1}. ${line}`).join("\n")}`;
   }
-  if (!source) return { ...out, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
+  if (!source) return { ...out, ...(skipBindings ? { skip_ranges: skipBindings.ranges, skip_bar: skipBindings.bar } : {}), ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
   // The show's "skip the first N seconds": a first listen starts there. (A resume keeps the person's own place.)
   const progress = getProgress(person.id, item.id);
   if (out.position_s === undefined && !progress && source.skip_intro_s > 0) out.position_s = source.skip_intro_s;
@@ -169,5 +172,5 @@ registerItemView(APP, (person, item, view) => {
   // The Podcast speed setting is the start for a show with neither (the player no longer writes the setting: each show keeps its own).
   const kindSpeed = getPersonSettingValue(person, "audio.speed.podcast");
   const rate = showRateOf(person, source.id) ?? (source.speed || null) ?? (typeof kindSpeed === "number" && kindSpeed > 0 && kindSpeed !== 1 ? kindSpeed : null);
-  return { ...out, show_id: source.id, ...(rate ? { show_rate: rate } : {}), ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
+  return { ...out, ...(skipBindings ? { skip_ranges: skipBindings.ranges, skip_bar: skipBindings.bar } : {}), show_id: source.id, ...(rate ? { show_rate: rate } : {}), ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
 });

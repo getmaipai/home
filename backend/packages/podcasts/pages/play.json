@@ -146,6 +146,24 @@
             }
           },
           "sleep_timer": true,
+          "skip_ranges": {
+            "source": "package",
+            "path": "item",
+            "params": { "id": "$state.id" }
+          },
+          "skip_bar": {
+            "source": "package",
+            "path": "item",
+            "params": { "id": "$state.id" }
+          },
+          "skip_actions": {
+            "range_select": { "call": { "target": "/api/plugins/podcasts/skip-action", "args": { "action_id": "{action_id}", "id": "{id}", "media_id": "{media_id}" } } },
+            "undo": { "call": { "target": "/api/plugins/podcasts/skip-action", "args": { "action_id": "{action_id}", "id": "{id}", "media_id": "{media_id}" } } },
+            "skip_button": { "call": { "target": "/api/plugins/podcasts/skip-action", "args": { "action_id": "{action_id}", "id": "{id}", "media_id": "{media_id}" } } },
+            "hear_anyway": { "call": { "target": "/api/plugins/podcasts/skip-action", "args": { "action_id": "{action_id}", "id": "{id}", "media_id": "{media_id}" } } },
+            "wrong": { "call": { "target": "/api/plugins/podcasts/skip-action", "args": { "action_id": "{action_id}", "id": "{id}", "media_id": "{media_id}" } } },
+            "missed": { "call": { "target": "/api/plugins/podcasts/skip-action", "args": { "action_id": "{action_id}", "id": "{id}", "media_id": "{media_id}" } } }
+          },
           "skip": {
             "back": 15,
             "forward": 30

@@ -6,7 +6,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { resetDb } from "../../../tests/reset-db";
 import { newMediaItemId } from "@/lib/id";
 import { BUILTIN_SEGMENT_POLICY, PODCAST_SEGMENT_KINDS, resolveSegmentPolicy } from "./podcastSegmentPolicy";
-import { acceptPodcastSegments, correctPodcastSegment, pollPodcastSegments, processPodcastCopy, skipPlanFor } from "./podcastSegments";
+import { acceptPodcastSegments, correctPodcastSegment, podcastPlayerSkipBindings, pollPodcastSegments, processPodcastCopy, skipPlanFor } from "./podcastSegments";
 import type { PersonRow } from "@/types";
 import type { MediaSegmentsRecord } from "@maipai/spec/media/ts/segments.js";
 
@@ -61,6 +61,17 @@ beforeEach(async () => {
 const correctionCalls: Array<[string, string]> = [];
 
 describe("saved podcast segment lifecycle", () => {
+  test("player bindings show marked ranges but expose only skip-mode time as saved", () => {
+    const bindings = podcastPlayerSkipBindings({ state: "ready", ranges: [
+      { id: "ad1", kind: "ad", startSec: 10, endSec: 70, status: "auto", mode: "skip" },
+      { id: "sponsor1", kind: "sponsor", startSec: 100, endSec: 150, status: "auto", mode: "skip" },
+      { id: "bumper1", kind: "bumper", startSec: 200, endSec: 230, status: "confirmed", mode: "skip" },
+      { id: "intro1", kind: "intro", startSec: 0, endSec: 45, status: "auto", mode: "mark" },
+    ] } as ReturnType<typeof skipPlanFor>);
+    expect(bindings.ranges).toHaveLength(4);
+    expect(bindings.ranges[3]).toMatchObject({ id: "intro1", start_sec: 0, end_sec: 45, status: "auto" });
+    expect(bindings.bar.saved_label).toBe("2 minutes saved");
+  });
   test("submits once per file SHA and pipeline version, polls and stores the result on the media item link", async () => {
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued", jobId: "segments-1" });
     expect(lastRequest).toMatchObject({ kind: "media.segments", input: { path: "podcast/file", kinds: PODCAST_SEGMENT_KINDS } });
@@ -90,7 +101,7 @@ describe("saved podcast segment lifecycle", () => {
     expect(accepted.ok).toBe(true);
     const child = db.select().from(people).where(eq(people.id, "person-podseg-child")).get()! as PersonRow;
     const childPlan = skipPlanFor(itemId, child) as Record<string, unknown>;
-    expect(childPlan.ranges).toEqual([{ startSec: 10, endSec: 20 }]);
+    expect(childPlan.ranges).toEqual([{ id: "seg-1", kind: "ad", startSec: 10, endSec: 20, status: "auto", source: "llm", confidence: 0.95, mode: "skip" }]);
     expect(childPlan).not.toHaveProperty("record");
     correctionCalls.length = 0;
     await correctPodcastSegment(itemId, "record-1", "seg-1", true);

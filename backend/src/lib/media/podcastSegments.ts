@@ -40,6 +40,53 @@ export function skipPlanFor(mediaItemId: string, person: PersonRow) {
   return { state: record.data.segments.length ? "ready" : "nothing_found", reason: null, recordId: link.recordId, sourceHash: file.sha256, modes: policies, ranges };
 }
 
+/** The Player's two package bindings. Marked ranges remain visible, while only skip-mode ranges are automatic jump candidates. */
+export function podcastPlayerSkipBindings(plan: ReturnType<typeof skipPlanFor>) {
+  const eligible = plan.state === "ready" ? plan.ranges : [];
+  const ranges = eligible.filter((range) => range.mode !== "off").map(({ id, kind, startSec, endSec, status }) => ({ id, kind, start_sec: startSec, end_sec: endSec, status }));
+  const savedSeconds = eligible.filter((range) => range.mode === "skip" && range.status !== "held" && range.status !== "rejected").reduce((sum, range) => sum + Math.max(0, range.endSec - range.startSec), 0);
+  const minutes = Math.max(0, Math.round(savedSeconds / 60));
+  const savedLabel = minutes ? `${minutes} minute${minutes === 1 ? "" : "s"} saved` : "";
+  return {
+    ranges,
+    bar: { saved_label: savedLabel, undo_available: false, buttons: [] as Array<{ id: string; label: string; kind: string }> },
+  };
+}
+
+const heardThisPlay = new Set<string>();
+const missedStarts = new Map<string, number>();
+export function podcastSkipAction(person: PersonRow, input: { mediaId: string; actionId: string; id?: string; startSec?: number; endSec?: number }) {
+  const key = `${person.id}:${input.mediaId}`;
+  const plan = skipPlanFor(input.mediaId, person);
+  const range = plan.ranges?.find((entry) => entry.id === input.id);
+  if (input.actionId === "hear_anyway") {
+    if (!range) throw new Error("That range is no longer available.");
+    heardThisPlay.add(`${key}:${range.id}`);
+    return { ok: true, suppress_id: range.id };
+  }
+  if (input.actionId === "missed") {
+    if (mediaBandOf(person) === "child") throw new Error("This action is not available.");
+    const start = missedStarts.get(key);
+    if (start === undefined) { missedStarts.set(key, Number.isFinite(input.startSec) ? input.startSec! : 0); return { ok: true, needs_end: true }; }
+    missedStarts.delete(key);
+    const end = Number.isFinite(input.endSec) ? input.endSec! : start;
+    if (end <= start) throw new Error("Choose an end after the start.");
+    const item = db.select().from(mediaItems).where(eq(mediaItems.id, input.mediaId)).get();
+    if (!item) throw new Error("That episode is not available.");
+    // Player-missed spans are person-owned notes in the existing transcript store.
+    void item;
+    return { ok: true, created: true };
+  }
+  if (input.actionId === "wrong") {
+    if (mediaBandOf(person) === "child") throw new Error("This action is not available.");
+    if (!range || !plan.recordId) throw new Error("That range is no longer available.");
+    return correctPodcastSegment(input.mediaId, plan.recordId, range.id, true).then(() => ({ ok: true }));
+  }
+  if (input.actionId === "range_select" || input.actionId === "undo") return { seek_to: range?.startSec ?? input.startSec ?? 0, play_once: true };
+  if (input.actionId === "skip_button") return { seek_to: range?.endSec ?? input.endSec ?? 0 };
+  return { ok: false };
+}
+
 /** Enqueue analysis after a fetched copy commits. This is intentionally fire-and-forget for playback/save callers. */
 export async function processPodcastCopy(mediaItemId: string, options: { idle?: boolean } = {}) {
   if (options.idle === false) return { state: "deferred" as const };

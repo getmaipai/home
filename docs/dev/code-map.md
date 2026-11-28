@@ -890,7 +890,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastParity.ts` | episodeSortOf, seasonsOf, orderEpisodes, followPodcast, unfollowPodcast, isFollowed |
 | `backend/src/lib/media/podcastRates.ts` | RATE_MIN, RATE_MAX, RATE_LINE, showRateOf, setShowRate |
 | `backend/src/lib/media/podcastSegmentPolicy.ts` | PODCAST_SEGMENT_KINDS, PODCAST_SEGMENT_PIPELINE_VERSION, BUILTIN_SEGMENT_POLICY, resolveSegmentPolicy |
-| `backend/src/lib/media/podcastSegments.ts` | resolvedPodcastPolicies, skipPlanFor, processPodcastCopy, queuePodcastRows, cancelPodcastProcessing, backfillPodcastShow |
+| `backend/src/lib/media/podcastSegments.ts` | resolvedPodcastPolicies, skipPlanFor, podcastPlayerSkipBindings, podcastSkipAction, processPodcastCopy, queuePodcastRows |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
 | `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, plainNotes |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
