@@ -777,6 +777,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/inbound/pairing.ts` | createInboundPairing, redeemInboundPairing, __pairingStoreKeysForTests, __resetInboundPairingForTests |
 | `backend/src/lib/inbound/telegramReceiver.ts` | pollOnce, defaultTelegramReceiverSend |
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, withoutUnfitJobs |
+| `backend/src/lib/installJournal.ts` | journalPath, beginInstall, markInstallStep, finishInstall, readOpenJournals, decideRecovery |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight |
 | `backend/src/lib/installStatus.ts` | setRobotReleaseInstall, EMPTY_INSTALL, summarizeBackground, summarizeInstall, cachedInstallStatus, __setInstallStatusForTests |
