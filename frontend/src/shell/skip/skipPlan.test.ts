@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { applySkip, mapTime, mergeSkipToast, screenReaderSkipLine, skipSourceLabel, type SkipPlan } from "./skipPlan";
+import { i18n } from "@lingui/core";
+import { applySkip, formatTimeSaved, mapTime, mergeSkipToast, screenReaderSkipLine, skipSourceLabel, type SkipPlan } from "./skipPlan";
 
 describe("shared skip plan", () => {
   const plan: SkipPlan = { state: "ready", ranges: [{ startSec: 10, endSec: 20, kind: "ad", status: "auto" }, { startSec: 30, endSec: 35, kind: "intro", status: "held" }], modes: { ad: "skip", intro: "skip" } };
@@ -32,5 +33,18 @@ describe("shared skip plan", () => {
     expect(skipSourceLabel("fingerprint", 0.7)).toEqual({ id: "Found by matching the same sound as other episodes" });
     expect(skipSourceLabel("alignment", 0.7)).toEqual({ id: "Found by matching the same sound as other episodes" });
     expect(screenReaderSkipLine(125)).toEqual({ id: "Skipped a {mins} minute break", values: { mins: 2 } });
+  });
+});
+
+describe("time saved label", () => {
+  test("seconds, minutes and hours without rounding a short break up to a minute", () => {
+    i18n.load("en-US", {}); i18n.activate("en-US");
+    expect(formatTimeSaved(0)).toBe("");
+    expect(formatTimeSaved(30)).toContain("30");
+    expect(formatTimeSaved(30)).not.toContain("min");
+    expect(formatTimeSaved(173)).toContain("2");
+    expect(formatTimeSaved(173)).toContain("53");
+    expect(formatTimeSaved(1500)).toContain("25");
+    expect(formatTimeSaved(3840)).toContain("1");
   });
 });

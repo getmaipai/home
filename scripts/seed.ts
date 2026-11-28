@@ -131,8 +131,10 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
 function seedPodcastSkipPreview(db: Database, ownerId: string): void {
   const now = new Date().toISOString();
   const sourceId = "msrc-podcastdemo";
-  db.query(`INSERT OR IGNORE INTO media_sources (id,kind,scope,owner_person_id,label,url,auto,paused,visible_to,archive,prune,created_at,hlc,provenance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(sourceId, "feed", "household", ownerId, "The Kitchen Table Show", "https://podcast.example.test/feed.xml", "{}", 0, '"household"', "[]", 0, now, "1:0:podseed", "dev:podcast-skip");
+  db.query(`INSERT OR IGNORE INTO media_sources (id,kind,scope,owner_person_id,label,feed_id,url,auto,paused,visible_to,archive,prune,created_at,hlc,provenance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(sourceId, "feed", "household", ownerId, "The Kitchen Table Show", "feed-podcastdemo", "https://podcast.example.test/feed.xml", "{}", 0, '"household"', "[]", 0, now, `${Date.now()}:0:podseed`, `person:${ownerId}`);
+  db.query(`INSERT OR IGNORE INTO feeds (id,url,title,publisher,band,package_id,person_id,etag,last_modified,poll_interval_s,next_poll_at,fail_count,quiet_until,enabled,hlc,provenance,created_at,updated_at,purpose) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run("feed-podcastdemo", "https://podcast.example.test/feed.xml", "The Kitchen Table Show", "example.test", "adult", null, null, null, null, 3600, "2099-01-01T00:00:00.000Z", 0, null, 1, `${Date.now()}:0:podseed`, `person:${ownerId}`, now, now, "podcast");
   const definitions = [
     { key: "three-breaks", title: "Three breaks and an intro", state: "ready", segments: [
       { id: "demo-ad", kind: "ad", startSec: 120, endSec: 150, confidence: 0.99, source: "llm", status: "auto" },
@@ -153,11 +155,11 @@ function seedPodcastSkipPreview(db: Database, ownerId: string): void {
     const sha = (index + 1).toString(16).padStart(64, "0");
     const jobId = episode.state === "queued" ? "demo-segments-queued" : null;
     db.query(`INSERT OR IGNORE INTO attachments (id,owner_person_id,conversation_id,turn_id,media_type,size,sha256,storage_path,retention,provenance,origin,media_source_id,deleted_at,trash_until,file_name,created_at,hlc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(fileId, ownerId, null, null, "audio/mpeg", 1000, sha, `podcast/demo/${episode.key}.mp3`, "kept", "podcast:dev-seed", "fetched", sourceId, null, null, null, now, "1:0:podseed");
+      .run(fileId, ownerId, null, null, "audio/mpeg", 1000, sha, `podcast/demo/${episode.key}.mp3`, "kept", "podcast:dev-seed", "fetched", sourceId, null, null, null, now, `${Date.now()}:0:podseed`);
     db.query(`INSERT OR IGNORE INTO media_items (id,kind,title,description,source_id,loc_file_id,media_type,duration_s,playable,chapters,subtitles,locator_kind,external,advisory_explicit,advisory_source,band_ok,hidden,added_at,created_at,hlc,provenance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(itemId, "podcast_episode", episode.title, "Seeded podcast skip preview", sourceId, fileId, "audio/mpeg", 1800, "original", "[]", "[]", "file", JSON.stringify({ extractor: "rss", id: `demo-${episode.key}`, url: `https://podcast.example.test/${episode.key}.mp3`, channel_id: sourceId, channel_name: "The Kitchen Table Show", published_at: new Date(Date.now() - index * 86400000).toISOString() }), 0, "tag", "child", 0, now, now, "1:0:podseed", "dev:podcast-skip");
+      .run(itemId, "podcast_episode", episode.title, "Seeded podcast skip preview", sourceId, fileId, "audio/mpeg", 1800, "original", "[]", "[]", "none", JSON.stringify({ extractor: "rss", id: `demo-${episode.key}`, url: `https://podcast.example.test/${episode.key}.mp3`, channel_id: sourceId, channel_name: "The Kitchen Table Show", published_at: new Date(Date.now() - index * 86400000).toISOString() }), 0, "tag", "child", 0, now, now, `${Date.now()}:0:podseed`, `person:${ownerId}`);
     if (["ready", "nothing_found"].includes(episode.state)) {
-      const record = JSON.stringify({ fileSha256: sha, durationSec: 1800, segments: episode.segments, producedBy: { transcriptRevision: "demo", modelId: "preview", pipelineVersion: "1", createdAt: now }, cleanCopy: true, created_at: now, hlc: "1:0:podseed", provenance: "stack:media.segments" });
+      const record = JSON.stringify({ fileSha256: sha, durationSec: 1800, segments: episode.segments, producedBy: { transcriptRevision: "demo", modelId: "preview", pipelineVersion: "1", createdAt: now }, cleanCopy: true, created_at: now, hlc: `${Date.now()}:0:podseed`, provenance: "stack:media.segments" });
       const recordId = `demo-record-${episode.key}`;
       db.query(`INSERT OR IGNORE INTO podcast_segment_records (sha256,pipeline_version,state,record_id,job_id,record,reason,updated_at) VALUES (?,?,?,?,?,?,?,?)`).run(sha, "1", episode.state, recordId, null, record, null, now);
       db.query(`INSERT OR IGNORE INTO podcast_segment_links (media_item_id,sha256,pipeline_version,state,record_id,job_id,record,reason,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(itemId, sha, "1", episode.state, recordId, null, record, null, now);

@@ -164,6 +164,11 @@ msgid "{activeLabel}, {displayTime} remaining"
 msgstr "{activeLabel}, quedan {displayTime}"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/skipPlan.ts:48
+msgid "{amount} saved"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:60
 #, needs-review
 msgid "{category} at {tier}"

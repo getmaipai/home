@@ -152,6 +152,11 @@ msgid "{activeLabel}, {displayTime} remaining"
 msgstr "{activeLabel}, {displayTime} remaining"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/skipPlan.ts:48
+msgid "{amount} saved"
+msgstr "{amount} saved"
+
+#. js-lingui-explicit-id
 #: src/apps/settings/performanceModel.ts:60
 msgid "{category} at {tier}"
 msgstr "{category} at {tier}"
