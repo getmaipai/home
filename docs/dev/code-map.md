@@ -890,7 +890,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/parsers/zip.ts` | openZip |
 | `backend/src/lib/media/pictureFragments.ts` | RELIGHT_KEEP, PICTURE_PICK_KEYS, resolvePicks, composePicturePrompt, pictureFragmentChips |
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine, podcastSnipLabel, podcastSnipRowsForRoute |
-| `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
+| `backend/src/lib/media/podcastDirectory.ts` | PODCAST_GENRES, __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, podcastDirectoryStatus, searchDirectory |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcastParity.ts` | episodeSortOf, seasonsOf, orderEpisodes, followPodcast, unfollowPodcast, isFollowed |
 | `backend/src/lib/media/podcastRates.ts` | RATE_MIN, RATE_MAX, RATE_LINE, showRateOf, setShowRate |
