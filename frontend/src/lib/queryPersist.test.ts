@@ -22,4 +22,11 @@ describe("query cache restore", () => {
     saveQueryCache(filled(), "p1", 1000, s);
     expect(restoreQueryCache(new QueryClient(), "p1", 1000 + QUERY_PERSIST_MAX_AGE_MS + 1, s)).toBe(false);
   });
+  test("answers saved by an older build are dropped, so a new install never paints old pages", () => {
+    const s = memory(); saveQueryCache(filled(), "p1", 1000, s);
+    const saved = JSON.parse(s.getItem(QUERY_PERSIST_KEY)!);
+    s.setItem(QUERY_PERSIST_KEY, JSON.stringify({ ...saved, build: "http://old-build/assets/index-OLD.js" }));
+    expect(restoreQueryCache(new QueryClient(), "p1", 2000, s)).toBe(false);
+    expect(s.getItem(QUERY_PERSIST_KEY)).toBeNull();
+  });
 });

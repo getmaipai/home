@@ -8,7 +8,10 @@ export const QUERY_PERSIST_MAX_AGE_MS = 30 * 60_000;
 const MAX_QUERY_BYTES = 60_000;
 const MAX_TOTAL_BYTES = 400_000;
 
-interface Saved { t: number; personId: string; state: ReturnType<typeof dehydrate> }
+/** This build's own address: a new install serves a new bundle name, so answers saved by an older build (old page layouts included) are never put back. */
+const BUILD = import.meta.url;
+
+interface Saved { t: number; personId: string; build?: string; state: ReturnType<typeof dehydrate> }
 
 export function clearQueryCache(storage: Storage | undefined = safeStorage()): void {
   try { storage?.removeItem(QUERY_PERSIST_KEY); } catch { /* storage blocked: nothing to clear */ }
@@ -33,7 +36,7 @@ export function saveQueryCache(client: QueryClient, personId: string, now = Date
       return true;
     },
   });
-  try { storage.setItem(QUERY_PERSIST_KEY, JSON.stringify({ t: now, personId, state } satisfies Saved)); } catch { clearQueryCache(storage); }
+  try { storage.setItem(QUERY_PERSIST_KEY, JSON.stringify({ t: now, personId, build: BUILD, state } satisfies Saved)); } catch { clearQueryCache(storage); }
 }
 
 /** Put saved answers back for this person if they are recent; anything else is dropped. Returns whether it restored. */
@@ -43,7 +46,7 @@ export function restoreQueryCache(client: QueryClient, personId: string, now = D
     const raw = storage.getItem(QUERY_PERSIST_KEY);
     if (!raw) return false;
     const saved = JSON.parse(raw) as Saved;
-    if (saved.personId !== personId || now - saved.t > QUERY_PERSIST_MAX_AGE_MS) { clearQueryCache(storage); return false; }
+    if (saved.personId !== personId || saved.build !== BUILD || now - saved.t > QUERY_PERSIST_MAX_AGE_MS) { clearQueryCache(storage); return false; }
     hydrate(client, saved.state);
     return true;
   } catch { clearQueryCache(storage); return false; }
