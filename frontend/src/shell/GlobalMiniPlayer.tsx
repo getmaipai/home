@@ -76,12 +76,13 @@ export function GlobalMiniPlayer() {
   const waiting = useMediaLoading(held?.el ?? null, liveHeld ? START_GIVE_UP_MS : null);
   const closeStage = useCallback(() => setStage(false), []);
   const stateId = (state as { pageState?: { id?: string } } | null)?.pageState?.id;
+  // Hooks stay above the early return below so their order never changes between renders.
+  const skip = useSkipPlan(held?.appId === "podcasts" ? held.id : null);
+  const [skipped, setSkipped] = useState<SkipRange | null>(null);
   if (!held || !held.started || onPlayPageOf(held, pathname, search, stateId)) return null;
 
   const PipIcon = getIcon("picture-in-picture"), FullIcon = getIcon("maximize");
   const el = held.el;
-  const skip = useSkipPlan(held.appId === "podcasts" ? held.id : null);
-  const [skipped, setSkipped] = useState<SkipRange | null>(null);
   const activeRange = held.appId === "podcasts" ? applySkip(skip.plan, position) : null;
   const skipRange = activeRange?.kind === "intro" || activeRange?.kind === "recap" || activeRange?.kind === "sponsor" ? activeRange : null;
   const doSkip = (range: SkipRange | null) => { if (!range) return; setSkipped(range); el.currentTime = range.endSec; };
