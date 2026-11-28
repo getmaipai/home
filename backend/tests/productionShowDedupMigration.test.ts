@@ -1,0 +1,41 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { Database } from "bun:sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+
+describe("production duplicate cleanup migration", () => {
+  test("keeps the earliest duplicate, removes item references, is repeatable, and leaves feeds alone", () => {
+    const sqlite = new Database(":memory:");
+    sqlite.exec("PRAGMA foreign_keys = ON");
+    sqlite.exec(`CREATE TABLE media_sources(id TEXT PRIMARY KEY, kind TEXT, scope TEXT, owner_person_id TEXT, label TEXT, created_at TEXT);
+      CREATE TABLE media_items(id TEXT PRIMARY KEY, source_id TEXT);
+      CREATE TABLE media_progress(id TEXT PRIMARY KEY, media_id TEXT);
+      CREATE TABLE podcast_segment_links(media_item_id TEXT PRIMARY KEY);
+      CREATE TABLE podcast_transcripts(item_id TEXT PRIMARY KEY);
+      CREATE TABLE transcripts(library_item_id TEXT);
+      CREATE TABLE media_collections(items TEXT);
+      CREATE TABLE attachments(media_source_id TEXT);
+      INSERT INTO media_sources VALUES ('keep','production','person','p1','Morning briefing','2026-11-08T10:00:00Z');
+      INSERT INTO media_sources VALUES ('drop2','production','person','p1','Morning briefing','2026-11-08T10:00:02Z');
+      INSERT INTO media_sources VALUES ('drop3','production','person','p1','Morning briefing','2026-11-08T10:00:03Z');
+      INSERT INTO media_sources VALUES ('feed','feed','person','p1','Morning briefing','2026-11-08T10:00:04Z');
+      INSERT INTO media_items VALUES ('i1','drop2'); INSERT INTO media_items VALUES ('i2','drop3');
+      INSERT INTO media_progress VALUES ('pr1','i1'); INSERT INTO podcast_segment_links VALUES ('i1');
+      INSERT INTO podcast_transcripts VALUES ('i2'); INSERT INTO transcripts VALUES ('i2');
+      INSERT INTO media_collections VALUES ('[{"media_id":"i1"},{"media_id":"i2"},{"media_id":"keep-item"}]');
+      INSERT INTO attachments VALUES ('drop2');`);
+    const migration = readFileSync(join(import.meta.dir, "../src/db/migrations/0216_production_show_dedup.sql"), "utf8");
+    const statements = migration.split("--> statement-breakpoint").map((sql) => sql.trim()).filter(Boolean);
+    for (const statement of statements) sqlite.exec(statement);
+    expect((sqlite.query("SELECT id FROM media_sources ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id)).toEqual(["feed", "keep"]);
+    expect(sqlite.query("SELECT count(*) AS n FROM media_items").get()).toEqual({ n: 0 });
+    expect(sqlite.query("SELECT count(*) AS n FROM media_progress").get()).toEqual({ n: 0 });
+    expect(sqlite.query("SELECT items FROM media_collections").get()).toEqual({ items: "[{\"media_id\":\"keep-item\"}]" });
+    expect(sqlite.query("SELECT count(*) AS n FROM attachments").get()).toEqual({ n: 0 });
+    for (const statement of statements) sqlite.exec(statement);
+    expect(sqlite.query("SELECT count(*) AS n FROM media_sources").get()).toEqual({ n: 2 });
+    sqlite.close();
+  });
+});

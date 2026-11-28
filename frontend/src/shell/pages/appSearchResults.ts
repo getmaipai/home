@@ -32,7 +32,7 @@ export function appSearchGroups(
     ...(row.channel ? { subtitle: row.channel } : {}),
     ...(row.thumbnail ? { thumbnail: row.thumbnail } : {}),
     href: `${app.to}/${playPage}?id=${encodeURIComponent(row.feed_url || row.id)}`,
-    ...(row.feed_url ? { action: "Follow" } : {}),
+    ...(row.feed_url ? { action: row.action_label ?? "Follow" } : {}),
   }));
   if (results.length === 0) return [];
   return [{ kind: "app", heading: app.label, results }];

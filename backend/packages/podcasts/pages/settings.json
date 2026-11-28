@@ -1,0 +1,6 @@
+{
+  "type": "page",
+  "id": "settings",
+  "title": "Podcasts Settings",
+  "body": [{ "type": "empty_state", "icon": "settings", "text": "Choose how podcast breaks are handled." }]
+}

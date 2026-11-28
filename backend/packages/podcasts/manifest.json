@@ -266,6 +266,15 @@
           "segments",
           "bumper"
         ]
+      },
+      {
+        "id": "settings",
+        "label": "Settings",
+        "icon": "settings",
+        "nav": true,
+        "kind": "schema",
+        "module": "settings",
+        "min_role": "adult"
       }
     ],
     "sidebar": {
@@ -321,7 +330,8 @@
           "title": "Tools",
           "pages": [
             "filters",
-            "stats"
+            "stats",
+            "settings"
           ]
         },
         {

@@ -130,7 +130,7 @@ export function PackageAppHeaderActions() {
         <DropdownMenuContent align="end">{more.map((item) => <DropdownMenuItem key={item.label} onSelect={() => open(item.open)}>{item.label}</DropdownMenuItem>)}</DropdownMenuContent>
       </DropdownMenu>
     ) : null}
-    {state.settingsArea ? <Button type="button" variant="ghost" size="icon-lg" className="max-md:hidden" aria-label={`${state.label} settings`} onClick={() => navigate(`/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button> : null}
+    {state.settingsArea ? <Button type="button" variant="ghost" size="icon-lg" className="max-md:hidden" aria-label={`${state.label} settings`} onClick={() => navigate(state.to === "/apps/podcasts" ? "/apps/podcasts/settings" : `/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button> : null}
   </>;
 }
 

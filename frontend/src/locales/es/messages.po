@@ -186,7 +186,7 @@ msgid "{count, plural, one {# ad skipped} other {# ads skipped}}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:100
 msgid "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}"
 msgstr ""
 
@@ -1830,8 +1830,8 @@ msgid "setting.notifications.telegram.bot_token.help"
 msgstr "Un token de bot de @BotFather, usado para enviar notificaciones a Telegram. Un bot para todo el hogar; cada persona vincula su propio chat abajo."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:58
-msgid "A bumper is a short sound or spoken tag around an ad break. A bumper next to a skipped ad goes with it by default."
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:95
+msgid "A bumper is a short sound or spoken tag around an ad break. One next to a skipped ad goes with it."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -2331,7 +2331,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:11
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Ad"
 msgstr ""
 
@@ -4171,7 +4171,7 @@ msgstr "Azelma"
 #: src/shell/pageHeaderTitle.tsx:149
 #: src/shell/pages/companionFlow/AnimateStep.tsx:155
 #: src/shell/pages/companionFlow/CustomizeStep.tsx:200
-#: src/shell/pages/packageAppHeaderBar.tsx:101
+#: src/shell/pages/packageAppHeaderBar.tsx:112
 #: src/shell/pages/PackageAppPage.tsx:287
 #: src/shell/pages/settings/settingsBackLink.ts:51
 #: src/shell/pages/settings/settingsBackLink.ts:56
@@ -4939,7 +4939,7 @@ msgid "Built-in synth"
 msgstr "Synth integrado"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Bumper"
 msgstr ""
 
@@ -6283,11 +6283,6 @@ msgid "setting.host.guard.max_reboots_per_12h.help"
 msgstr "Elige cuántas veces puede reiniciar el guardián el Mac en 12 horas. Elige 0 para que nunca lo reinicie."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:74
-msgid "Choose how podcast breaks work"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:331
 msgid "setting.content.filters.help"
 msgstr ""
@@ -6373,6 +6368,11 @@ msgid "Choose what each person can use. A feature someone cannot use is simply a
 msgstr ""
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+msgid "Choose what happens to each kind of break in this show. Use default follows your own choice, then the household's."
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1177
 msgid "setting.podcasts.skip.ad.help"
 msgstr ""
@@ -6424,11 +6424,6 @@ msgstr "Elige cuándo suena esta alarma."
 #, needs-review
 msgid "Choose where to store data"
 msgstr "Elige dónde guardar los datos"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:58
-msgid "Choose whether each kind of break is skipped, marked for you, or left alone."
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1796
@@ -8004,7 +7999,7 @@ msgid "Could not load pets."
 msgstr "No se pudieron cargar las mascotas."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:33
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:32
 msgid "Could not load podcast skip settings. Your saved choices were not changed. Retry or close this page."
 msgstr ""
 
@@ -8543,7 +8538,7 @@ msgid "Could not save"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:47
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:45
 msgid "Could not save {key}. Check your connection and try again."
 msgstr ""
 
@@ -11559,6 +11554,11 @@ msgid "Finding articles…"
 msgstr "Buscando artículos…"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:96
+msgid "Finding shows"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:631
 #, needs-review
 msgid "setting.engines.embed.choice.does"
@@ -11921,6 +11921,16 @@ msgstr "Por ejemplo: hazlo de noche, añade un sombrero rojo"
 #, needs-review
 msgid "For example: slower, acoustic, with a warm piano"
 msgstr "Por ejemplo: más lento, acústico, con un piano cálido"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:76
+msgid "For me"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:76
+msgid "For the household"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/RobotWifi.tsx:56
@@ -14081,20 +14091,10 @@ msgid "Household"
 msgstr "Hogar"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:69
-msgid "Household {kind} default"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/apps/settings/CommandsSection.tsx:105
 #, needs-review
 msgid "Household commands"
 msgstr "Comandos del hogar"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:69
-msgid "Household default"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/companionFlow/CreateCharacterStep.tsx:239
@@ -14490,11 +14490,6 @@ msgstr "¿Cómo debe cambiar? Por ejemplo: heavy metal"
 #, needs-review
 msgid "How should your synth behave, speak, and interact? (Optional)"
 msgstr "¿Cómo debe comportarse, hablar e interactuar tu synth? (Opcional)"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
-msgid "How skip settings work"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1606
@@ -14907,7 +14902,7 @@ msgid "Ingestion"
 msgstr "Ingesta"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:17
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Inherit"
 msgstr ""
 
@@ -14992,11 +14987,6 @@ msgstr "Heredar"
 #, needs-review
 msgid "setting.search.source_mode.wikimedia.option_label.inherit"
 msgstr "Heredar"
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:66
-msgid "Inherited: {value}"
-msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/settings/SettingField.tsx:211
@@ -15204,7 +15194,7 @@ msgstr "Puerto de comprobación de internet"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:11
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Intro"
 msgstr ""
 
@@ -16090,7 +16080,7 @@ msgid "Last probe:"
 msgstr "Última sondea:"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:100
 #: src/shell/pages/PodcastTimeSaved.tsx:16
 msgid "Last processed {when}"
 msgstr ""
@@ -16279,6 +16269,11 @@ msgstr "Permite a un nuevo chat preguntar una vez cómo fue algo que mencionaste
 #, needs-review
 msgid "setting.ease.word_help.does"
 msgstr "Permite a una persona tocar una palabra para ver qué significa."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:98
+msgid "Lets adults find and follow shows. Only the words you type are sent."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1171
@@ -17162,7 +17157,7 @@ msgid "Loading performance"
 msgstr "Cargando rendimiento"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:34
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:33
 msgid "Loading podcast skip settings…"
 msgstr ""
 
@@ -18409,7 +18404,7 @@ msgid "setting.tts.voice_id.option_label.marius"
 msgstr "Marius"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:17
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 msgid "Mark"
 msgstr ""
 
@@ -18493,11 +18488,6 @@ msgstr "Marcar para todas las edades"
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:34
 msgid "Mark an end time after the start time, then send the range."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:74
-msgid "Mark only"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21081,7 +21071,7 @@ msgid "Nothing shared yet."
 msgstr "Aún no hay nada compartido."
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:100
 msgid "Nothing skipped yet."
 msgstr ""
 
@@ -21193,9 +21183,7 @@ msgstr "desactivado"
 #: src/apps/settings/SafetyChangesSection.tsx:13
 #: src/lib/settingCopy.ts:42
 #: src/shell/pages/dashboard/ArrangeHome.tsx:106
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:17
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:72
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:74
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 #: src/shell/pages/status/StatusComponents.tsx:159
 msgid "Off"
 msgstr ""
@@ -21592,16 +21580,6 @@ msgid "on"
 msgstr "activa"
 
 #. js-lingui-explicit-id
-#: src/apps/reminders/DeviceSchedulesView.tsx:29
-#: src/apps/settings/RobotBody.tsx:212
-#: src/apps/settings/RobotBody.tsx:213
-#: src/apps/settings/SafetyChangesSection.tsx:13
-#: src/lib/settingCopy.ts:41
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:72
-msgid "On"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:98
 #, needs-review
 msgid "setting.chat.flash_attention_override.option_label.on"
@@ -21644,6 +21622,15 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1670
 msgid "setting.search.web.teen_mode.option_label.on"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/apps/reminders/DeviceSchedulesView.tsx:29
+#: src/apps/settings/RobotBody.tsx:212
+#: src/apps/settings/RobotBody.tsx:213
+#: src/apps/settings/SafetyChangesSection.tsx:13
+#: src/lib/settingCopy.ts:41
+msgid "On"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -21882,6 +21869,11 @@ msgstr ""
 #, needs-review
 msgid "area.Online radio and podcasts"
 msgstr "Radio y podcasts en línea"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:99
+msgid "Only an admin can change whether people can find shows in the directory."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:272
@@ -22364,7 +22356,7 @@ msgstr "Conexiones salientes"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:11
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Outro"
 msgstr ""
 
@@ -23612,19 +23604,18 @@ msgid "setting.podcasts.skip.backfill_latest.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:36
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:65
+msgid "Podcast settings"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:35
 msgid "Podcast skip choices follow the household settings."
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1208
 msgid "setting.podcasts.skip.explainer.dismissed.label"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:55
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:56
-msgid "Podcast skip settings"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -24383,7 +24374,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:11
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Recap"
 msgstr ""
 
@@ -25144,11 +25135,6 @@ msgid "Reset to default"
 msgstr "Restablecer a los valores predeterminados"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:68
-msgid "Reset to inherited"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/pages/performance/EnginesHealthBody.tsx:30
 #, needs-review
 msgid "Resolved {date}"
@@ -25342,8 +25328,8 @@ msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así 
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:147
 #: src/shell/GlobalMiniPlayer.tsx:138
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:33
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:32
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:100
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -26092,6 +26078,7 @@ msgstr "Guardar tu clave de copia de seguridad"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/MusicSpeechPage.tsx:80
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:69
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/WikipediaPage.tsx:91
 #: src/shell/pages/WikipediaPage.tsx:92
@@ -26499,7 +26486,7 @@ msgid "area.Search"
 msgstr "Búsqueda"
 
 #. js-lingui-explicit-id
-#: src/shell/pages/packageAppHeaderBar.tsx:114
+#: src/shell/pages/packageAppHeaderBar.tsx:125
 #: src/shell/pages/PackageAppPage.tsx:287
 msgid "Search {name}"
 msgstr ""
@@ -26659,6 +26646,11 @@ msgstr "Buscar synths"
 #, needs-review
 msgid "Search table rows"
 msgstr "Busca en las filas de la tabla"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:98
+msgid "Search the public podcast directory"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/chat/composerAddMenu.tsx:233
@@ -26926,7 +26918,7 @@ msgstr "Modelo de chat seleccionado"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:11
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Self-promotion"
 msgstr ""
 
@@ -28147,7 +28139,7 @@ msgstr "Habilidades añadidas a este hogar"
 
 #. js-lingui-explicit-id
 #: src/shell/pages/dashboard/GettingStarted.tsx:32
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:17
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
 #, needs-review
 msgid "Skip"
 msgstr "Omitir"
@@ -28239,23 +28231,18 @@ msgid "setting.podcasts.skip.bumpers_with_ads.help"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:74
-msgid "Skip ads"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:74
-msgid "Skip ads jumps over detected breaks. Mark only shows them in the timeline without skipping. Off leaves playback unchanged. A bumper is a short sound or spoken tag around an ad break; by default a bumper beside a skipped ad goes with it."
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:72
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:95
 msgid "Skip bumpers with ads"
 msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1206
 msgid "setting.podcasts.skip.bumpers_with_ads.label"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:74
+msgid "Skip jumps over the break. Mark shows it on the progress bar and lets you skip with one tap. Off leaves it alone."
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -28270,13 +28257,12 @@ msgid "Skip ranges"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:56
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:65
 msgid "Skip settings for {show}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:55
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:85
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:107
 msgid "Skip settings for this show"
 msgstr ""
 
@@ -29025,7 +29011,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSegmentsPage.tsx:11
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:16
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:15
 msgid "Sponsor"
 msgstr ""
 
@@ -29089,7 +29075,7 @@ msgid "Stack is offline. Playback remains available; try again later."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:100
 msgid "Stack is offline. Retry to reload this show summary."
 msgstr ""
 
@@ -32717,12 +32703,12 @@ msgid "This session ran out of its budget. Start a new session to carry on."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:56
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:65
 msgid "this show"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:100
 msgid "This show"
 msgstr ""
 
@@ -34191,6 +34177,11 @@ msgid "setting.generation.styles.civitai.label"
 msgstr "Usar Civitai"
 
 #. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:90
+msgid "Use default"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/shell/pages/settings/WebSearchSettings.tsx:117
 #, needs-review
 msgid "Use DuckDuckGo"
@@ -34481,6 +34472,11 @@ msgstr "Usa tu lectura en este hub para elegir historias para My Mix."
 #, needs-review
 msgid "Using a password? Tap \"Use a password instead\"."
 msgstr "¿Usas una contraseña? Toca \"Usa una contraseña en su lugar\"."
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:90
+msgid "Using default: {value}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/activityRows.tsx:42
@@ -35873,6 +35869,11 @@ msgstr "Quién lo usa"
 #, needs-review
 msgid "Whole word"
 msgstr "Palabra completa"
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:75
+msgid "Whose settings"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/VoiceBrowserSection.tsx:91

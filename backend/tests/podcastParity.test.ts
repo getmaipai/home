@@ -177,7 +177,7 @@ describe("the pages", () => {
     expect(boards.map((node) => node.primary.label)).toEqual(["Follow", "Following"]);
     expect(boards[1]!.primary.action.confirm.on_confirm.call.target).toBe("/api/plugins/podcasts/directory/remove");
     expect(boards.every((node) => node.hide_when_empty === true)).toBe(true);
-    expect(boards.map((node) => node.secondary[0])).toEqual(boards.map(() => expect.objectContaining({ label: "Skip settings", action: { navigate: { to: "/apps/podcasts/skip" } } })));
+    expect(boards.map((node) => node.secondary[0])).toEqual(boards.map(() => expect.objectContaining({ label: "Skip settings", action: { navigate: { to: "/apps/podcasts/skip", state: { show: "{id}" } } } })));
   });
 
   test("Library filters the shows, and Listen Now's Latest episodes are rows with three actions at most", () => {

@@ -51,7 +51,11 @@ export async function podcastDirectoryRows(person: PersonRow, q: string, scope =
   if ((scope === "top" || scope === "genre" || scope === "trending") && !allowed) return [];
   const result = scope === "top" || scope === "trending" ? await topShows() : scope === "genre" && PODCAST_GENRES.some((genre) => genre.id === genreId) ? await topShowsForGenre(genreId) : words !== "" ? await searchDirectory(words) : { ok: true as const, shows: [] };
   if (!result.ok) return local;
-  const directory = result.shows.map((show) => ({ id: show.id, title: show.title, author: show.author, summary: show.genre ?? "", thumbnail: artProxyAddress(show.art), feed_url: show.feed_url, ...(admin ? { action_label: "Follow" } : {}) }));
+  const directory = result.shows.map((show) => {
+    const existing = db.select().from(mediaSources).where(eq(mediaSources.url, show.feed_url)).all().find((row) => row.kind === "feed" && !row.deletedAt);
+    const followed = existing ? isFollowed(existing as never) : false;
+    return { id: existing?.id ?? show.id, title: show.title, author: show.author, summary: show.genre ?? "", thumbnail: artProxyAddress(show.art), feed_url: show.feed_url, followed, ...(admin ? { action_label: followed ? "Following" : "Follow" } : {}) };
+  });
   return shelf === "shows" ? directory : [...local, ...directory];
 }
 
@@ -138,7 +142,9 @@ export async function podcastShowRows(person: PersonRow, id: string, scope: stri
   if (!result.ok) return [];
   const show = result.value.show;
   const directory = directoryShowForFeed(address);
-  return [{ id: address, title: show.title || directory?.title, author: show.author || directory?.author, genre: directory?.genre ?? "", description: show.description, thumbnail: directory?.art ? artProxyAddress(directory.art) : null, followed: false, can_follow: canFollow, feed_url: address }];
+  const existing = db.select().from(mediaSources).where(eq(mediaSources.url, address)).all().find((row) => row.kind === "feed" && !row.deletedAt);
+  const followed = existing ? isFollowed(existing as never) : false;
+  return [{ id: existing?.id ?? address, title: show.title || directory?.title, author: show.author || directory?.author, genre: directory?.genre ?? "", description: show.description, thumbnail: directory?.art ? artProxyAddress(directory.art) : null, followed, can_follow: canFollow && !followed, feed_url: address }];
 }
 
 function podcastDate(value: string | null | undefined): string {

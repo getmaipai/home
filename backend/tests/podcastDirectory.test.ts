@@ -136,6 +136,19 @@ describe("podcast dashboard directory rows", () => {
     expect(teenRows[0]?.action_label).toBeUndefined();
     expect((await teenClient.post("/api/plugins/podcasts/directory/add", { url: "https://feeds.example.com/cabin.xml" })).status).toBe(403);
   });
+
+  test("each podcast skip setting can be written and read back", async () => {
+    const { client } = await owner();
+    const kinds = ["ad", "sponsor", "bumper", "selfpromo", "intro", "outro", "recap"];
+    const { setValue, getPersonSettingValue } = await import("@/lib/settings");
+    const { row } = await owner();
+    for (const kind of kinds) {
+      const key = `podcasts.skip.${kind}`;
+      const written = setValue(row, `person:${row.id}`, key, "skip");
+      expect(written.ok).toBe(true);
+      expect(getPersonSettingValue(row, key)).toBe("skip");
+    }
+  });
 });
 
 describe("podcast show details", () => {
@@ -219,12 +232,13 @@ test("podcast manifest and all referenced schema pages validate at boot", () => 
   const read = (module: string) => JSON.parse(readFileSync(join(dir, "pages", `${module}.json`), "utf8"));
   expect(PackageManifest.safeParse(manifest).success).toBe(true);
   expect(checkAppPackage("podcasts", manifest.contributes, read, manifest.min_role)).toEqual([]);
+  expect(manifest.contributes.sidebar.groups.find((group: { id: string }) => group.id === "play-tools")?.pages).toContain("settings");
   const ajv = new Ajv2020({ strict: false });
   for (const entry of manifest.contributes.pages) expect(ajv.validate(UI_SCHEMA, read(entry.module))).toBe(true);
   expect(manifest.contributes.pages.some((page: { id: string }) => page.id === "find")).toBe(false);
   const show = read("show");
   const billboards = show.body.filter((node: { type: string }) => node.type === "billboard");
   expect(billboards.map((node: { primary: { label: string } }) => node.primary.label)).toEqual(["Follow", "Following"]);
-  expect(billboards.every((node: { secondary: unknown[] }) => node.secondary.length === 0)).toBe(true);
+  expect(billboards.every((node: { secondary: unknown[] }) => node.secondary.length === 1)).toBe(true);
   expect(show.body.some((node: { type: string; item_label_field?: string }) => (node.type === "list" || node.type === "media_shelf") && node.item_label_field === "description")).toBe(true);
 });

@@ -63,7 +63,7 @@
         {
           "label": "Skip settings",
           "icon": "skip-forward",
-          "action": { "navigate": { "to": "/apps/podcasts/skip" } }
+          "action": { "navigate": { "to": "/apps/podcasts/skip", "state": { "show": "{id}" } } }
         }
       ],
       "empty_state": { "type": "empty_state", "icon": "mic", "text": "This show is no longer available. Search for it again or choose another show.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Search podcasts" }
@@ -108,7 +108,7 @@
         {
           "label": "Skip settings",
           "icon": "skip-forward",
-          "action": { "navigate": { "to": "/apps/podcasts/skip" } }
+          "action": { "navigate": { "to": "/apps/podcasts/skip", "state": { "show": "{id}" } } }
         }
       ]
     },
