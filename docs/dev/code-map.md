@@ -445,6 +445,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/reader/SearchBox.tsx` | ReaderSearchBox |
 | `frontend/src/shell/reader/SearchResults.tsx` | SearchResults |
 | `frontend/src/shell/sessionLockContext.tsx` | useSessionLocked, SessionLockGate |
+| `frontend/src/shell/skip/SkipControls.tsx` | SkipRanges, SkippedPill, SkipButton, PlayOriginalButton |
 | `frontend/src/shell/tierLease/TierLeaseNotice.tsx` | TierLeaseNotice |
 | `frontend/src/shell/useAmbientCompanion.tsx` | useAmbientCompanion |
 | `frontend/src/shell/useSideChat.tsx` | SPOKEN_IDLE_NEW_CONVERSATION_MS, useSideChat |
