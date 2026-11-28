@@ -20648,11 +20648,6 @@ msgid "Play or pause"
 msgstr "Play or pause"
 
 #. js-lingui-explicit-id
-#: src/shell/skip/SkipControls.tsx:32
-msgid "Play original"
-msgstr "Play original"
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1912
 msgid "setting.ui.enrollment_sounds.help"
 msgstr "Play soft sounds during face enrollment as the camera finds your face, then a chime when a photo is taken."

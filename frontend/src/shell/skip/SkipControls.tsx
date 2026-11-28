@@ -27,7 +27,3 @@ export function SkipButton({ range, onSkip, onHear }: { range: SkipRange | null;
   const label = i18n._({ id: "Skip {kind}", message: "Skip {kind}", values: { kind: kindLabel(range.kind).toLowerCase() } });
   return <span className="inline-flex gap-1"><Button size="sm" onClick={onSkip}>{label}</Button><Button variant="ghost" size="sm" onClick={onHear}>{i18n._({ id: "Hear it anyway", message: "Hear it anyway" })}</Button></span>;
 }
-
-export function PlayOriginalButton({ onPlayOriginal }: { onPlayOriginal: () => void }) {
-  return <Button variant="ghost" size="sm" onClick={onPlayOriginal}>{i18n._({ id: "Play original", message: "Play original" })}</Button>;
-}

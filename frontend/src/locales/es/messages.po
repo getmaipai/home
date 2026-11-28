@@ -23304,11 +23304,6 @@ msgid "Play or pause"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/skip/SkipControls.tsx:32
-msgid "Play original"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1912
 #, needs-review
 msgid "setting.ui.enrollment_sounds.help"
