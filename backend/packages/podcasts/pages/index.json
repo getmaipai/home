@@ -92,6 +92,7 @@
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
+      "layout": "grid",
       "orientation": "vertical",
       "density": "compact",
       "on_select": {
@@ -168,6 +169,7 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
+      "layout": "grid",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/show",
@@ -194,6 +196,7 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
+      "layout": "grid",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/show",

@@ -126,7 +126,7 @@ describe("Listen Now rows, queue and played", () => {
     const { client, data } = await setup();
     const rows = await data("latest");
     expect(rows.map((row) => row.title)).toEqual(["Ep 4", "Ep 3", "Ep 2", "Ep 1"]);
-    expect(rows[0]).toMatchObject({ date: "Oct 26, 2026", duration_s: 600, queue_label: "Add to queue", queue_next: true, played_label: "Mark played", played_next: true, badge: "New" });
+    expect(rows[0]).toMatchObject({ date: "Oct 26, 2026", duration_s: 600, queue_label: "Add to queue", queue_next: true, played_label: "Mark played", played_next: true, unplayed: "Unplayed" });
     const id = rows[0]!.id as string;
     await client.post("/api/plugins/podcasts/queue", { media_id: id, on: true });
     expect((await data("latest"))[0]).toMatchObject({ queue_label: "Remove from queue", queue_next: false });
@@ -142,7 +142,7 @@ describe("Listen Now rows, queue and played", () => {
     expect((await data("latest")).map((row) => row.id)).not.toContain(id);
     expect((await data("episodes")).find((row) => row.id === id)).toMatchObject({ played: true, played_label: "Mark unplayed", played_next: false, badge: "Played" });
     await client.post("/api/plugins/podcasts/played", { media_id: id, on: false });
-    expect((await data("latest"))[0]).toMatchObject({ id, played_label: "Mark played", badge: "New" });
+    expect((await data("latest"))[0]).toMatchObject({ id, played_label: "Mark played", unplayed: "Unplayed" });
   });
 
   test("an episode that is not in the person's podcasts is refused with a next step", async () => {
@@ -186,6 +186,18 @@ describe("the pages", () => {
     expect(latest).toMatchObject({ orientation: "vertical", item_badge_field: "unplayed", item_badge_presentation: "dot" });
     expect(latest.row_actions.length).toBeLessThanOrEqual(3);
     expect(latest.row_actions.map((action: { label: string }) => action.label)).toEqual(["Play", "Add to queue", "Save"]);
+    expect(read("play").body.map((node: { type: string }) => node.type)).toEqual(["player", "media_shelf"]);
+    expect(read("play").body[1]).toMatchObject({ heading: "Up next", orientation: "horizontal", layout: "rail" });
+    expect(read("shows").body[1]).toMatchObject({ type: "media_shelf", layout: "grid" });
+    for (const file of ["episodes", "saved", "queue", "show"]) {
+      const visit = (node: any): void => {
+        if (Array.isArray(node)) return node.forEach(visit);
+        if (!node || typeof node !== "object") return;
+        if (node.type === "media_shelf" && node.heading === "Episodes") expect(node.density).toBe("compact");
+        Object.values(node).forEach(visit);
+      };
+      visit(read(file));
+    }
   });
 
   test("every empty state names a next step", () => {

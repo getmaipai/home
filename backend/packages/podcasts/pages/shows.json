@@ -44,6 +44,8 @@
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",
+      "density": "compact",
+      "layout": "grid",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/show",

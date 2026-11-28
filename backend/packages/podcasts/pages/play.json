@@ -4,251 +4,243 @@
   "title": "Listen",
   "body": [
     {
-      "type": "split_view",
-      "aside_label": "Up next",
-      "main": [
+      "type": "player",
+      "bind": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "scope": "item",
+          "id": "$state.id"
+        }
+      },
+      "kind": "audio",
+      "autoplay_next": true,
+      "details": true,
+      "details_show": [
+        "title",
+        "facts",
+        "description",
+        "chapters",
+        "transcript"
+      ],
+      "actions": [
         {
-          "type": "player",
-          "bind": {
-            "source": "package",
-            "path": "item",
-            "params": {
-              "scope": "item",
-              "id": "$state.id"
-            }
-          },
-          "kind": "audio",
-          "autoplay_next": true,
-          "details": true,
-          "details_show": [
-            "title",
-            "facts",
-            "description",
-            "chapters",
-            "transcript"
-          ],
-          "actions": [
-            {
-              "label": "Add to queue",
-              "icon": "list-video",
-              "field": "queued",
-              "on_label": "In your queue",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/podcasts/queue",
-                  "args": {
-                    "media_id": "{id}",
-                    "on": "{on}"
-                  }
-                }
-              }
-            },
-            {
-              "label": "Save on the hub",
-              "icon": "hard-drive",
-              "field": "saved",
-              "on_label": "Saved on the hub",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/podcasts/save",
-                  "args": {
-                    "media_id": "{id}",
-                    "on": "{on}"
-                  }
-                }
-              }
-            },
-            {
-              "label": "Bookmark",
-              "icon": "bookmark",
-              "action": {
-                "call": {
-                  "target": "/api/plugins/podcasts/bookmark",
-                  "args": {
-                    "media_id": "{id}"
-                  }
-                }
-              }
-            }
-          ],
-          "on_progress": {
+          "label": "Add to queue",
+          "icon": "list-video",
+          "field": "queued",
+          "on_label": "In your queue",
+          "action": {
             "call": {
-              "target": "/api/plugins/podcasts/progress",
+              "target": "/api/plugins/podcasts/queue",
               "args": {
                 "media_id": "{id}",
-                "position_s": "{position_s}",
-                "duration_s": "{duration_s}",
-                "reason": "{reason}"
+                "on": "{on}"
               }
-            }
-          },
-          "on_next": {
-            "play": {
-              "media_id": "{id}"
-            }
-          },
-          "empty_state": {
-            "type": "empty_state",
-            "icon": "headphones",
-            "text": "This episode is not here any more. Go back to Podcasts and pick another.",
-            "action": {
-              "navigate": {
-                "to": "/apps/podcasts/index"
-              }
-            },
-            "action_label": "Back to Podcasts"
-          },
-          "fields": {
-            "description": "description",
-            "facts": "facts"
-          },
-          "edit": {
-            "label": "Edit",
-            "title": "Edit episode",
-            "visible_field": "can_edit",
-            "cover_choices_field": "cover_choices",
-            "fields": [
-              {
-                "name": "title",
-                "kind": "text",
-                "label": "Title"
-              },
-              {
-                "name": "description",
-                "kind": "textarea",
-                "label": "Description"
-              },
-              {
-                "name": "cover",
-                "kind": "cover",
-                "label": "Cover"
-              }
-            ],
-            "on_save": {
-              "call": {
-                "target": "/api/plugins/podcasts/actions/edit",
-                "args": {
-                  "id": "{id}",
-                  "title": "{title}",
-                  "description": "{description}",
-                  "artwork": "{cover}"
-                }
-              }
-            },
-            "on_upload": {
-              "call": {
-                "target": "/api/plugins/podcasts/actions/cover",
-                "args": {
-                  "id": "{id}",
-                  "file": "{file}"
-                }
-              }
-            }
-          },
-          "sleep_timer": true,
-          "skip_ranges": {
-            "source": "package",
-            "path": "item",
-            "params": {
-              "id": "$state.id"
-            }
-          },
-          "skip_bar": {
-            "source": "package",
-            "path": "item",
-            "params": {
-              "id": "$state.id"
-            }
-          },
-          "skip_actions": {
-            "range_select": {
-              "call": {
-                "target": "/api/plugins/podcasts/skip-action",
-                "args": {
-                  "action_id": "{action_id}",
-                  "id": "{id}",
-                  "media_id": "{media_id}"
-                }
-              }
-            },
-            "undo": {
-              "call": {
-                "target": "/api/plugins/podcasts/skip-action",
-                "args": {
-                  "action_id": "{action_id}",
-                  "id": "{id}",
-                  "media_id": "{media_id}"
-                }
-              }
-            },
-            "skip_button": {
-              "call": {
-                "target": "/api/plugins/podcasts/skip-action",
-                "args": {
-                  "action_id": "{action_id}",
-                  "id": "{id}",
-                  "media_id": "{media_id}"
-                }
-              }
-            }
-          },
-          "skip": {
-            "back": 15,
-            "forward": 30
-          },
-          "rate": {
-            "field": "show_rate",
-            "value": 1,
-            "on_change": {
-              "call": {
-                "target": "/api/plugins/podcasts/shows/{show_id}/rate",
-                "method": "PATCH",
-                "args": {
-                  "rate": "{rate}"
-                }
-              }
-            }
-          },
-          "transcript_bind": {
-            "source": "package",
-            "path": "directory",
-            "params": {
-              "scope": "transcript",
-              "id": "$state.id"
             }
           }
-        }
-      ],
-      "aside": [
+        },
         {
-          "type": "media_shelf",
-          "heading": "Up next",
-          "bind": {
-            "source": "package",
-            "path": "up-next",
-            "params": {
-              "id": "$state.id"
+          "label": "Save on the hub",
+          "icon": "hard-drive",
+          "field": "saved",
+          "on_label": "Saved on the hub",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/save",
+              "args": {
+                "media_id": "{id}",
+                "on": "{on}"
+              }
             }
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{channel}",
-          "item_media_field": "thumbnail",
-          "item_progress_field": "progress",
-          "item_badge_field": "copy_label",
-          "item_meta_field": "duration_s",
-          "aspect": "square",
-          "variant": "plain",
-          "orientation": "vertical",
-          "hide_when_empty": true,
-          "on_select": {
-            "play": {
-              "media_id": "{id}"
+          }
+        },
+        {
+          "label": "Bookmark",
+          "icon": "bookmark",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/bookmark",
+              "args": {
+                "media_id": "{id}"
+              }
             }
           }
         }
       ],
-      "aside_sheet": "phone"
+      "on_progress": {
+        "call": {
+          "target": "/api/plugins/podcasts/progress",
+          "args": {
+            "media_id": "{id}",
+            "position_s": "{position_s}",
+            "duration_s": "{duration_s}",
+            "reason": "{reason}"
+          }
+        }
+      },
+      "on_next": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "This episode is not here any more. Go back to Podcasts and pick another.",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/index"
+          }
+        },
+        "action_label": "Back to Podcasts"
+      },
+      "fields": {
+        "description": "description",
+        "facts": "facts"
+      },
+      "edit": {
+        "label": "Edit",
+        "title": "Edit episode",
+        "visible_field": "can_edit",
+        "cover_choices_field": "cover_choices",
+        "fields": [
+          {
+            "name": "title",
+            "kind": "text",
+            "label": "Title"
+          },
+          {
+            "name": "description",
+            "kind": "textarea",
+            "label": "Description"
+          },
+          {
+            "name": "cover",
+            "kind": "cover",
+            "label": "Cover"
+          }
+        ],
+        "on_save": {
+          "call": {
+            "target": "/api/plugins/podcasts/actions/edit",
+            "args": {
+              "id": "{id}",
+              "title": "{title}",
+              "description": "{description}",
+              "artwork": "{cover}"
+            }
+          }
+        },
+        "on_upload": {
+          "call": {
+            "target": "/api/plugins/podcasts/actions/cover",
+            "args": {
+              "id": "{id}",
+              "file": "{file}"
+            }
+          }
+        }
+      },
+      "sleep_timer": true,
+      "skip_ranges": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "skip_bar": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "skip_actions": {
+        "range_select": {
+          "call": {
+            "target": "/api/plugins/podcasts/skip-action",
+            "args": {
+              "action_id": "{action_id}",
+              "id": "{id}",
+              "media_id": "{media_id}"
+            }
+          }
+        },
+        "undo": {
+          "call": {
+            "target": "/api/plugins/podcasts/skip-action",
+            "args": {
+              "action_id": "{action_id}",
+              "id": "{id}",
+              "media_id": "{media_id}"
+            }
+          }
+        },
+        "skip_button": {
+          "call": {
+            "target": "/api/plugins/podcasts/skip-action",
+            "args": {
+              "action_id": "{action_id}",
+              "id": "{id}",
+              "media_id": "{media_id}"
+            }
+          }
+        }
+      },
+      "skip": {
+        "back": 15,
+        "forward": 30
+      },
+      "rate": {
+        "field": "show_rate",
+        "value": 1,
+        "on_change": {
+          "call": {
+            "target": "/api/plugins/podcasts/shows/{show_id}/rate",
+            "method": "PATCH",
+            "args": {
+              "rate": "{rate}"
+            }
+          }
+        }
+      },
+      "transcript_bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "transcript",
+          "id": "$state.id"
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Up next",
+      "bind": {
+        "source": "package",
+        "path": "up-next",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "horizontal",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "layout": "rail"
     }
   ]
 }

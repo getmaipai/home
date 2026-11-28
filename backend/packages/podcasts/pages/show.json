@@ -251,6 +251,7 @@
       "aspect": "wide",
       "variant": "plain",
       "orientation": "vertical",
+      "density": "compact",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/episode",

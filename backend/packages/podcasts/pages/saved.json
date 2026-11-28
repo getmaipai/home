@@ -19,6 +19,7 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
+      "layout": "grid",
       "orientation": "vertical",
       "hide_when_empty": true,
       "on_select": {
@@ -61,6 +62,7 @@
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
+      "layout": "grid",
       "orientation": "vertical",
       "on_select": {
         "play": {
@@ -95,6 +97,7 @@
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
+      "layout": "grid",
       "orientation": "vertical",
       "hide_when_empty": true,
       "on_select": {

@@ -41,6 +41,7 @@
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",
+      "density": "compact",
       "on_select": {
         "navigate": {
           "to": "/apps/podcasts/episode",
@@ -119,6 +120,7 @@
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",
+      "density": "compact",
       "hide_when_empty": true,
       "on_select": {
         "play": {

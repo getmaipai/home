@@ -20,6 +20,7 @@
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",
+      "density": "compact",
       "on_select": {
         "play": {
           "media_id": "{id}"
