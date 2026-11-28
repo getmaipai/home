@@ -2,11 +2,13 @@
 // across media and chat voice, the person's video speed applies, the sleep timer reaches it and the Media Session shows its title.
 // MEDIA-POLISH-01: the element is the media host's own (mediaHost.tsx), registered for as long as the host holds the item, on the
 // watch page, in the docked mini bar and while the person is in another app. It draws nothing.
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAudioRegistration } from "@/shell/audioSessionContext";
 import type { AudioChapter, AudioItem, AudioKind } from "@/shell/audioSession";
+import { useSkipPlan } from "@/shell/skip/useSkipPlan";
+import { applySkip, type SkipRange } from "@/shell/skip/skipPlan";
 
 interface PlayedItem {
   id: string;
@@ -44,6 +46,44 @@ export function MediaPlayerRegistration({ adultOnly = false, ...props }: Registr
 interface RegistrationProps { appId: string; mediaId: string | null; element: HTMLMediaElement | null; next?: (() => void) | undefined; liveSubtitle?: string; adultOnly?: boolean }
 
 function RegisteredPlayer({ appId, mediaId, element, next, liveSubtitle }: Omit<RegistrationProps, "adultOnly">) {
+  const skip = useSkipPlan(appId === "podcasts" ? mediaId : null);
+  const lastSkip = useRef<SkipRange | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setSkipNotice] = useState<SkipRange | null>(null);
+  const undo = useCallback(() => {
+    if (!element || !lastSkip.current) return;
+    element.currentTime = lastSkip.current.startSec;
+    lastSkip.current = null;
+    setSkipNotice(null);
+    element.play().catch(() => {});
+    element.dispatchEvent(new Event("podcast-skip-undone"));
+  }, [element]);
+  useEffect(() => {
+    if (!element) return;
+    const onUndo = () => undo();
+    element.addEventListener("podcast-skip-undo", onUndo);
+    return () => element.removeEventListener("podcast-skip-undo", onUndo);
+  }, [element, undo]);
+  useEffect(() => {
+    if (!element || appId !== "podcasts") return;
+    const onTime = () => {
+      const range = applySkip(skip.plan, element.currentTime);
+      if (!range) return;
+      lastSkip.current = range;
+      setSkipNotice(range);
+      element.currentTime = range.endSec;
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+      undoTimer.current = setTimeout(() => { lastSkip.current = null; }, 7000);
+    };
+    element.addEventListener("timeupdate", onTime);
+    return () => { element.removeEventListener("timeupdate", onTime); if (undoTimer.current) clearTimeout(undoTimer.current); };
+  }, [appId, element, skip.plan]);
+  useEffect(() => {
+    if (!element || appId !== "podcasts") return;
+    const onPlan = () => { void skip.refresh(); };
+    element.addEventListener("podcast-skip-undo", onPlan as EventListener);
+    return () => element.removeEventListener("podcast-skip-undo", onPlan as EventListener);
+  }, [appId, element, skip.refresh]);
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {

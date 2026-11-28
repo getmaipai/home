@@ -36,8 +36,8 @@ export function skipPlanFor(mediaItemId: string, person: PersonRow) {
   const record = MediaSegmentsSchema.safeParse(rawRecord);
   if (!record.success) return { state: "unavailable", reason: "The Stack returned an invalid segment record. Reprocess this saved episode.", ranges: [] };
   const policies = resolvedPodcastPolicies(person, item.sourceId);
-  const kinds = PODCAST_SEGMENT_KINDS.filter((kind) => policies[kind] === "skip") as MediaSegment["kind"][];
-  return { state: record.data.segments.length ? "ready" : "nothing_found", reason: null, ranges: skipPlan(record.data, { kinds, bumpersWithAds: policies.bumper === "skip" && getHouseholdSettingValue("podcasts.skip.bumpers_with_ads") !== false }) };
+  const ranges = record.data.segments.map((segment) => ({ id: segment.id, kind: segment.kind, startSec: segment.startSec, endSec: segment.endSec, status: segment.status, source: segment.source, confidence: segment.confidence, mode: policies[segment.kind as PodcastSegmentKind] ?? "off" }));
+  return { state: record.data.segments.length ? "ready" : "nothing_found", reason: null, recordId: link.recordId, sourceHash: file.sha256, modes: policies, ranges };
 }
 
 /** Enqueue analysis after a fetched copy commits. This is intentionally fire-and-forget for playback/save callers. */

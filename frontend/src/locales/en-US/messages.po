@@ -630,6 +630,11 @@ msgid "{kind} ({size})"
 msgstr "{kind} ({size})"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:13
+msgid "{kind} from {start} to {end}"
+msgstr "{kind} from {start} to {end}"
+
+#. js-lingui-explicit-id
 #: src/apps/code/NewSession.tsx:113
 msgid "{kind}: {account}"
 msgstr "{kind}: {account}"
@@ -4309,7 +4314,7 @@ msgid "setting.companion.voice.buddy.label"
 msgstr "Buddy's voice"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:115
+#: src/shell/GlobalMiniPlayer.tsx:125
 msgid "Buffering"
 msgstr "Buffering"
 
@@ -6406,7 +6411,7 @@ msgstr "Connected over the internet"
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:18
-#: src/shell/GlobalMiniPlayer.tsx:115
+#: src/shell/GlobalMiniPlayer.tsx:125
 #: src/shell/pages/StatusPage.tsx:26
 msgid "Connecting"
 msgstr "Connecting"
@@ -10685,13 +10690,13 @@ msgid "setting.robot.barge_in.open_mic.label"
 msgstr "Full open-mic interruption"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:136
+#: src/shell/GlobalMiniPlayer.tsx:146
 #: src/shell/media/MusicVisualizerSection.tsx:74
 msgid "Full screen"
 msgstr "Full screen"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:134
+#: src/shell/GlobalMiniPlayer.tsx:144
 #: src/shell/media/MusicVisualizerSection.tsx:74
 msgid "Full screen visualizer"
 msgstr "Full screen visualizer"
@@ -11321,6 +11326,11 @@ msgstr "Health and medicine"
 #: src/shell/pages/StatusPage.tsx:89
 msgid "Health checks"
 msgstr "Health checks"
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:28
+msgid "Hear it anyway"
+msgstr "Hear it anyway"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:752
@@ -20374,7 +20384,7 @@ msgid "Picture"
 msgstr "Picture"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:135
+#: src/shell/GlobalMiniPlayer.tsx:145
 msgid "Picture in picture"
 msgstr "Picture in picture"
 
@@ -20636,6 +20646,11 @@ msgstr "Play in the player"
 #: src/shell/music/MusicPlayerBar.tsx:119
 msgid "Play or pause"
 msgstr "Play or pause"
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:32
+msgid "Play original"
+msgstr "Play original"
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1912
@@ -22215,7 +22230,7 @@ msgstr "Off, Home's own engine does this. Turn on only after the Stack has been 
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:147
-#: src/shell/GlobalMiniPlayer.tsx:120
+#: src/shell/GlobalMiniPlayer.tsx:130
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -23558,7 +23573,7 @@ msgid "Seed {seed}. Take {index} of {total}."
 msgstr "Seed {seed}. Take {index} of {total}."
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:127
+#: src/shell/GlobalMiniPlayer.tsx:137
 #: src/shell/media/NowPlayingStage.tsx:179
 #: src/shell/music/MusicPlayerBar.tsx:151
 msgid "Seek"
@@ -24773,6 +24788,11 @@ msgid "SKIP"
 msgstr "SKIP"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:27
+msgid "Skip {kind}"
+msgstr "Skip {kind}"
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1207
 msgid "setting.podcasts.skip.bumpers_with_ads.help"
 msgstr "Skip a bumper when it is grouped with an adjacent skipped ad."
@@ -24788,11 +24808,26 @@ msgid "Skip next"
 msgstr "Skip next"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:12
+msgid "Skip ranges"
+msgstr "Skip ranges"
+
+#. js-lingui-explicit-id
 #: src/apps/setup/HostTuneStep.tsx:68
 #: src/apps/setup/HostTuneStep.tsx:77
 #: src/apps/setup/HostTuneStep.tsx:150
 msgid "Skip this step"
 msgstr "Skip this step"
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:22
+msgid "Skipped a {mins} minute break"
+msgstr "Skipped a {mins} minute break"
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:22
+msgid "Skipped a break, {saved}"
+msgstr "Skipped a break, {saved}"
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:118
@@ -28764,7 +28799,7 @@ msgid "This song's file is missing. Make it again."
 msgstr "This song's file is missing. Make it again."
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:120
+#: src/shell/GlobalMiniPlayer.tsx:130
 msgid "This station did not start. Check your connection, then press Retry."
 msgstr "This station did not start. Check your connection, then press Retry."
 
@@ -29624,6 +29659,7 @@ msgstr "Understood the request"
 #: src/shell/pages/FilesPage.tsx:190
 #: src/shell/pages/MusicLibrary.tsx:169
 #: src/shell/pages/MusicStudioView.tsx:182
+#: src/shell/skip/SkipControls.tsx:22
 msgid "Undo"
 msgstr "Undo"
 

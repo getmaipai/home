@@ -715,6 +715,11 @@ msgid "{kind} ({size})"
 msgstr "{kind} ({size})"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:13
+msgid "{kind} from {start} to {end}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/code/NewSession.tsx:113
 msgid "{kind}: {account}"
 msgstr ""
@@ -4878,7 +4883,7 @@ msgid "setting.companion.voice.buddy.label"
 msgstr "Voz de Buddy"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:115
+#: src/shell/GlobalMiniPlayer.tsx:125
 #, needs-review
 msgid "Buffering"
 msgstr "Cargando"
@@ -7236,7 +7241,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/settings/StackChanInstallDialog.tsx:18
-#: src/shell/GlobalMiniPlayer.tsx:115
+#: src/shell/GlobalMiniPlayer.tsx:125
 #: src/shell/pages/StatusPage.tsx:26
 #, needs-review
 msgid "Connecting"
@@ -12080,14 +12085,14 @@ msgid "setting.robot.barge_in.open_mic.label"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:136
+#: src/shell/GlobalMiniPlayer.tsx:146
 #: src/shell/media/MusicVisualizerSection.tsx:74
 #, needs-review
 msgid "Full screen"
 msgstr "Pantalla completa"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:134
+#: src/shell/GlobalMiniPlayer.tsx:144
 #: src/shell/media/MusicVisualizerSection.tsx:74
 #, needs-review
 msgid "Full screen visualizer"
@@ -12794,6 +12799,11 @@ msgstr "Salud y medicina"
 #, needs-review
 msgid "Health checks"
 msgstr "Controles de salud"
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:28
+msgid "Hear it anyway"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:752
@@ -23001,7 +23011,7 @@ msgid "Picture"
 msgstr "Imagen"
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:135
+#: src/shell/GlobalMiniPlayer.tsx:145
 #, needs-review
 msgid "Picture in picture"
 msgstr "Imagen en imagen"
@@ -23291,6 +23301,11 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/music/MusicPlayerBar.tsx:119
 msgid "Play or pause"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:32
+msgid "Play original"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -25082,7 +25097,7 @@ msgstr "Retirado. El MaiPai Stack ahora decide qué motor hace cada tarea, así 
 #: src/apps/reminders/RemindersPage.tsx:193
 #: src/apps/settings/EngineLinkCredentialSection.tsx:279
 #: src/apps/settings/StackChanInstallDialog.tsx:147
-#: src/shell/GlobalMiniPlayer.tsx:120
+#: src/shell/GlobalMiniPlayer.tsx:130
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
 #: src/shell/pages/settings/HouseSettings.tsx:47
@@ -26587,7 +26602,7 @@ msgid "Seed {seed}. Take {index} of {total}."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:127
+#: src/shell/GlobalMiniPlayer.tsx:137
 #: src/shell/media/NowPlayingStage.tsx:179
 #: src/shell/music/MusicPlayerBar.tsx:151
 #, needs-review
@@ -27951,6 +27966,11 @@ msgid "SKIP"
 msgstr "OMITIR"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:27
+msgid "Skip {kind}"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/lib/settingCopy.generated.ts:1207
 msgid "setting.podcasts.skip.bumpers_with_ads.help"
 msgstr ""
@@ -27967,12 +27987,27 @@ msgid "Skip next"
 msgstr "Saltar la próxima"
 
 #. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:12
+msgid "Skip ranges"
+msgstr ""
+
+#. js-lingui-explicit-id
 #: src/apps/setup/HostTuneStep.tsx:68
 #: src/apps/setup/HostTuneStep.tsx:77
 #: src/apps/setup/HostTuneStep.tsx:150
 #, needs-review
 msgid "Skip this step"
 msgstr "Omitir este paso"
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:22
+msgid "Skipped a {mins} minute break"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/skip/SkipControls.tsx:22
+msgid "Skipped a break, {saved}"
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/apps/clock/AlarmEditor.tsx:118
@@ -32404,7 +32439,7 @@ msgid "This song's file is missing. Make it again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/GlobalMiniPlayer.tsx:120
+#: src/shell/GlobalMiniPlayer.tsx:130
 #, needs-review
 msgid "This station did not start. Check your connection, then press Retry."
 msgstr "La estación no empezó. Revisa tu conexión y luego pulsa Reintentar."
@@ -33389,6 +33424,7 @@ msgstr "Entendió la solicitud"
 #: src/shell/pages/FilesPage.tsx:190
 #: src/shell/pages/MusicLibrary.tsx:169
 #: src/shell/pages/MusicStudioView.tsx:182
+#: src/shell/skip/SkipControls.tsx:22
 #, needs-review
 msgid "Undo"
 msgstr "Deshacer"

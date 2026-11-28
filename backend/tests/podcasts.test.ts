@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, podcastTranscripts, shares, people, transcripts, transcriptRevisions } from "@/db/schema";
+import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, podcastTranscripts, shares, people, transcripts, transcriptRevisions, podcastSegmentRecords } from "@/db/schema";
 import { evaluateFilter, filterSummary } from "@/lib/media/podcastFilters";
 import { sharedWith } from "@/lib/media/collections";
 import { TestClient } from "./client";
@@ -26,6 +26,7 @@ import { purgeExpired } from "@/lib/trash/registry";
 import { nextHlc } from "@/lib/hlc";
 import { newConversationTurnId, newMediaItemId, newShareId } from "@/lib/id";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { skipPlanFor } from "@/lib/media/podcastSegments";
 import { syncShelfFeeds } from "@/lib/shelf/shelfFeeds";
 import { runShelfTick } from "@/lib/shelf/shelfJobs";
 import { getPodcastTranscript, searchPodcastTranscripts } from "@/lib/media/podcasts";
@@ -461,6 +462,31 @@ async function subscribeAgainHidden(owner: TestClient): Promise<string> {
 }
 
 describe("the privacy page", () => {
+  test("the segment route returns every range with resolved mode and Stack metadata", async () => {
+    const { owner, subscribe, poll, idOf } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id })).status).toBe(200);
+    const item = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!;
+    const file = db.select().from(attachments).where(eq(attachments.id, item.locFileId!)).get()!;
+    const storedRecord = { fileSha256: file.sha256, durationSec: 190, cleanCopy: true, producedBy: { transcriptRevision: "r1", modelId: "fixture", pipelineVersion: "1", createdAt: new Date().toISOString() }, created_at: new Date().toISOString(), hlc: "1:0:fixture1", provenance: "stack:media.segments", segments: [
+      { id: "ad-1", kind: "ad", startSec: 10, endSec: 20, confidence: 0.99, source: "fingerprint", status: "auto" },
+      { id: "sponsor-1", kind: "sponsor", startSec: 40, endSec: 50, confidence: 0.92, source: "llm", status: "held" },
+      { id: "intro-1", kind: "intro", startSec: 60, endSec: 75, confidence: 0.88, source: "chapter", status: "confirmed" },
+    ] };
+    db.insert(podcastSegmentRecords).values({ sha256: file.sha256, pipelineVersion: "1", state: "ready", recordId: "record-fixture", jobId: null, record: JSON.stringify(storedRecord), reason: null, updatedAt: new Date().toISOString() }).run();
+    const plan = await (await owner.get(`/api/plugins/podcasts/segments/${id}`)).json() as { state: string; sourceHash: string; ranges: Array<Record<string, unknown>> };
+    expect(plan.state).toBe("ready");
+    expect(plan.sourceHash).toBe(file.sha256);
+    expect(plan.ranges).toEqual([
+      { id: "ad-1", kind: "ad", startSec: 10, endSec: 20, status: "auto", source: "fingerprint", confidence: 0.99, mode: "skip" },
+      { id: "sponsor-1", kind: "sponsor", startSec: 40, endSec: 50, status: "held", source: "llm", confidence: 0.92, mode: "skip" },
+      { id: "intro-1", kind: "intro", startSec: 60, endSec: 75, status: "confirmed", source: "chapter", confidence: 0.88, mode: "mark" },
+    ]);
+    expect(db.select().from(mediaSources).where(eq(mediaSources.id, sourceId)).get()).toBeTruthy();
+  });
+
   test("lists each podcast feed host with a conditional request and no identity, and only while a show is followed", async () => {
     const { owner, subscribe } = await setup();
     expect(privacyConnections().some((row) => row.id === "platform:podcast-feeds")).toBe(false);

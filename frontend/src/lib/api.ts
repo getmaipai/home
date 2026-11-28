@@ -1763,6 +1763,7 @@ export const api = {
   // `/media/<id>` link is read from its kind).
   appData: <T>(pkg: string, dataId: string, body: Record<string, unknown> = {}) =>
     request<T>(`/api/plugins/${encodeURIComponent(pkg)}/data/${encodeURIComponent(dataId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  requestSkipPlan: (episodeId: string) => request<import("@/shell/skip/skipPlan").SkipPlan>(`/api/plugins/podcasts/segments/${encodeURIComponent(episodeId)}`),
   mediaItem: (id: string) => request<{ item: { id: string; kind: string; title: string } }>(`/api/media/items/${encodeURIComponent(id)}`),
   // MEDIA-POLISH-01: the docked mini bar's progress report (POST /api/plugins/:id/progress, the media app host's own action).
   mediaProgress: (pkg: string, body: { media_id: string; position_s?: number; duration_s?: number; reason: string; locator?: unknown; percent?: number }, keepalive = false) =>

@@ -24,6 +24,9 @@ import { clock } from "@/shell/media/NowPlayingStage";
 import { useArtPalette } from "@/lib/media/artPalette";
 import { START_GIVE_UP_MS, useMediaLoading } from "@/lib/media/mediaLoading";
 import { Spinner } from "@maipai/ui/src/dashboard/components/ui/spinner";
+import { SkipRanges, SkippedPill, SkipButton } from "@/shell/skip/SkipControls";
+import { useSkipPlan } from "@/shell/skip/useSkipPlan";
+import { applySkip, type SkipRange } from "@/shell/skip/skipPlan";
 
 /** True when the person is on the page that plays `held` right now (its watch, play, listen or read page). */
 export function onPlayPageOf(held: HoistedMedia, pathname: string, search: string, stateId: string | undefined): boolean {
@@ -77,6 +80,12 @@ export function GlobalMiniPlayer() {
 
   const PipIcon = getIcon("picture-in-picture"), FullIcon = getIcon("maximize");
   const el = held.el;
+  const skip = useSkipPlan(held.appId === "podcasts" ? held.id : null);
+  const [skipped, setSkipped] = useState<SkipRange | null>(null);
+  const activeRange = held.appId === "podcasts" ? applySkip(skip.plan, position) : null;
+  const skipRange = activeRange?.kind === "intro" || activeRange?.kind === "recap" || activeRange?.kind === "sponsor" ? activeRange : null;
+  const doSkip = (range: SkipRange | null) => { if (!range) return; setSkipped(range); el.currentTime = range.endSec; };
+  const undoSkip = () => { if (skipped) { el.currentTime = skipped.startSec; setSkipped(null); } };
   const pictureInPicture = typeof document !== "undefined" && "pictureInPictureEnabled" in document && document.pictureInPictureEnabled && el instanceof HTMLVideoElement;
   // News Listen (NEWS-04) holds a story being read aloud: expanding opens the story, and its place is not a media position to save.
   const listenStory = storyIdOfListen(held.appId, held.id);
@@ -109,6 +118,7 @@ export function GlobalMiniPlayer() {
           }}
           actionsSlot={
             <>
+              {held.appId === "podcasts" ? <><SkippedPill range={skipped} onUndo={undoSkip} /><SkipButton range={skipRange} onSkip={() => doSkip(skipRange)} onHear={() => { if (skipRange) el.currentTime = skipRange.startSec; }} /></> : null}
               {waiting.loading ? (
                 <span role="status" data-testid="mini-loading" className="flex items-center gap-2 pe-2 text-base text-muted-foreground">
                   <Spinner aria-hidden="true" role="presentation" />
@@ -137,6 +147,7 @@ export function GlobalMiniPlayer() {
             </>
           }
         />
+        {held.appId === "podcasts" ? <div className="absolute inset-x-2 bottom-1 pointer-events-auto"><SkipRanges plan={skip.plan} duration={duration} onSeek={(p) => { el.currentTime = p; }} /></div> : null}
         {isAudio && vizOn ? <AudioVisualizer variant={variant} mode="strip" getAnalyser={getAnalyser} palette={palette} active={playing} opacity={0.4} fade className="pointer-events-none absolute inset-0 z-40 size-full grayscale" /> : null}
       </div>
       {stage ? <NowPlayingStage media={held} onClose={closeStage} /> : null}
