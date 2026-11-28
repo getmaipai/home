@@ -87,7 +87,7 @@ export async function podcastDiscoveryRows(person: PersonRow, scope: string, gen
 }
 
 /** Dedupe library rows by their feed/source identity, not by episode title. */
-export function dedupePodcastShowRows<T extends { id?: string; feed_url?: string; title?: string; channel?: string }>(rows: readonly T[]): T[] {
+export function dedupePodcastShowRows<T extends { id?: string; feed_url?: string; title?: string; channel?: string | null }>(rows: readonly T[]): T[] {
   const seen = new Set<string>();
   // A feed is one show by its address. A show made here has none: the same title and label is one show to a person, however many were made.
   return rows.filter((row) => { const key = row.feed_url || (row.title ? `made:${row.title.trim().toLocaleLowerCase()}|${row.channel ?? ""}` : row.id) || ""; if (!key || seen.has(key)) return false; seen.add(key); return true; });
