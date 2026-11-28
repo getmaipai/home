@@ -6,6 +6,7 @@ import { podcastSegmentLinks, podcastSegmentRecords, podcastShowKeys, attachment
 import { getStackClient } from "@/lib/stackEngine";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { mediaBandOf } from "@/lib/media/band";
+import { allowedSources } from "./appHost";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { PersonRow } from "@/types";
 import { BUILTIN_SEGMENT_POLICY, PODCAST_SEGMENT_KINDS, resolveSegmentPolicy, type PodcastSegmentKind, type SegmentPolicy, PODCAST_SEGMENT_PIPELINE_VERSION } from "./podcastSegmentPolicy";
@@ -36,7 +37,7 @@ export function skipPlanFor(mediaItemId: string, person: PersonRow) {
   const record = MediaSegmentsSchema.safeParse(rawRecord);
   if (!record.success) return { state: "unavailable", reason: "The Stack returned an invalid segment record. Reprocess this saved episode.", ranges: [] };
   const policies = resolvedPodcastPolicies(person, item.sourceId);
-  const ranges = record.data.segments.map((segment) => ({ id: segment.id, kind: segment.kind, startSec: segment.startSec, endSec: segment.endSec, status: segment.status, source: segment.source, confidence: segment.confidence, mode: policies[segment.kind as PodcastSegmentKind] ?? "off" }));
+  const ranges = record.data.segments.map((segment) => ({ id: segment.id, kind: segment.kind, startSec: segment.startSec, endSec: segment.endSec, status: segment.status, source: segment.source, confidence: segment.confidence, ...(segment.groupId ? { groupId: segment.groupId } : {}), mode: policies[segment.kind as PodcastSegmentKind] ?? "off" }));
   return { state: record.data.segments.length ? "ready" : "nothing_found", reason: null, recordId: link.recordId, sourceHash: file.sha256, modes: policies, ranges };
 }
 
@@ -73,9 +74,7 @@ export function podcastSkipAction(person: PersonRow, input: { mediaId: string; a
     if (end <= start) throw new Error("Choose an end after the start.");
     const item = db.select().from(mediaItems).where(eq(mediaItems.id, input.mediaId)).get();
     if (!item) throw new Error("That episode is not available.");
-    // Player-missed spans are person-owned notes in the existing transcript store.
-    void item;
-    return { ok: true, created: true };
+    return reportMissingPodcastAd(start, end).then(() => ({ ok: true, created: true }));
   }
   if (input.actionId === "wrong") {
     if (mediaBandOf(person) === "child") throw new Error("This action is not available.");
@@ -89,6 +88,69 @@ export function podcastSkipAction(person: PersonRow, input: { mediaId: string; a
   }
   if (input.actionId === "skip_button") return { ok: true, player: { seek_to_sec: range?.endSec ?? input.endSec ?? 0, announce: "Skipped the break.", refresh: true } };
   return { ok: false };
+}
+
+/** Non-adults receive only the ranges needed to play or mark segments, without review or record metadata. */
+export function playbackSkipPlanFor(mediaItemId: string, person: PersonRow) {
+  const plan = skipPlanFor(mediaItemId, person);
+  if (mediaBandOf(person) === "adult") return plan;
+  return {
+    state: plan.state,
+    reason: plan.reason,
+    modes: plan.modes,
+    ranges: plan.ranges.filter((range) => range.status !== "held" && range.status !== "rejected").map(({ startSec, endSec, kind, mode }) => ({ startSec, endSec, kind, mode })),
+  };
+}
+
+/** Review metadata is adult-only; playback plans remain available to every allowed listener. */
+export function segmentReviewFor(mediaItemId: string, person: PersonRow) {
+  if (mediaBandOf(person) !== "adult") return null;
+  const plan = skipPlanFor(mediaItemId, person);
+  if (plan.state !== "ready" && plan.state !== "nothing_found") return { ...plan, segments: [] };
+  const link = db.select().from(podcastSegmentLinks).where(eq(podcastSegmentLinks.mediaItemId, mediaItemId)).get();
+  if (!link?.record) return { ...plan, segments: [] };
+  try {
+    const parsed = MediaSegmentsSchema.safeParse(JSON.parse(link.record));
+    if (!parsed.success) return { state: "unavailable", reason: "The saved segment record could not be read. Reload this episode.", ranges: [], segments: [] };
+    return { ...plan, record_id: link.recordId, updated_at: link.updatedAt, segments: parsed.data.segments.map((segment) => ({ id: segment.id, kind: segment.kind, start: segment.startSec, end: segment.endSec, source: segment.source, confidence: segment.confidence, status: segment.status })) };
+  } catch { return { state: "unavailable", reason: "The saved segment record could not be read. Reload this episode.", ranges: [], segments: [] }; }
+}
+
+export function podcastSkipSummary(person: PersonRow) {
+  const sources = new Map(allowedSources(person).map((source) => [source.id, source.label] as const));
+  const episodes = db.select().from(mediaItems).all().filter((row) => row.kind === "podcast_episode" && sources.has(row.sourceId));
+  const result: Array<{ id: string; show_id: string; show: string; updated_at: string; ads_skipped: number; seconds_saved: number }> = [];
+  for (const item of episodes) {
+    const link = db.select().from(podcastSegmentLinks).where(eq(podcastSegmentLinks.mediaItemId, item.id)).get();
+    if (!link?.record || link.state !== "ready") continue;
+    try {
+      const parsed = MediaSegmentsSchema.safeParse(JSON.parse(link.record));
+      if (!parsed.success) continue;
+      const ads = parsed.data.segments.filter((segment) => segment.kind === "ad" && segment.status !== "rejected" && segment.status !== "held");
+      result.push({ id: item.id, show_id: item.sourceId, show: sources.get(item.sourceId)!, updated_at: link.updatedAt, ads_skipped: ads.length, seconds_saved: ads.reduce((sum, segment) => sum + Math.max(0, segment.endSec - segment.startSec), 0) });
+    } catch { /* malformed local data contributes no time */ }
+  }
+  const now = Date.now();
+  const shows = [...new Set(result.map((row) => row.show_id))].map((showId) => {
+    const rows = result.filter((row) => row.show_id === showId);
+    return { show: rows[0]!.show, show_id: showId, ads_skipped: rows.reduce((sum, row) => sum + row.ads_skipped, 0), seconds_saved: rows.reduce((sum, row) => sum + row.seconds_saved, 0) };
+  });
+  const aggregate = { this_week: result.filter((row) => Date.parse(row.updated_at) >= now - 7 * 86400000).reduce((sum, row) => sum + row.seconds_saved, 0), this_month: result.filter((row) => Date.parse(row.updated_at) >= now - 30 * 86400000).reduce((sum, row) => sum + row.seconds_saved, 0), household_seconds: result.reduce((sum, row) => sum + row.seconds_saved, 0) };
+  if (mediaBandOf(person) !== "adult") return { ...aggregate, shows: [], episodes: [] };
+  return { ...aggregate, shows, episodes: result };
+}
+
+export function podcastSkipRowFields(mediaItemId: string, person: PersonRow): Record<string, string> {
+  const item = db.select({ sourceId: mediaItems.sourceId }).from(mediaItems).where(eq(mediaItems.id, mediaItemId)).get();
+  const source = item ? db.select({ kind: mediaSources.kind }).from(mediaSources).where(eq(mediaSources.id, item.sourceId)).get() : null;
+  if (source?.kind !== "feed") return {};
+  const plan = skipPlanFor(mediaItemId, person) as { state: string; reason?: string | null; ranges?: Array<{ id?: string; mode?: string; kind?: string; groupId?: string; status?: string }> };
+  const skipped = new Set(plan.ranges?.filter((range) => range.mode === "skip" && !["held", "rejected"].includes(range.status ?? "") && ["ad", "sponsor", "bumper"].includes(range.kind ?? "")).map((range) => range.kind === "bumper" && range.groupId ? `bumper:${range.groupId}` : range.id) ?? []).size;
+  const mode = plan.ranges?.some((range) => range.mode === "skip") ? "skip" : plan.ranges?.some((range) => range.mode === "mark") ? "mark" : "off";
+  const needsReview = mediaBandOf(person) === "adult" && (plan.state === "not_processed" || plan.ranges?.some((range) => range.status === "held"));
+  const skip_badge = ["queued", "processing"].includes(plan.state) ? "Processing" : ["offline", "unavailable"].includes(plan.state) ? "Stack offline" : needsReview ? "Needs review" : plan.state === "nothing_found" ? "No ads found" : mode === "off" ? "Skipping off" : mode === "mark" ? "Ready" : skipped ? `${skipped} breaks skipped` : "No ads found";
+  const skip_help = plan.state === "queued" || plan.state === "processing" ? "Stack is checking this saved episode. Keep listening while it runs." : plan.state === "offline" || plan.state === "unavailable" ? plan.reason ?? "Analysis could not reach Stack. Playback remains available; retry when Stack is online." : plan.state === "not_processed" ? mediaBandOf(person) === "adult" ? "This episode has not been analyzed. Save a copy; an adult admin can add it to the processing queue." : "" : needsReview ? "Some detected ranges need review. Open this episode to confirm them or report a detection as wrong." : plan.state === "nothing_found" ? "Analysis finished without finding ad breaks. Nothing needs fixing." : mode === "off" ? "Break analysis is ready, but skipping is off. Change this in podcast skip settings." : mode === "mark" ? "Analysis is ready. Marked ranges stay visible and will not be skipped." : `${skipped} detected breaks will be skipped during playback.`;
+  return { skip_badge, skip_help };
 }
 
 /** Enqueue analysis after a fetched copy commits. This is intentionally fire-and-forget for playback/save callers. */
@@ -237,6 +299,13 @@ export async function correctPodcastSegment(mediaItemId: string, recordId: strin
   const correct = getStackClient().correctMediaSegment;
   if (!correct) throw new Error("This Stack version cannot accept segment corrections. Update Stack and try again.");
   return correct(segmentId, rejected ? "rejected" : "confirmed");
+}
+
+export async function reportMissingPodcastAd(startSec: number, endSec: number) {
+  if (!Number.isFinite(startSec) || !Number.isFinite(endSec) || startSec < 0 || endSec <= startSec) throw new Error("Choose a valid start and end time for the missed ad.");
+  const submit = getStackClient().correctMediaSegment;
+  if (!submit) throw new Error("This Stack version cannot accept segment corrections. Update Stack and try again.");
+  return submit(`person-${randomUUID()}`, "confirmed", { range: { startSec, endSec } });
 }
 
 export type { MediaSegmentsRecord, MediaSegment };

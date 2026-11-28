@@ -6,7 +6,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { resetDb } from "../../../tests/reset-db";
 import { newMediaItemId } from "@/lib/id";
 import { BUILTIN_SEGMENT_POLICY, PODCAST_SEGMENT_KINDS, resolveSegmentPolicy } from "./podcastSegmentPolicy";
-import { acceptPodcastSegments, correctPodcastSegment, podcastPlayerSkipBindings, podcastSkipAction, pollPodcastSegments, processPodcastCopy, skipPlanFor } from "./podcastSegments";
+import { acceptPodcastSegments, correctPodcastSegment, playbackSkipPlanFor, pollPodcastSegments, podcastPlayerSkipBindings, podcastSkipAction, podcastSkipSummary, processPodcastCopy, reportMissingPodcastAd, segmentReviewFor, skipPlanFor } from "./podcastSegments";
 import type { PersonRow } from "@/types";
 import type { MediaSegmentsRecord } from "@maipai/spec/media/ts/segments.js";
 
@@ -34,28 +34,30 @@ const record = (sha: string, pipelineVersion = "1"): MediaSegmentsRecord => ({
 });
 const stackJob = (id: string, state: "queued" | "running" | "done" | "failed", result: unknown = null) => ({ id, kind: "media.segments", role: null, state, percent: 0, completedBytes: 0, totalBytes: 0, status: state, position: null, input: {}, result, reason: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
 let adult: PersonRow;
+let child: PersonRow;
 let itemId: string;
 let sha = "a".repeat(64);
 let jobNo = 0;
 let lastRequest: unknown;
 let pollResult: ReturnType<typeof stackJob>;
 let submitFailure = false;
+let missingCorrection: { id: string; status: string; range?: { startSec: number; endSec: number } } | null = null;
 
 beforeEach(async () => {
   resetDb();
   const now = new Date().toISOString();
-  adult = db.insert(people).values({ id: "person-podseg-adult", displayName: "Owner", role: "owner", avatarSeed: "owner", source: "local", createdAt: now, updatedAt: now, hlc: "1:0:fixture01" }).returning().get() as PersonRow;
-  db.insert(people).values({ id: "person-podseg-child", displayName: "Child", role: "child", avatarSeed: "child", source: "local", createdAt: now, updatedAt: now, hlc: "1:0:fixture02" }).run();
-  sha = "a".repeat(64); itemId = newMediaItemId(); jobNo = 0; lastRequest = null; submitFailure = false;
+  adult = db.insert(people).values({ id: "person-adultpodseg", displayName: "Owner", role: "owner", avatarSeed: "owner", source: "local", createdAt: now, updatedAt: now, hlc: "1:0:fixture01" }).returning().get() as PersonRow;
+  child = db.insert(people).values({ id: "person-childpodseg", displayName: "Child", role: "child", avatarSeed: "child", source: "local", createdAt: now, updatedAt: now, hlc: "1:0:fixture02" }).returning().get() as PersonRow;
+  sha = "a".repeat(64); itemId = newMediaItemId(); jobNo = 0; lastRequest = null; submitFailure = false; missingCorrection = null;
   pollResult = stackJob("segments-1", "running");
-  const sourceId = "podcast-source-test";
+  const sourceId = "msrc-podcasttest";
   db.insert(mediaSources).values({ id: sourceId, kind: "feed", scope: "household", ownerPersonId: adult.id, label: "Show X", url: "https://example.test/feed", auto: "{}", paused: false, visibleTo: '"household"', archive: "[]", prune: true, createdAt: new Date().toISOString(), hlc: "1:0:fixture01", provenance: "test" }).run();
   db.insert(mediaItems).values({ id: itemId, kind: "podcast_episode", title: "Episode", sourceId, locFileId: "podcast-file-test", mediaType: "audio/mpeg", playable: "original", chapters: "[]", subtitles: "[]", locatorKind: "file", bandOk: "adult", advisoryExplicit: false, advisorySource: "tag", hidden: false, addedAt: new Date().toISOString(), createdAt: new Date().toISOString(), hlc: "1:0:fixture01", provenance: "test" }).run();
   db.insert(attachments).values({ id: "podcast-file-test", ownerPersonId: adult.id, conversationId: null, turnId: null, mediaType: "audio/mpeg", size: 100, sha256: sha, storagePath: "podcast/file", retention: "kept", provenance: "podcast:manual", origin: "fetched", mediaSourceId: sourceId, deletedAt: null, trashUntil: null, name: null, createdAt: new Date().toISOString(), hlc: "1:0:fixture01" }).run();
   __setStackClientForTests({
     submitJob: async (request: unknown) => { lastRequest = request; jobNo++; if (submitFailure) throw new Error("offline"); return stackJob(`segments-${jobNo}`, "queued") as never; },
     job: async () => pollResult as never,
-    correctMediaSegment: async (id: string, status: string) => { correctionCalls.push([id, status]); return { ok: true }; },
+    correctMediaSegment: async (id: string, status: string, options?: { range?: { startSec: number; endSec: number } }) => { correctionCalls.push([id, status]); if (options?.range) missingCorrection = { id, status, range: options.range }; return { ok: true }; },
   } as never);
 });
 const correctionCalls: Array<[string, string]> = [];
@@ -76,7 +78,7 @@ describe("saved podcast segment lifecycle", () => {
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued", jobId: "segments-1" });
     expect(lastRequest).toMatchObject({ kind: "media.segments", input: { path: "podcast/file", kinds: PODCAST_SEGMENT_KINDS } });
     const showKey = (lastRequest as { input: { showKey: string } }).input.showKey;
-    expect(showKey).not.toBe("podcast-source-test");
+    expect(showKey).not.toBe("msrc-podcasttest");
     expect(showKey).toMatch(/^[0-9a-f-]{36}$/);
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued" });
     expect(jobNo).toBe(1);
@@ -99,10 +101,16 @@ describe("saved podcast segment lifecycle", () => {
     await processPodcastCopy(itemId);
     const accepted = acceptPodcastSegments(itemId, sha, "record-1", record(sha));
     expect(accepted.ok).toBe(true);
-    const child = db.select().from(people).where(eq(people.id, "person-podseg-child")).get()! as PersonRow;
     const childPlan = skipPlanFor(itemId, child) as Record<string, unknown>;
     expect(childPlan.ranges).toEqual([{ id: "seg-1", kind: "ad", startSec: 10, endSec: 20, status: "auto", source: "llm", confidence: 0.95, mode: "skip" }]);
     expect(childPlan).not.toHaveProperty("record");
+    expect(segmentReviewFor(itemId, child)).toBeNull();
+    expect(segmentReviewFor(itemId, adult)).toMatchObject({ segments: [{ id: "seg-1", kind: "ad", start: 10, end: 20, source: "llm", status: "auto" }] });
+    expect(playbackSkipPlanFor(itemId, child)).toMatchObject({ ranges: [{ startSec: 10, endSec: 20, kind: "ad", mode: "skip" }] });
+    expect(playbackSkipPlanFor(itemId, child).ranges[0]).not.toHaveProperty("confidence");
+    expect(playbackSkipPlanFor(itemId, child)).not.toHaveProperty("sourceHash");
+    expect(podcastSkipSummary(adult)).toMatchObject({ shows: [{ show_id: "msrc-podcasttest", ads_skipped: 1 }] });
+    expect(podcastSkipSummary(child)).toMatchObject({ shows: [], episodes: [] });
     correctionCalls.length = 0;
     await correctPodcastSegment(itemId, "record-1", "seg-1", true);
     expect(correctionCalls).toEqual([["seg-1", "rejected"]]);
@@ -110,7 +118,6 @@ describe("saved podcast segment lifecycle", () => {
   test("skip actions answer with player instructions the page renderer applies; a child cannot review", async () => {
     await processPodcastCopy(itemId);
     acceptPodcastSegments(itemId, sha, "record-1", record(sha));
-    const child = db.select().from(people).where(eq(people.id, "person-podseg-child")).get()! as PersonRow;
     const undo = await podcastSkipAction(child, { mediaId: itemId, actionId: "undo", id: "seg-1" }) as { player: Record<string, unknown> };
     expect(undo.player).toMatchObject({ seek_to_sec: 10, play_once_until_sec: 20, resume_after: true });
     const press = await podcastSkipAction(child, { mediaId: itemId, actionId: "skip_button", id: "seg-1" }) as { player: Record<string, unknown> };
@@ -120,12 +127,16 @@ describe("saved podcast segment lifecycle", () => {
     await expect(Promise.resolve().then(() => podcastSkipAction(child, { mediaId: itemId, actionId: "wrong", id: "seg-1" }))).rejects.toThrow();
     await expect(Promise.resolve().then(() => podcastSkipAction(child, { mediaId: itemId, actionId: "missed", startSec: 5 }))).rejects.toThrow();
   });
+  test("a missed ad is submitted to Stack with its source-time range", async () => {
+    await reportMissingPodcastAd(32, 48);
+    expect(missingCorrection).toMatchObject({ id: expect.stringMatching(/^person-/), status: "confirmed", range: { startSec: 32, endSec: 48 } });
+  });
   test("a completed plan follows matching saved-copy SHA, never the publisher stream", async () => {
     await processPodcastCopy(itemId);
     expect(acceptPodcastSegments(itemId, sha, "record-1", record(sha)).ok).toBe(true);
     const secondId = newMediaItemId();
-    db.insert(mediaItems).values({ id: secondId, kind: "podcast_episode", title: "Same bytes", sourceId: "podcast-source-test", locFileId: "podcast-file-copy-2", mediaType: "audio/mpeg", playable: "original", chapters: "[]", subtitles: "[]", locatorKind: "file", bandOk: "adult", advisoryExplicit: false, advisorySource: "tag", hidden: false, addedAt: new Date().toISOString(), createdAt: new Date().toISOString(), hlc: "1:0:fixture02", provenance: "test" }).run();
-    db.insert(attachments).values({ id: "podcast-file-copy-2", ownerPersonId: adult.id, conversationId: null, turnId: null, mediaType: "audio/mpeg", size: 100, sha256: sha, storagePath: "podcast/identical", retention: "kept", provenance: "podcast:manual", origin: "fetched", mediaSourceId: "podcast-source-test", deletedAt: null, trashUntil: null, name: null, createdAt: new Date().toISOString(), hlc: "1:0:fixture02" }).run();
+    db.insert(mediaItems).values({ id: secondId, kind: "podcast_episode", title: "Same bytes", sourceId: "msrc-podcasttest", locFileId: "podcast-file-copy-2", mediaType: "audio/mpeg", playable: "original", chapters: "[]", subtitles: "[]", locatorKind: "file", bandOk: "adult", advisoryExplicit: false, advisorySource: "tag", hidden: false, addedAt: new Date().toISOString(), createdAt: new Date().toISOString(), hlc: "1:0:fixture02", provenance: "test" }).run();
+    db.insert(attachments).values({ id: "podcast-file-copy-2", ownerPersonId: adult.id, conversationId: null, turnId: null, mediaType: "audio/mpeg", size: 100, sha256: sha, storagePath: "podcast/identical", retention: "kept", provenance: "podcast:manual", origin: "fetched", mediaSourceId: "msrc-podcasttest", deletedAt: null, trashUntil: null, name: null, createdAt: new Date().toISOString(), hlc: "1:0:fixture02" }).run();
     expect(skipPlanFor(secondId, adult)).toMatchObject({ state: "ready", ranges: [{ startSec: 10, endSec: 20 }] });
     expect(await processPodcastCopy(secondId)).toMatchObject({ state: "ready" });
     expect(jobNo).toBe(1);

@@ -33,10 +33,10 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{channel}",
+      "item_subtitle_field": "{channel} · {unplayed} · {skip_help}",
       "item_media_field": "thumbnail",
       "item_progress_field": "progress",
-      "item_badge_field": "unplayed",
+      "item_badge_field": "skip_badge",
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
@@ -98,8 +98,7 @@
             }
           }
         }
-      ],
-      "item_badge_presentation": "dot"
+      ]
     },
     {
       "type": "media_shelf",
@@ -113,9 +112,10 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{summary}",
+      "item_subtitle_field": "{summary} · {unplayed} · {skip_help}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
+      "item_badge_field": "skip_badge",
       "aspect": "square",
       "variant": "plain",
       "orientation": "vertical",

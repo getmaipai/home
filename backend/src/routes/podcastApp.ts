@@ -28,7 +28,7 @@ import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { setShowAutoSave, setShowPlayed, showSaveRows, episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
-import { skipPlanFor, correctPodcastSegment, podcastSkipAction, pollPodcastSegments, queuePodcastRows, cancelPodcastProcessing, backfillPodcastShow } from "@/lib/media/podcastSegments";
+import { skipPlanFor, playbackSkipPlanFor, segmentReviewFor, podcastSkipSummary, correctPodcastSegment, reportMissingPodcastAd, podcastSkipAction, pollPodcastSegments, queuePodcastRows, cancelPodcastProcessing, backfillPodcastShow } from "@/lib/media/podcastSegments";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -128,14 +128,15 @@ export async function podcastShowSeasonRows(person: PersonRow, id: string): Prom
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/played-all", "/show-auto", "/shows", "/shows/*", "/segments/*", "/processing/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/played-all", "/show-auto", "/shows", "/shows/*", "/segments/*", "/segments-summary", "/processing/*"]);
 
   routes.get("/processing", requireAuth, async (c) => {
     const person = c.get("person");
-    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
+    if (mediaBandOf(person) !== "adult") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
     const shows = allowedSources(person).filter((row) => row.kind === "feed" && !row.paused);
     return c.json({ episodes: shows.flatMap((source) => queuePodcastRows(source.id).map((episode) => ({ ...episode, show_id: source.id, show: source.label }))) }, 200);
   });
+  routes.get("/segments-summary", requireAuth, async (c) => c.json(podcastSkipSummary(c.get("person")), 200));
   routes.get("/processing/:source_id", requireAuth, async (c) => {
     const person = c.get("person"), sourceId = c.req.param("source_id");
     if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
@@ -158,16 +159,20 @@ export function podcastRoutes() {
     const item = readableIn(person, "podcasts", c.req.param("media_id"));
     if (!item) return c.json({ error: "That episode is not in your Podcasts list." }, 404);
     await pollPodcastSegments(item.id);
-    return c.json(skipPlanFor(item.id, person), 200);
+    return c.json(mediaBandOf(person) === "adult" ? segmentReviewFor(item.id, person) ?? skipPlanFor(item.id, person) : playbackSkipPlanFor(item.id, person), 200);
   });
   routes.post("/segments/:media_id/correction", requireAuth, async (c) => {
     const person = c.get("person");
-    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
+    if (mediaBandOf(person) !== "adult") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
     const item = readableIn(person, "podcasts", c.req.param("media_id"));
     if (!item) return c.json({ error: "That episode is not in your Podcasts list." }, 404);
     const body = await jsonBody(c);
-    if (typeof body.record_id !== "string" || typeof body.segment_id !== "string" || body.rejected !== true) return c.json({ error: "Choose a detected segment to report as wrong." }, 400);
-    try { await correctPodcastSegment(item.id, body.record_id, body.segment_id, true); return c.json({ ok: true }, 200); }
+    if (typeof body.start === "number" && typeof body.end === "number" && body.start >= 0 && body.end > body.start) {
+      try { await reportMissingPodcastAd(body.start, body.end); return c.json({ ok: true }, 200); }
+      catch { return c.json({ error: "The Stack could not save this missed-ad report. Check that it is online, then try again." }, 503); }
+    }
+    if (typeof body.record_id !== "string" || typeof body.segment_id !== "string" || typeof body.rejected !== "boolean") return c.json({ error: "Choose a detected segment to report as wrong." }, 400);
+    try { await correctPodcastSegment(item.id, body.record_id, body.segment_id, body.rejected); return c.json({ ok: true }, 200); }
     catch { return c.json({ error: "The Stack could not save this correction. Check that it is online, then try again." }, 503); }
   });
   routes.post("/skip-action", requireAuth, async (c) => {

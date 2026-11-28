@@ -401,6 +401,7 @@ export function createAudioSession() {
       const el = focused?.el;
       if (el) controls.seekTo(el.currentTime + seconds);
     },
+    currentTime(): number { return focused?.el?.currentTime ?? 0; },
     seekTo(seconds: number): void {
       const el = focused?.el;
       if (!el) return;

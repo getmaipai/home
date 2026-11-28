@@ -5,6 +5,7 @@
 // the household stops following is listed as Unfollowed and Follow brings it back.
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
+import { podcastSkipRowFields } from "@/lib/media/podcastSegments";
 import { mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { findFeedByUrl } from "@/lib/shelf/feedStore";
@@ -123,6 +124,7 @@ export function episodeFields(person: PersonRow, items: readonly MediaItem[], no
       // PODCAST-DOT-01: the unplayed dot is drawn when this field is not empty (its text is the dot's accessible name).
       unplayed: played ? "" : "Unplayed",
       badge: played ? "Played" : !heard && fresh ? "New" : saved ? "Saved" : "",
+      ...podcastSkipRowFields(item.id, person),
     });
   }
   return out;

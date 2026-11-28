@@ -104,6 +104,7 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
   const db = new Database(join(options.dataDir, "hub.db"));
   try {
     seedToursDisabledForCapture(db, Object.values(people));
+    seedPodcastSkipPreview(db, people.sage);
   } finally {
     db.close();
   }
@@ -124,6 +125,46 @@ export async function seedDemoHousehold(options: SeedOptions): Promise<SeedResul
     seedDemoSongs(options.dataDir);
   }
   return { cookie, people };
+}
+
+/** PODCAST-SKIP preview rows: stable, local-only saved copies and analysis states. */
+function seedPodcastSkipPreview(db: Database, ownerId: string): void {
+  const now = new Date().toISOString();
+  const sourceId = "msrc-podcastdemo";
+  db.query(`INSERT OR IGNORE INTO media_sources (id,kind,scope,owner_person_id,label,url,auto,paused,visible_to,archive,prune,created_at,hlc,provenance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(sourceId, "feed", "household", ownerId, "The Kitchen Table Show", "https://podcast.example.test/feed.xml", "{}", 0, '"household"', "[]", 0, now, "1:0:podseed", "dev:podcast-skip");
+  const definitions = [
+    { key: "three-breaks", title: "Three breaks and an intro", state: "ready", segments: [
+      { id: "demo-ad", kind: "ad", startSec: 120, endSec: 150, confidence: 0.99, source: "llm", status: "auto" },
+      { id: "demo-sponsor", kind: "sponsor", startSec: 300, endSec: 330, confidence: 0.96, source: "llm", status: "auto" },
+      { id: "demo-bumper", kind: "bumper", startSec: 330, endSec: 335, confidence: 0.97, source: "llm", status: "auto", groupId: "demo-group" },
+      { id: "demo-intro", kind: "intro", startSec: 0, endSec: 20, confidence: 0.92, source: "llm", status: "auto" },
+    ] },
+    { key: "no-ads", title: "A quiet episode", state: "nothing_found", segments: [] },
+    { key: "processing", title: "Checking this episode", state: "queued", segments: [] },
+    { key: "offline", title: "Analysis needs a connection", state: "offline", segments: [] },
+    { key: "needs-review", title: "Not analyzed yet", state: "not_processed", segments: [] },
+    { key: "ready-mark", title: "Ready with marked intro", state: "ready", segments: [{ id: "demo-mark-intro", kind: "intro", startSec: 12, endSec: 42, confidence: 0.9, source: "llm", status: "auto" }] },
+    { key: "skipping-off", title: "Break found with skipping off", state: "ready", segments: [{ id: "demo-selfpromo", kind: "selfpromo", startSec: 75, endSec: 100, confidence: 0.93, source: "llm", status: "auto" }] },
+  ];
+  for (const [index, episode] of definitions.entries()) {
+    const itemId = `media-podcastdemo${index}`;
+    const fileId = `file-podcastdemo${index}`;
+    const sha = (index + 1).toString(16).padStart(64, "0");
+    const jobId = episode.state === "queued" ? "demo-segments-queued" : null;
+    db.query(`INSERT OR IGNORE INTO attachments (id,owner_person_id,conversation_id,turn_id,media_type,size,sha256,storage_path,retention,provenance,origin,media_source_id,deleted_at,trash_until,file_name,created_at,hlc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(fileId, ownerId, null, null, "audio/mpeg", 1000, sha, `podcast/demo/${episode.key}.mp3`, "kept", "podcast:dev-seed", "fetched", sourceId, null, null, null, now, "1:0:podseed");
+    db.query(`INSERT OR IGNORE INTO media_items (id,kind,title,description,source_id,loc_file_id,media_type,duration_s,playable,chapters,subtitles,locator_kind,external,advisory_explicit,advisory_source,band_ok,hidden,added_at,created_at,hlc,provenance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(itemId, "podcast_episode", episode.title, "Seeded podcast skip preview", sourceId, fileId, "audio/mpeg", 1800, "original", "[]", "[]", "file", JSON.stringify({ extractor: "rss", id: `demo-${episode.key}`, url: `https://podcast.example.test/${episode.key}.mp3`, channel_id: sourceId, channel_name: "The Kitchen Table Show", published_at: new Date(Date.now() - index * 86400000).toISOString() }), 0, "tag", "child", 0, now, now, "1:0:podseed", "dev:podcast-skip");
+    if (["ready", "nothing_found"].includes(episode.state)) {
+      const record = JSON.stringify({ fileSha256: sha, durationSec: 1800, segments: episode.segments, producedBy: { transcriptRevision: "demo", modelId: "preview", pipelineVersion: "1", createdAt: now }, cleanCopy: true, created_at: now, hlc: "1:0:podseed", provenance: "stack:media.segments" });
+      const recordId = `demo-record-${episode.key}`;
+      db.query(`INSERT OR IGNORE INTO podcast_segment_records (sha256,pipeline_version,state,record_id,job_id,record,reason,updated_at) VALUES (?,?,?,?,?,?,?,?)`).run(sha, "1", episode.state, recordId, null, record, null, now);
+      db.query(`INSERT OR IGNORE INTO podcast_segment_links (media_item_id,sha256,pipeline_version,state,record_id,job_id,record,reason,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(itemId, sha, "1", episode.state, recordId, null, record, null, now);
+    } else {
+      db.query(`INSERT OR IGNORE INTO podcast_segment_links (media_item_id,sha256,pipeline_version,state,record_id,job_id,record,reason,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`).run(itemId, sha, "1", episode.state, null, jobId, null, episode.state === "offline" ? "Stack is offline; playback remains available. Try again later." : null, now);
+    }
+  }
 }
 
 const DEMO_STATIONS = [

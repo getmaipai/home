@@ -1763,6 +1763,10 @@ export const api = {
   // `/media/<id>` link is read from its kind).
   appData: <T>(pkg: string, dataId: string, body: Record<string, unknown> = {}) =>
     request<T>(`/api/plugins/${encodeURIComponent(pkg)}/data/${encodeURIComponent(dataId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  podcastSegments: (id: string) => request<{ state: string; reason?: string | null; record_id?: string; ranges?: Array<{ id: string; kind: string; startSec: number; endSec: number; mode?: string }>; segments: Array<{ id: string; kind: string; start: number; end: number; source: string; confidence: number; status: string }> }>(`/api/plugins/podcasts/segments/${encodeURIComponent(id)}`),
+  podcastSegmentsSummary: () => request<{ this_week: number; this_month: number; household_seconds: number; shows: Array<{ show: string; show_id: string; ads_skipped: number; seconds_saved: number }>; episodes: Array<{ id: string; show: string; show_id: string; updated_at: string; ads_skipped: number; seconds_saved: number }> }>("/api/plugins/podcasts/segments-summary"),
+  correctPodcastSegment: (id: string, input: { record_id: string; segment_id: string; rejected: boolean }) => request<{ ok: true }>(`/api/plugins/podcasts/segments/${encodeURIComponent(id)}/correction`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  reportMissingPodcastAd: (id: string, input: { start: number; end: number }) => request<{ ok: true }>(`/api/plugins/podcasts/segments/${encodeURIComponent(id)}/correction`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   requestSkipPlan: (episodeId: string) => request<import("@/shell/skip/skipPlan").SkipPlan>(`/api/plugins/podcasts/segments/${encodeURIComponent(episodeId)}`),
   mediaItem: (id: string) => request<{ item: { id: string; kind: string; title: string } }>(`/api/media/items/${encodeURIComponent(id)}`),
   // MEDIA-POLISH-01: the docked mini bar's progress report (POST /api/plugins/:id/progress, the media app host's own action).

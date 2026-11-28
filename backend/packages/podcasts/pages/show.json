@@ -244,10 +244,10 @@
       },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{date} · {description}",
+      "item_subtitle_field": "{date} · {description} · {skip_help}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
-      "item_badge_field": "unplayed",
+      "item_badge_field": "skip_badge",
       "aspect": "wide",
       "variant": "plain",
       "orientation": "vertical",
@@ -310,8 +310,7 @@
             }
           }
         }
-      ],
-      "item_badge_presentation": "dot"
+      ]
     }
   ]
 }

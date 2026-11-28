@@ -44,6 +44,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
+import { PodcastSkipSettingsPage } from "@/shell/pages/PodcastSkipSettingsPage";
 
 export interface SettingsViewProps {
   person: Roster;
@@ -121,6 +122,7 @@ function HomeDevicesAdminSettings({ person, detailId, tab }: SettingsViewProps) 
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
 export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = {
+  "podcasts.skip": ({ person }) => <PodcastSkipSettingsPage person={person} />,
   "account.profile": AccountProfile,
   "account.memories": AccountMemories,
   "account.coding_keys": CodingKeysSettings,

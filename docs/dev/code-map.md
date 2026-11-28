@@ -369,6 +369,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/PerformancePage.tsx` | PerformanceIcon, PerformancePage |
 | `frontend/src/shell/pages/PersonContentSection.tsx` | OWN_CONTENT_KEYS, useOwnContentKeys, PersonContentSection |
 | `frontend/src/shell/pages/PersonProfilePage.tsx` | PersonProfilePage |
+| `frontend/src/shell/pages/PodcastSegmentsPage.tsx` | PodcastSegmentsPage |
+| `frontend/src/shell/pages/PodcastSkipSettingsPage.tsx` | PodcastSkipSettingsPage, PodcastShowSkipSettingsAction |
+| `frontend/src/shell/pages/PodcastTimeSaved.tsx` | PodcastTimeSaved |
 | `frontend/src/shell/pages/PrivacyPage.tsx` | PrivacyIcon, PrivacyPage |
 | `frontend/src/shell/pages/ProjectsPage.tsx` | ProjectsPage |
 | `frontend/src/shell/pages/ReferencePage.tsx` | ReferencePage |
@@ -890,7 +893,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastParity.ts` | episodeSortOf, seasonsOf, orderEpisodes, followPodcast, unfollowPodcast, isFollowed |
 | `backend/src/lib/media/podcastRates.ts` | RATE_MIN, RATE_MAX, RATE_LINE, showRateOf, setShowRate |
 | `backend/src/lib/media/podcastSegmentPolicy.ts` | PODCAST_SEGMENT_KINDS, PODCAST_SEGMENT_PIPELINE_VERSION, BUILTIN_SEGMENT_POLICY, resolveSegmentPolicy |
-| `backend/src/lib/media/podcastSegments.ts` | resolvedPodcastPolicies, skipPlanFor, podcastPlayerSkipBindings, podcastSkipAction, processPodcastCopy, queuePodcastRows |
+| `backend/src/lib/media/podcastSegments.ts` | resolvedPodcastPolicies, skipPlanFor, podcastPlayerSkipBindings, podcastSkipAction, playbackSkipPlanFor, segmentReviewFor |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
 | `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, plainNotes |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |

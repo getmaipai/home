@@ -35,6 +35,9 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import "./packageAppNews.css";
 import "./packageAppWeather.css";
+import { PodcastSegmentsPage } from "@/shell/pages/PodcastSegmentsPage";
+import { PodcastSkipSettingsPage, PodcastShowSkipSettingsAction } from "@/shell/pages/PodcastSkipSettingsPage";
+import { PodcastTimeSaved } from "@/shell/pages/PodcastTimeSaved";
 
 
 function VideoDetails({ id }: { id: string }) {
@@ -294,6 +297,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
         {(shown) => { const doc = phoneSearchTo && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {isStudioPage(packageId, pageId) ? <MusicStudioPage pageId={pageId} search={location.search} adult={person.age_band === "adult"} /> : packageId === "weather" && pageId === "index" ? null : <ArticleSpeechBridge><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} /></ArticleSpeechBridge>}
           {media && packageId !== "audio" && isMediaPlayPage(packageId, pageId) ? <div className="flex max-sm:hidden"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
+          {packageId === "podcasts" && pageId === "episode" ? <PodcastSegmentsPage person={person} id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
+          {packageId === "podcasts" && pageId === "index" ? <><PodcastSkipSettingsPage person={person} /><PodcastTimeSaved person={person} /></> : null}
+          {packageId === "podcasts" && pageId === "show" ? <PodcastShowSkipSettingsAction person={person} showId={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "video" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "audio" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
