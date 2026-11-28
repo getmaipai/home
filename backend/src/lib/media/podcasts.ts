@@ -27,6 +27,8 @@ import { itemFromRow, itemToRow, MediaItem, sourceFromRow, type MediaItemRow, ty
 import { checkStorageCap } from "@/lib/storage/usage";
 import { diskIsLow } from "@/lib/storage";
 import { getSettingValueForPerson } from "@/lib/settings";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { DEFAULT_IDLE_WINDOW_MS, turnActiveWithin } from "@/lib/turnActivity";
 import { mayManagePodcastCopy, trashPodcastCopy } from "@/lib/trash/podcastCopies";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { reportShelfEvent } from "@/lib/shelf/shelfEvents";
@@ -679,7 +681,7 @@ export async function saveEpisode(actor: PersonRow, itemId: string, options: Sav
     }
     db.update(mediaItems).set({ locFileId: stored.value.id, size: stored.value.size, fingerprint: stored.value.sha256, mediaType, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
     syncFileReferences(stored.value.id);
-    void import("@/lib/media/podcastSegments").then(({ processPodcastCopy }) => processPodcastCopy(row.id, { idle: true })).catch(() => {});
+    queuePodcastSegmentProcessing(source.id, [row.id]);
     return { ok: true, value: itemFromRow(itemRow(row.id)!) };
   } catch (error) {
     if (error instanceof RedirectLimitError) return { ok: false, status: 502, error: "The episode server sent more than five redirects or left out the next address. Try again later or ask the show for a direct episode link." };
@@ -737,6 +739,23 @@ export function queuePodcastAutoRules(sourceId: string, deps: PollDeps = routeDe
   if (autoWorker) return;
   autoWorker = trackBackgroundWork(runAutoQueue());
 }
+
+/** Runs analysis only after the keep lane has committed fetched copies; Stack work stays out of the feed poll and playback path. */
+export function queuePodcastSegmentProcessing(sourceId: string, ids?: readonly string[]): void {
+  void import("@/lib/media/podcastSegments").then(async ({ processPodcastCopy }) => {
+    const source = liveSourceById(sourceId);
+    if (!source || source.kind !== "feed" || source.paused) return;
+    const latest = db.select().from(mediaItems).where(and(eq(mediaItems.sourceId, sourceId), isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false))).all()
+      .sort((a, b) => publishedOf(b).localeCompare(publishedOf(a)));
+    const count = Math.max(1, Math.min(20, Number(getHouseholdSettingValue("podcasts.skip.backfill_latest") ?? 3) || 3));
+    const selected = ids ? latest.filter((row) => ids.includes(row.id)) : latest.slice(0, count);
+    // Serial jobs run on a later turn and only when there has been no recent household interaction.
+    setTimeout(async () => {
+      if (turnActiveWithin(DEFAULT_IDLE_WINDOW_MS)) { setTimeout(() => queuePodcastSegmentProcessing(sourceId, ids), DEFAULT_IDLE_WINDOW_MS); return; }
+      for (const row of selected) if (row.locFileId || row.locUrl) await processPodcastCopy(row.id, { idle: true });
+    }, 0);
+  }).catch(() => {});
+}
 async function runAutoQueue(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
   for (;;) {
@@ -748,6 +767,7 @@ async function runAutoQueue(): Promise<void> {
     try {
       await autoInFlight.get(id)?.catch(() => undefined);
       await applyAutoRules(id, job.deps, job.nowMs, job.freshIds);
+      queuePodcastSegmentProcessing(id, job.freshIds.length ? job.freshIds : undefined);
     } catch { reportShelfEvent("podcast_keep_failed"); }
   }
 }

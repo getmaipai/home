@@ -2380,6 +2380,17 @@ export const podcastSegmentLinks = sqliteTable("podcast_segment_links", {
   record: text("record"), reason: text("reason"), updatedAt: text("updated_at").notNull(),
 });
 
+// A Stack-owned show key is random and contains no Home/source identity. Segment records are
+// content-addressed separately so identical saved copies can share analysis by SHA and pipeline.
+export const podcastShowKeys = sqliteTable("podcast_show_keys", {
+  sourceId: text("source_id").primaryKey().references(() => mediaSources.id, { onDelete: "cascade" }),
+  showKey: text("show_key").notNull().unique(),
+});
+export const podcastSegmentRecords = sqliteTable("podcast_segment_records", {
+  sha256: text("sha256").notNull(), pipelineVersion: text("pipeline_version").notNull(),
+  state: text("state").notNull(), recordId: text("record_id"), jobId: text("job_id"), record: text("record"), reason: text("reason"), updatedAt: text("updated_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.sha256, table.pipelineVersion] })]);
+
 // MUSIC-ID-01 (docs/design/music-identify-2026-11-13.md): each scanned library song's Chromaprint fingerprint, kept next to the library
 // records so a heard clip is matched against the household's own music with no network. `fingerprint` is base64 of little-endian 32-bit
 // words ('' when fpcalc could not read the file, so it is not retried until the file changes); `file_key` is the item's own

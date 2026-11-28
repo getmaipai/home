@@ -63,7 +63,10 @@ const correctionCalls: Array<[string, string]> = [];
 describe("saved podcast segment lifecycle", () => {
   test("submits once per file SHA and pipeline version, polls and stores the result on the media item link", async () => {
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued", jobId: "segments-1" });
-    expect(lastRequest).toMatchObject({ kind: "media.segments", input: { path: "podcast/file", showKey: "podcast-source-test" } });
+    expect(lastRequest).toMatchObject({ kind: "media.segments", input: { path: "podcast/file", kinds: PODCAST_SEGMENT_KINDS } });
+    const showKey = (lastRequest as { input: { showKey: string } }).input.showKey;
+    expect(showKey).not.toBe("podcast-source-test");
+    expect(showKey).toMatch(/^[0-9a-f-]{36}$/);
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued" });
     expect(jobNo).toBe(1);
     pollResult = stackJob("segments-1", "done", { record_id: "record-1", sha256: sha, record: record(sha) });
@@ -74,7 +77,7 @@ describe("saved podcast segment lifecycle", () => {
     submitFailure = true;
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "offline" });
     expect(skipPlanFor(itemId, adult)).toMatchObject({ state: "offline", ranges: [] });
-    expect(db.select().from(podcastSegmentLinks).where(eq(podcastSegmentLinks.mediaItemId, itemId)).get()?.reason).toContain("Playback remains available");
+    expect(db.select().from(podcastSegmentLinks).where(eq(podcastSegmentLinks.mediaItemId, itemId)).get()?.reason?.toLowerCase()).toContain("playback remains available");
     submitFailure = false;
     expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued" });
     pollResult = stackJob("segments-2", "failed");
@@ -92,5 +95,22 @@ describe("saved podcast segment lifecycle", () => {
     correctionCalls.length = 0;
     await correctPodcastSegment(itemId, "record-1", "seg-1", true);
     expect(correctionCalls).toEqual([["seg-1", "rejected"]]);
+  });
+  test("a completed plan follows matching saved-copy SHA, never the publisher stream", async () => {
+    await processPodcastCopy(itemId);
+    expect(acceptPodcastSegments(itemId, sha, "record-1", record(sha)).ok).toBe(true);
+    const secondId = newMediaItemId();
+    db.insert(mediaItems).values({ id: secondId, kind: "podcast_episode", title: "Same bytes", sourceId: "podcast-source-test", locFileId: "podcast-file-copy-2", mediaType: "audio/mpeg", playable: "original", chapters: "[]", subtitles: "[]", locatorKind: "file", bandOk: "adult", advisoryExplicit: false, advisorySource: "tag", hidden: false, addedAt: new Date().toISOString(), createdAt: new Date().toISOString(), hlc: "1:0:fixture02", provenance: "test" }).run();
+    db.insert(attachments).values({ id: "podcast-file-copy-2", ownerPersonId: adult.id, conversationId: null, turnId: null, mediaType: "audio/mpeg", size: 100, sha256: sha, storagePath: "podcast/identical", retention: "kept", provenance: "podcast:manual", origin: "fetched", mediaSourceId: "podcast-source-test", deletedAt: null, trashUntil: null, name: null, createdAt: new Date().toISOString(), hlc: "1:0:fixture02" }).run();
+    expect(skipPlanFor(secondId, adult)).toMatchObject({ state: "ready", ranges: [{ startSec: 10, endSec: 20 }] });
+    expect(await processPodcastCopy(secondId)).toMatchObject({ state: "ready" });
+    expect(jobNo).toBe(1);
+  });
+  test("without a saved copy, Stack receives the episode URL and the plan remains unavailable to stream playback", async () => {
+    db.update(mediaItems).set({ locFileId: null, locUrl: "https://publisher.example/episode.mp3" }).where(eq(mediaItems.id, itemId)).run();
+    expect(await processPodcastCopy(itemId)).toMatchObject({ state: "queued" });
+    expect(lastRequest).toMatchObject({ kind: "media.segments", input: { url: "https://publisher.example/episode.mp3" } });
+    expect((lastRequest as { input: Record<string, unknown> }).input).not.toHaveProperty("path");
+    expect(skipPlanFor(itemId, adult)).toMatchObject({ ranges: [] });
   });
 });

@@ -59,7 +59,7 @@ export function orderEpisodes<T extends SortableEpisode>(personId: string, episo
 /** Follow: a show this home stopped following comes back (and is checked now); a new one is added as before. */
 export function followPodcast(actor: PersonRow, url: string): Outcome<{ source_id: string }> {
   const added = subscribePodcast(actor, { url });
-  if (added.ok) return { ok: true, value: { source_id: added.value.source.id } };
+  if (added.ok) { void import("./podcasts").then(({ queuePodcastSegmentProcessing }) => queuePodcastSegmentProcessing(added.value.source.id)).catch(() => {}); return { ok: true, value: { source_id: added.value.source.id } }; }
   if (added.status !== 409) return added;
   const checked = checkFeedAddress(url.trim());
   const feed = checked.ok ? findFeedByUrl(checked.url) : null;
@@ -68,6 +68,7 @@ export function followPodcast(actor: PersonRow, url: string): Outcome<{ source_i
   const resumed = updatePodcastSource(actor, row.id, { paused: false });
   if (!resumed.ok) return resumed;
   void pollPodcastNow(feed!.id);
+  void import("./podcasts").then(({ queuePodcastSegmentProcessing }) => queuePodcastSegmentProcessing(row.id)).catch(() => {});
   return { ok: true, value: { source_id: row.id } };
 }
 

@@ -28,7 +28,7 @@ import { eq } from "drizzle-orm";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { setShowAutoSave, setShowPlayed, showSaveRows, episodeFields, episodeSortOf, followPodcast, isFollowed, orderEpisodes, seasonsOf, setPlayed, unfollowPodcast, type SortableEpisode } from "@/lib/media/podcastParity";
 import { NOT_AVAILABLE_HERE } from "@/lib/notAvailable";
-import { skipPlanFor, correctPodcastSegment, pollPodcastSegments } from "@/lib/media/podcastSegments";
+import { skipPlanFor, correctPodcastSegment, pollPodcastSegments, queuePodcastRows, cancelPodcastProcessing, backfillPodcastShow } from "@/lib/media/podcastSegments";
 
 
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
@@ -128,7 +128,30 @@ export async function podcastShowSeasonRows(person: PersonRow, id: string): Prom
 
 export function podcastRoutes() {
   const routes = apiRouter();
-  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/played-all", "/show-auto", "/shows", "/shows/*", "/segments/*"]);
+  gateMediaApp(routes, "podcasts", ["/data/directory", "/preview/*", "/transcript/*", "/save", "/bookmark", "/snips", "/subscribe", "/source", "/filters", "/filters/*", "/directory/*", "/played", "/played-all", "/show-auto", "/shows", "/shows/*", "/segments/*", "/processing/*"]);
+
+  routes.get("/processing", requireAuth, async (c) => {
+    const person = c.get("person");
+    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
+    const shows = allowedSources(person).filter((row) => row.kind === "feed" && !row.paused);
+    return c.json({ episodes: shows.flatMap((source) => queuePodcastRows(source.id).map((episode) => ({ ...episode, show_id: source.id, show: source.label }))) }, 200);
+  });
+  routes.get("/processing/:source_id", requireAuth, async (c) => {
+    const person = c.get("person"), sourceId = c.req.param("source_id");
+    if (mediaBandOf(person) === "child") return c.json({ error: NOT_AVAILABLE_HERE }, 403);
+    if (!allowedSources(person).some((row) => row.id === sourceId && row.kind === "feed" && !row.paused)) return c.json({ error: "That followed show is not available." }, 404);
+    return c.json({ episodes: queuePodcastRows(sourceId) }, 200);
+  });
+  routes.post("/processing/:source_id/backfill", requireAuth, async (c) => {
+    try { return c.json(await backfillPodcastShow(c.get("person"), c.req.param("source_id")), 202); }
+    catch (error) { return c.json({ error: error instanceof Error ? error.message : "Could not queue episode analysis." }, 403); }
+  });
+  routes.delete("/processing/:media_id", requireAuth, async (c) => {
+    const person = c.get("person"), item = readableIn(person, "podcasts", c.req.param("media_id"));
+    if (!isOwnerOrAdmin(person) || mediaBandOf(person) !== "adult") return c.json({ error: "Only an adult admin can cancel podcast processing." }, 403);
+    if (!item || !allowedSources(person).some((row) => row.id === item.source_id && row.kind === "feed")) return c.json({ error: "That episode is not in a followed show." }, 404);
+    return cancelPodcastProcessing(item.id) ? c.json({ ok: true, state: "not_processed" }, 200) : c.json({ error: "That episode has no queued analysis to cancel." }, 409);
+  });
 
   routes.get("/segments/:media_id", requireAuth, async (c) => {
     const person = c.get("person");

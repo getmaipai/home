@@ -1187,6 +1187,8 @@ export const SETTING_COPY: Record<string, { en: string; t: () => string }> = {
   "setting.podcasts.skip.ad.default.option_label.inherit": { en: "Inherit", t: () => i18n._({ id: "setting.podcasts.skip.ad.default.option_label.inherit", message: "Inherit" }) },
   "setting.podcasts.skip.ad.shows.label": { en: "ad show overrides", t: () => i18n._({ id: "setting.podcasts.skip.ad.shows.label", message: "ad show overrides" }) },
   "setting.podcasts.skip.ad.shows.help": { en: "Per-show ad segment behavior, stored as a JSON map.", t: () => i18n._({ id: "setting.podcasts.skip.ad.shows.help", message: "Per-show ad segment behavior, stored as a JSON map." }) },
+  "setting.podcasts.skip.backfill_latest.label": { en: "Podcast episodes to backfill", t: () => i18n._({ id: "setting.podcasts.skip.backfill_latest.label", message: "Podcast episodes to backfill" }) },
+  "setting.podcasts.skip.backfill_latest.help": { en: "How many of the latest episodes to analyze when a show is followed and when you request backfill.", t: () => i18n._({ id: "setting.podcasts.skip.backfill_latest.help", message: "How many of the latest episodes to analyze when a show is followed and when you request backfill." }) },
   "setting.podcasts.skip.bumper.label": { en: "bumper segments", t: () => i18n._({ id: "setting.podcasts.skip.bumper.label", message: "bumper segments" }) },
   "setting.podcasts.skip.bumper.help": { en: "Choose what to do with bumper segments in podcast episodes.", t: () => i18n._({ id: "setting.podcasts.skip.bumper.help", message: "Choose what to do with bumper segments in podcast episodes." }) },
   "setting.podcasts.skip.bumper.option_label.skip": { en: "Skip", t: () => i18n._({ id: "setting.podcasts.skip.bumper.option_label.skip", message: "Skip" }) },

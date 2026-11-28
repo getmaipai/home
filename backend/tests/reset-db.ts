@@ -25,6 +25,8 @@ import { isolateQueueProvidersForTests } from "@/lib/jobs/householdQueue";
 import {
   people,
   podcastSegmentLinks,
+  podcastSegmentRecords,
+  podcastShowKeys,
   alarms,
   worldPlaces,
   quickTimers,
@@ -252,6 +254,8 @@ export function resetDb(): void {
   db.delete(loraPeople).run(); // STACK-LORAS-01: the named adults of a style
   installFakeLoraStack(); // STACK-LORAS-01: the Stack holds the library; every test starts with an empty fake one
   db.delete(podcastSegmentLinks).run();
+  db.delete(podcastSegmentRecords).run();
+  db.delete(podcastShowKeys).run();
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
   db.delete(mediaProgress).run();
   db.delete(mediaWatchSessions).run();
