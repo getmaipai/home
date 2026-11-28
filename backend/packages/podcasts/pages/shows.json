@@ -57,13 +57,13 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "mic",
-        "text": "No shows here. Follow a show from Podcasts, or make your own with New show.",
+        "text": "You follow no shows yet. Search to find one.",
         "action": {
           "navigate": {
-            "to": "/apps/podcasts/new-show"
+            "to": "/apps/podcasts/search"
           }
         },
-        "action_label": "New show"
+        "action_label": "Search"
       }
     }
   ]

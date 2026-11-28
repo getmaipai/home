@@ -95,8 +95,8 @@ describe("per-show speed memory", () => {
 });
 
 describe("the play page", () => {
-  const play = JSON.parse(readFileSync(join(PACKAGES_DIR, "podcasts/pages/play.json"), "utf8")) as { body: Array<{ main: Array<Record<string, any>> }> };
-  const player = play.body[0]!.main[0]!;
+  const play = JSON.parse(readFileSync(join(PACKAGES_DIR, "podcasts/pages/play.json"), "utf8")) as { body: Array<Record<string, any>> };
+  const player = play.body[0]!;
   test("player.rate reads show_rate and calls the rate route with the speed and the show id", () => {
     expect(player.rate).toEqual({
       field: "show_rate",

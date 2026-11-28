@@ -3,7 +3,7 @@
 // pauses the directory for an hour, and nothing about the household is sent but the search words. Who may use it is decided here.
 import { tryConsume } from "@/lib/rateLimiter";
 
-export interface DirectoryShow { id: string; title: string; author: string; feed_url: string; art: string | null; genre: string | null; explicit: boolean }
+export interface DirectoryShow { id: string; title: string; author: string; feed_url: string; art: string | null; genre: string | null; genre_id?: string; explicit: boolean }
 export type DirectoryResult = { ok: true; shows: DirectoryShow[] } | { ok: false; status: 502; error: string };
 export interface DirectoryDeps { fetch?: typeof fetch; nowMs?: () => number }
 
@@ -12,6 +12,16 @@ const PACE = { capacity: 5, refillPerSecond: 1 / 3 } as const;
 const PAUSE_MS = 60 * 60 * 1000;
 const DOWN = "The podcast directory did not answer. Try again in a few minutes.";
 const MAX_RESULTS = 25;
+
+/** Apple podcast genre ids used by the public directory charts. */
+export const PODCAST_GENRES = [
+  { id: "1301", name: "Arts" }, { id: "1302", name: "Design" }, { id: "1303", name: "Comedy" }, { id: "1304", name: "Education" },
+  { id: "1305", name: "Kids & Family" }, { id: "1306", name: "Leisure" }, { id: "1307", name: "Health & Fitness" }, { id: "1309", name: "TV & Film" },
+  { id: "1310", name: "Music" }, { id: "1311", name: "News" }, { id: "1314", name: "Religion & Spirituality" },
+  { id: "1315", name: "Science" }, { id: "1316", name: "Sports" }, { id: "1318", name: "Technology" },
+  { id: "1321", name: "Business" }, { id: "1323", name: "Games" }, { id: "1324", name: "Society & Culture" },
+  { id: "1325", name: "Government" }, { id: "1329", name: "History" }, { id: "1489", name: "Fiction" },
+] as const;
 
 let pausedUntil = 0;
 const CACHE_MS = 15 * 60 * 1000;
@@ -40,6 +50,13 @@ export function directoryAllowed(person: { band: "adult" | "teen" | "child" }, s
   return false;
 }
 
+export function podcastDirectoryStatus(person: { band: "adult" | "teen" | "child" }, switches: { enabled: boolean; teens: boolean }): { allowed: boolean; note?: string } {
+  const allowed = directoryAllowed(person, switches);
+  if (allowed) return { allowed };
+  if (person.band === "child") return { allowed };
+  return { allowed, note: "Online podcast search is off. An admin can turn it on in Settings → Podcasts → Find podcasts online." };
+}
+
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 const https = (address: string): string => address.replace(/^http:\/\//i, "https://");
 const artOrNull = (value: unknown): string | null => { const art = https(text(value)); return art.startsWith("https://") ? art : null; };
@@ -64,7 +81,7 @@ function showOf(row: Record<string, unknown>): DirectoryShow | null {
   const title = text(row.collectionName);
   const id = row.collectionId !== undefined ? String(row.collectionId) : "";
   if (!feed.startsWith("https://") || title === "" || id === "") return null;
-  return { id, title, author: text(row.artistName), feed_url: feed, art: artOrNull(row.artworkUrl600 ?? row.artworkUrl100), genre: text(row.primaryGenreName) || null, explicit: row.collectionExplicitness === "explicit" };
+  return { id, title, author: text(row.artistName), feed_url: feed, art: artOrNull(row.artworkUrl600 ?? row.artworkUrl100), genre: text(row.primaryGenreName) || null, genre_id: typeof row.primaryGenreId === "number" || typeof row.primaryGenreId === "string" ? String(row.primaryGenreId) : undefined, explicit: row.collectionExplicitness === "explicit" };
 }
 
 export async function searchDirectory(term: string, deps: DirectoryDeps = {}): Promise<DirectoryResult> {
@@ -73,10 +90,14 @@ export async function searchDirectory(term: string, deps: DirectoryDeps = {}): P
   const now = deps.nowMs?.() ?? Date.now();
   const key = `search:${words.toLocaleLowerCase()}`;
   const cached = cache.get(key);
-  if (!deps.fetch && cached && cached.until > now) { if (cached.result.ok) rememberShows(cached.result.shows, now); return cached.result; }
+  if (cached && cached.until > now) { if (cached.result.ok) rememberShows(cached.result.shows, now); return cached.result; }
   const url = `https://itunes.apple.com/search?${new URLSearchParams({ media: "podcast", entity: "podcast", limit: String(MAX_RESULTS), term: words })}`;
   const body = (await get(url, deps)) as { results?: unknown } | null;
-  if (!body || !Array.isArray(body.results)) return { ok: false, status: 502, error: DOWN };
+  if (!body || !Array.isArray(body.results)) {
+    const result: DirectoryResult = { ok: false, status: 502, error: DOWN };
+    cache.set(key, { until: now + FAILURE_CACHE_MS, result });
+    return result;
+  }
   const result: DirectoryResult = { ok: true, shows: (body.results as Array<Record<string, unknown>>).map(showOf).filter((show): show is DirectoryShow => show !== null) };
   rememberShows(result.shows, now);
   cache.set(key, { until: now + CACHE_MS, result });
@@ -85,14 +106,23 @@ export async function searchDirectory(term: string, deps: DirectoryDeps = {}): P
 
 /** Apple's top list, then one lookup for the feed addresses (the list carries none). */
 export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResult> {
+  return topShowsForGenre(undefined, deps);
+}
+
+/** A chart request for a known Apple genre; cache and network pace are shared with the main chart. */
+export async function topShowsForGenre(genreId?: string, deps: DirectoryDeps = {}): Promise<DirectoryResult> {
   const now = deps.nowMs?.() ?? Date.now();
-  const cached = cache.get("top");
-  if (!deps.fetch && cached && cached.until > now) { if (cached.result.ok) rememberShows(cached.result.shows, now); return cached.result; }
-  const list = (await get(`https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/${MAX_RESULTS}/podcasts.json`, deps)) as { feed?: { results?: Array<Record<string, unknown>> } } | null;
+  const cacheKey = genreId ? `top:${genreId}` : "top";
+  const cached = cache.get(cacheKey);
+  if (cached && cached.until > now) { if (cached.result.ok) rememberShows(cached.result.shows, now); return cached.result; }
+  const chartUrl = genreId
+    ? `https://rss.marketingtools.apple.com/api/v2/us/podcast-genres/${genreId}/podcasts/top/${MAX_RESULTS}/podcasts.json`
+    : `https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/${MAX_RESULTS}/podcasts.json`;
+  const list = (await get(chartUrl, deps)) as { feed?: { results?: Array<Record<string, unknown>> } } | null;
   const entries = list?.feed?.results;
   if (!Array.isArray(entries) || entries.length === 0) {
     const result: DirectoryResult = { ok: false, status: 502, error: DOWN };
-    cache.set("top", { until: now + FAILURE_CACHE_MS, result });
+    cache.set(cacheKey, { until: now + FAILURE_CACHE_MS, result });
     return result;
   }
   const ids = entries.map((entry) => text(entry.id)).filter((id) => /^\d+$/.test(id));
@@ -104,11 +134,12 @@ export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResul
     const id = text(entry.id);
     const feed = feeds.get(id);
     if (!feed || !feed.startsWith("https://") || text(entry.name) === "") continue;
-    shows.push({ id, title: text(entry.name), author: text(entry.artistName), feed_url: feed, art: artOrNull(entry.artworkUrl100), genre: null, explicit: false });
+    const lookupRow = looked?.results?.find((row) => String(row.collectionId ?? "") === id);
+    shows.push({ id, title: text(entry.name), author: text(entry.artistName), feed_url: feed, art: artOrNull(entry.artworkUrl100), genre: text(lookupRow?.primaryGenreName) || null, genre_id: lookupRow?.primaryGenreId === undefined ? undefined : String(lookupRow.primaryGenreId), explicit: lookupRow?.collectionExplicitness === "explicit" });
   }
   const result: DirectoryResult = shows.length > 0 ? { ok: true, shows } : { ok: false, status: 502, error: DOWN };
   rememberShows(shows, now);
-  cache.set("top", { until: now + (result.ok ? CACHE_MS : FAILURE_CACHE_MS), result });
+  cache.set(cacheKey, { until: now + (result.ok ? CACHE_MS : FAILURE_CACHE_MS), result });
   return result;
 }
 

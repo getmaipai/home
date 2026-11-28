@@ -24,7 +24,7 @@ import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's ex
 import { showSaveRows } from "@/lib/media/podcastParity";
 import { videoPlaylistRoutes } from "./videoPlaylists";
 import { changeVideoPlaylistMembers, videoPlaylistFor } from "@/lib/videos/playlists";
-import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows, podcastShowSeasonRows, podcastTranscriptRows } from "./podcastApp";
+import { podcastRoutes, podcastDirectoryRows, podcastDiscoveryRows, podcastShowRows, podcastShowEpisodeRows, podcastShowSeasonRows, podcastTranscriptRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt, radioArtCard } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
@@ -149,7 +149,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       if (body.scope === "transcript") return c.json(await podcastTranscriptRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       if (body.scope === "show-saved") return c.json(showSaveRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       if (body.scope === "show-seasons") return c.json(await podcastShowSeasonRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
-      return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search", typeof body.shelf === "string" ? body.shelf : undefined, typeof body.kind === "string" ? body.kind : undefined)) as never, 200);
+      if (["categories", "trending", "recommended", "genre"].includes(String(body.scope))) return c.json(withLimit(body, await podcastDiscoveryRows(person, String(body.scope), typeof body.genre === "string" ? body.genre : undefined)) as never, 200);
+      return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search", typeof body.shelf === "string" ? body.shelf : undefined, typeof body.kind === "string" ? body.kind : undefined, typeof body.genre === "string" ? body.genre : undefined)) as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
     if (appId === "audio") {

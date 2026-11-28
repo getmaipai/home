@@ -65,8 +65,19 @@ function AppSearch({ label, appTo }: { label: string; appTo: string }) {
     return async (query: string): Promise<SearchGroup[]> => {
       const q = query.trim();
       if (q.length < 2) return [];
-      const rows = spec ? await api.appData<AppSearchRow[]>(pkg, spec.data, { q }).catch(() => []) : [];
-      return appSearchGroups({ to: appTo, label }, q, Array.isArray(rows) ? rows : [], spec?.playPage);
+      const rows = spec ? await api.appData<AppSearchRow[]>(pkg, spec.data, pkg === "podcasts" ? { q, scope: "search", shelf: "shows" } : { q }).catch(() => []) : [];
+      const groups = appSearchGroups({ to: appTo, label }, q, Array.isArray(rows) ? rows : [], spec?.playPage);
+      if (pkg === "podcasts" && Array.isArray(rows)) {
+        const [statusRows, fallbackRows] = await Promise.all([
+          api.appData<Array<{ allowed: boolean; note?: string }>>(pkg, spec!.data, { scope: "status" }).catch(() => []),
+          api.appData<AppSearchRow[]>(pkg, spec!.data, { q, scope: "search" }).catch(() => []),
+        ]);
+        const status = statusRows[0];
+        if (fallbackRows.length) groups.push(...appSearchGroups({ to: appTo, label }, q, fallbackRows, spec?.playPage));
+        if (status && !status.allowed && status.note) groups.push({ kind: "app", heading: "Search status", results: [{ kind: "app", id: "directory-off", title: status.note, href: `${appTo}/search?q=${encodeURIComponent(q)}` }] });
+      }
+      if (pkg !== "podcasts") return groups;
+      return [...groups, { kind: "app", heading: label, results: [{ kind: "app", id: "search", title: `Search ${label} for “${q}”`, href: `${appTo}/search?q=${encodeURIComponent(q)}` }] }];
     };
   }, [appTo, label]);
   return <HeaderSearch scope={{ label }} remote={remote} />;

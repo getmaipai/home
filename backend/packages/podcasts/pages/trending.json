@@ -1,18 +1,25 @@
 {
   "type": "page",
-  "id": "podcasts-trending",
+  "id": "trending",
   "title": "Trending",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "star",
-      "text": "What other homes are listening to is not shared, so this will show what is popular in your own library. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/podcasts/shows"
-        }
-      },
-      "action_label": "Open Shows"
+      "type": "media_shelf",
+      "heading": "Most played in your library and popular now",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "trending" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{author}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "size_control": true,
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "layout": "grid",
+      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
+      "row_actions": [{ "icon": "plus", "label": "Follow", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } } }],
+      "empty_state": { "type": "empty_state", "icon": "star", "text": "No popular shows are available right now. Search for a show to get started.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Search podcasts" }
     }
   ]
 }

@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "wand-sparkles",
-      "text": "Make your own show from an idea here. This page is coming soon.",
+      "text": "Create a show from your own idea with New show, then make its episodes here.",
       "action": {
         "navigate": {
           "to": "/apps/podcasts/shows"

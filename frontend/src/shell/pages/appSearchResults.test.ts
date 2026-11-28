@@ -33,5 +33,12 @@ describe("appSearchGroups", () => {
   test("Audio asks the songs data, Video the library", () => {
     expect(APP_SEARCH_DATA.audio).toMatchObject({ data: "songs", playPage: "play" });
     expect(APP_SEARCH_DATA.video).toMatchObject({ data: "library", playPage: "watch" });
+    expect(APP_SEARCH_DATA.podcasts).toMatchObject({ data: "directory", playPage: "show" });
+  });
+
+  test("a podcast directory result opens its feed preview", () => {
+    const [group] = appSearchGroups({ to: "/apps/podcasts", label: "Podcasts" }, "how did it get made", [{ id: "123", title: "How Did This Get Made?", feed_url: "https://feeds.example.com/show.xml" }], "show");
+    expect(group?.results[0]?.href).toBe("/apps/podcasts/show?id=https%3A%2F%2Ffeeds.example.com%2Fshow.xml");
+    expect(group?.results[0]?.action).toBe("Follow");
   });
 });

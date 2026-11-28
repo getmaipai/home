@@ -60,7 +60,7 @@
       "heading": "Up Next",
       "bind": {
         "source": "package",
-        "path": "continue"
+        "path": "latest"
       },
       "item_key_field": "id",
       "item_label_field": "title",
@@ -74,7 +74,14 @@
           "media_id": "{id}"
         }
       },
-      "hide_when_empty": true
+      "hide_when_empty": false,
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "Nothing is coming up yet. Follow a show to see its newest unplayed episodes here.",
+        "action": { "navigate": { "to": "/apps/podcasts/search" } },
+        "action_label": "Search shows"
+      }
     },
     {
       "type": "media_shelf",

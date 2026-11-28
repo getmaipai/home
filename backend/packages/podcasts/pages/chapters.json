@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "list-video",
-      "text": "Add and fix chapters on your episodes here. This page is coming soon.",
+      "text": "Open an episode to review or edit its chapter markers.",
       "action": {
         "navigate": {
           "to": "/apps/podcasts/shows"

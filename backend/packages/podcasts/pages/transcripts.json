@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "file-text",
-      "text": "Read and fix the words of an episode here. This page is coming soon.",
+      "text": "Choose an episode with an available transcript to read its words. Transcripts appear after processing finishes.",
       "action": {
         "navigate": {
           "to": "/apps/podcasts/shows"

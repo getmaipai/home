@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "image",
-      "text": "Make cover pictures for your shows here. This page is coming soon.",
+      "text": "Cover art editing is not available yet. Open one of your shows to see its current artwork.",
       "action": {
         "navigate": {
           "to": "/apps/podcasts/shows"

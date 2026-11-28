@@ -4,15 +4,20 @@
   "title": "New episodes",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "sparkles",
-      "text": "New episodes from the shows you follow will show up here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/podcasts/episodes"
-        }
-      },
-      "action_label": "Open Episodes"
+      "type": "media_shelf",
+      "heading": "New episodes",
+      "bind": { "source": "package", "path": "latest" },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "orientation": "vertical",
+      "density": "compact",
+      "on_select": { "navigate": { "to": "/apps/podcasts/episode", "state": { "id": "{id}" } } },
+      "empty_state": { "type": "empty_state", "icon": "sparkles", "text": "No new episodes yet. Follow a show to see them here.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Find shows" }
     }
   ]
 }

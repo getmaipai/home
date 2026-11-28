@@ -16,7 +16,7 @@ import { minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
 import { setShowRate, showRateOf } from "@/lib/media/podcastRates";
-import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows, directoryShowForFeed } from "@/lib/media/podcastDirectory";
+import { artProxyAddress, directoryAllowed, podcastDirectoryStatus, fetchDirectoryArt, searchDirectory, topShows, topShowsForGenre, PODCAST_GENRES, directoryShowForFeed } from "@/lib/media/podcastDirectory";
 import { podcastSnipLabel, podcastSnipRowsForRoute } from "@/lib/media/podcastApp";
 import { previewEpisodeAddress, previewPodcastFeed } from "@/lib/media/podcasts";
 import { guardedFetch, type DnsLookup } from "@maipai/core/src/ssrfGuard";
@@ -34,22 +34,81 @@ import { skipPlanFor, playbackSkipPlanFor, segmentReviewFor, podcastSkipSummary,
 type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
 
 /** The Find shows rows for the page's shelf: the search when words are typed, else Apple's top list. Not allowed, or no answer, is an empty list (the page says so). */
-export async function podcastDirectoryRows(person: PersonRow, q: string, scope = "search", shelf?: string, kind?: string): Promise<DirectoryRow[]> {
+export async function podcastDirectoryRows(person: PersonRow, q: string, scope = "search", shelf?: string, kind?: string, genreId?: string): Promise<DirectoryRow[]> {
   // APPS-PARITY: the Search page's Shows and Episodes shelves ask separately, and the Shows / Episodes chip (`kind`) switches the other one off.
   if (scope === "search" && ((shelf === "episodes" && kind === "shows") || (shelf === "shows" && kind === "episodes"))) return [];
   const band = mediaBandOf(person);
   const allowed = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
   const words = q.trim();
   const admin = (isOwnerOrAdmin(person)) && band === "adult";
-  const local = words.length >= 2 ? queryItems(person, "podcasts", { limit: 200 }).filter((item) => `${item.title} ${item.subtitle ?? ""} ${item.description ?? ""}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())).slice(0, 12).map((item) => ({ id: item.id, title: item.title, author: item.subtitle ?? "", summary: item.description ?? "", thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, feed_url: "", ...(admin ? { action_label: "Listen" } : {}) })) : [];
+  const local = words.length >= 2 ? dedupePodcastShowRows(queryItems(person, "podcasts", { followedOnly: true, limit: 500 }).filter((item) => `${item.artist ?? ""} ${item.subtitle ?? ""}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())).map((item) => ({ id: item.source_id ?? item.id, title: item.artist ?? item.subtitle ?? item.title, author: item.artist ?? "", summary: "In your library", thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, feed_url: "", ...(admin ? { action_label: "Listen" } : {}) }))).slice(0, 12) : [];
   if (scope === "search" && words === "") return [];
   if (shelf === "episodes") return local;
-  if (shelf === "shows" && (!allowed || minorQueryHit(words, band))) return [];
-  if (!allowed || words !== "" && minorQueryHit(words, band)) return local;
-  const result = scope === "top" ? await topShows() : words !== "" ? await searchDirectory(words) : { ok: true as const, shows: [] };
+  const deniedSearch = words !== "" && !allowed;
+  const unsafeSearch = words !== "" && minorQueryHit(words, band);
+  if (scope === "search" && shelf === "shows" && (deniedSearch || unsafeSearch)) return [];
+  if (deniedSearch || unsafeSearch) return local;
+  if ((scope === "top" || scope === "genre" || scope === "trending") && !allowed) return [];
+  const result = scope === "top" || scope === "trending" ? await topShows() : scope === "genre" && PODCAST_GENRES.some((genre) => genre.id === genreId) ? await topShowsForGenre(genreId) : words !== "" ? await searchDirectory(words) : { ok: true as const, shows: [] };
   if (!result.ok) return local;
   const directory = result.shows.map((show) => ({ id: show.id, title: show.title, author: show.author, summary: show.genre ?? "", thumbnail: artProxyAddress(show.art), feed_url: show.feed_url, ...(admin ? { action_label: "Follow" } : {}) }));
   return shelf === "shows" ? directory : [...local, ...directory];
+}
+
+/** Purpose-built rows for the discovery shelves and genre picker, sharing the existing directory data id. */
+export async function podcastDiscoveryRows(person: PersonRow, scope: string, genreId?: string): Promise<unknown[]> {
+  if (scope === "status") {
+    const status = podcastDirectoryStatus({ band: mediaBandOf(person) }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
+    return [{ ...status, available: true, admin: isOwnerOrAdmin(person) && mediaBandOf(person) === "adult" }];
+  }
+  const band = mediaBandOf(person);
+  const enabled = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
+  if (!enabled) return [];
+  if (scope === "categories") return PODCAST_GENRES.map(({ id, name }) => ({ id, title: name, name, feed_url: "" }));
+  if (scope === "trending") {
+    const [top, local] = await Promise.all([podcastDirectoryRows(person, "", "top", "shows"), Promise.resolve(podcastMostPlayedRows(person))]);
+    return [...local, ...dedupeDirectoryRows(top)];
+  }
+  if (scope === "genre") return podcastDirectoryRows(person, "", "genre", "shows", undefined, genreId);
+  if (scope === "recommended") {
+    const sources = allowedSources(person).filter((row) => row.kind === "feed" && isFollowed(row));
+    const items = sources.flatMap((source) => queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 1 }));
+    const genreIds = new Set(items.map((item) => {
+      const externalGenre = (item.external as (typeof item.external & { genre_id?: string }) | null)?.genre_id;
+      const match = typeof externalGenre === "string" ? externalGenre : null;
+      if (match && PODCAST_GENRES.some((genre) => genre.id === match)) return match;
+      return PODCAST_GENRES.find((genre) => genre.name.toLocaleLowerCase() === (item.genre ?? "").toLocaleLowerCase())?.id;
+    }).filter((id): id is string => !!id));
+    const recommendations = genreIds.size ? (await Promise.all([...genreIds].map((genreId) => podcastDirectoryRows(person, "", "genre", "shows", undefined, genreId)))).flat() : await podcastDirectoryRows(person, "", "top", "shows");
+    const followed = new Set(sources.map((source) => source.url));
+    return dedupeDirectoryRows(recommendations).filter((row) => !followed.has(row.feed_url));
+  }
+  return [];
+}
+
+/** Dedupe library rows by their feed/source identity, not by episode title. */
+export function dedupePodcastShowRows<T extends { id?: string; feed_url?: string }>(rows: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => { const key = row.feed_url || row.id || ""; if (!key || seen.has(key)) return false; seen.add(key); return true; });
+}
+
+function dedupeDirectoryRows(rows: DirectoryRow[]): DirectoryRow[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => { const key = row.feed_url || row.id; if (seen.has(key)) return false; seen.add(key); return true; });
+}
+
+/** Most-played follows the signed-in person's progress only. */
+function podcastMostPlayedRows(person: PersonRow): DirectoryRow[] {
+  const sources = allowedSources(person).filter((row) => row.kind === "feed");
+  const counts = new Map<string, number>();
+  for (const source of sources) for (const item of queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 500 })) {
+    const progress = getProgress(person.id, item.id);
+    if (progress && (progress.plays > 0 || progress.finishes > 0 || ("seconds" in progress.position && progress.position.seconds > 0))) counts.set(source.id, (counts.get(source.id) ?? 0) + Math.max(1, progress.plays, progress.finishes));
+  }
+  return sources.filter((source) => counts.has(source.id)).sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0)).map((source) => {
+    const item = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 1 })[0];
+    return { id: source.id, title: source.label, author: item?.artist ?? "", summary: "Most played in your library", thumbnail: item?.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, feed_url: source.url ?? "" };
+  });
 }
 
 /** The transcript reader's rows, {start_s, text}: what is stored or published for an episode this person can read; a child, a missing episode or no transcript gives none. */
@@ -210,7 +269,14 @@ export function podcastRoutes() {
   routes.post("/data/directory", requireAuth, async (c, next) => {
     const person = c.get("person");
     const body = await jsonBody(c);
-    return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search"), 200);
+    if (body.scope === "status") {
+      const status = podcastDirectoryStatus({ band: mediaBandOf(person) }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
+      return c.json({ ...status, available: true, admin: isOwnerOrAdmin(person) && mediaBandOf(person) === "adult" }, 200);
+    }
+    const rows = body.scope === "categories" || body.scope === "trending" || body.scope === "recommended" || body.scope === "genre"
+      ? await podcastDiscoveryRows(person, String(body.scope), typeof body.genre === "string" ? body.genre : undefined)
+      : await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search", typeof body.shelf === "string" ? body.shelf : undefined, typeof body.kind === "string" ? body.kind : undefined, typeof body.genre === "string" ? body.genre : undefined);
+    return c.json(rows, 200);
   });
 
   /** A host that answers on both address families is reached over IPv4 first: a home network with no working IPv6 route would otherwise fail on the first (IPv6) address. */

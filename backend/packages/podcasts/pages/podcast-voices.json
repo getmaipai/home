@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "user-round",
-      "text": "Pick the voices for your shows here. This page is coming soon.",
+      "text": "Choose voices while creating a podcast episode. Your saved voice choices will appear here when available.",
       "action": {
         "navigate": {
           "to": "/apps/podcasts/shows"

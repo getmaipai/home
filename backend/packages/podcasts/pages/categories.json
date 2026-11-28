@@ -1,18 +1,15 @@
 {
   "type": "page",
-  "id": "podcasts-categories",
+  "id": "categories",
   "title": "Categories",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "compass",
-      "text": "Browse podcasts by topic here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/podcasts/shows"
-        }
-      },
-      "action_label": "Open Shows"
+      "type": "list",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "categories" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "row_action": { "icon": "arrow-right", "label": "Browse {title}", "action": { "navigate": { "to": "/apps/podcasts/search", "state": { "genre": "{id}", "category": "{title}" } } } },
+      "empty_state": { "type": "empty_state", "icon": "compass", "text": "Podcast categories are unavailable right now.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Search podcasts" }
     }
   ]
 }

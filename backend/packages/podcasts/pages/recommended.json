@@ -1,18 +1,25 @@
 {
   "type": "page",
-  "id": "podcasts-recommended",
+  "id": "recommended",
   "title": "Recommended",
   "body": [
     {
-      "type": "empty_state",
-      "icon": "wand-sparkles",
-      "text": "Shows picked from what you listen to will show up here. This page is coming soon.",
-      "action": {
-        "navigate": {
-          "to": "/apps/podcasts/shows"
-        }
-      },
-      "action_label": "Open Shows"
+      "type": "media_shelf",
+      "heading": "Picked for your followed shows",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "recommended" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{author}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "size_control": true,
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "layout": "grid",
+      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
+      "row_actions": [{ "icon": "plus", "label": "Follow", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } } }],
+      "empty_state": { "type": "empty_state", "icon": "wand-sparkles", "text": "No recommendations are available yet. Search for a show to get started.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Search podcasts" }
     }
   ]
 }

@@ -59,7 +59,8 @@
         }
       },
       "hide_when_empty": true,
-      "secondary": []
+      "secondary": [],
+      "empty_state": { "type": "empty_state", "icon": "mic", "text": "This show is no longer available. Search for it again or choose another show.", "action": { "navigate": { "to": "/apps/podcasts/search" } }, "action_label": "Search podcasts" }
     },
     {
       "type": "billboard",

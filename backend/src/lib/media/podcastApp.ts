@@ -15,9 +15,10 @@ import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilte
 import { podcastStatsRows } from "./podcastStats";
 import { isFollowed, showFilterOf, showMatches, withEpisodeFields, type ShowFilter } from "./podcastParity";
 import { podcastSummaryFor, searchPodcastTranscripts } from "./podcasts";
-import { podcastDirectoryRows } from "@/routes/podcastApp";
+import { podcastDirectoryRows, podcastDiscoveryRows, dedupePodcastShowRows } from "@/routes/podcastApp";
 import { loadFormats } from "@/lib/talent/formats";
 import { podcastPlayerSkipBindings, skipPlanFor } from "./podcastSegments";
+import { podcastShowEpisodeRows, podcastShowSeasonRows, podcastTranscriptRows } from "@/routes/podcastApp";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -123,15 +124,32 @@ registerMediaAppData(APP, (person, dataId, params) => {
   const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
   switch (dataId) {
     case "skip-plan": return params.id ? skipPlanFor(params.id, person) : { state: "not_processed", ranges: [] };
-    case "shows": return params.scope === "new" ? [{ id: "new-show", title: "New show" }] : showRows(person, showFilterOf(params.scope));
+    case "shows": return params.scope === "new" ? [{ id: "new-show", title: "New show" }] : dedupePodcastShowRows(showRows(person, showFilterOf(params.scope)));
     // PODCAST-PARITY-01: Listen Now's Latest episodes, newest first, not yet played; each row carries the date, queue and played fields its actions read.
     case "latest": {
-      const items = queryItems(person, APP, { followedOnly: true, limit: 60 }).sort((a, b) => publishedOf(b).localeCompare(publishedOf(a)));
+      const items = queryItems(person, APP, { followedOnly: true, limit: 200 }).sort((a, b) => publishedOf(b).localeCompare(publishedOf(a)));
       const unplayed = items.filter((item) => !getProgress(person.id, item.id)?.completed).slice(0, limit);
       return withEpisodeFields(person, unplayed, episodeRows(person, unplayed));
     }
-    case "directory": return params.scope === "talent-formats" ? [...loadFormats().values()].filter((format) => ["news_briefing", "kids_news", "round_table"].includes(format.id)).map((format) => ({ id: format.id, label: format.label })) : podcastDirectoryRows(person, params.query ?? "", params.scope ?? "search");
+    case "directory": {
+      if (params.scope === "show-episodes") return podcastShowEpisodeRows(person, params.id ?? "", { sort: params.sort, season: params.season });
+      if (params.scope === "show-seasons") return podcastShowSeasonRows(person, params.id ?? "");
+      if (params.scope === "transcript") return podcastTranscriptRows(person, params.id ?? "");
+      return params.scope === "talent-formats" ? [...loadFormats().values()].filter((format) => ["news_briefing", "kids_news", "round_table"].includes(format.id)).map((format) => ({ id: format.id, label: format.label })) : params.scope === "categories" || params.scope === "trending" || params.scope === "recommended" || params.scope === "genre" ? podcastDiscoveryRows(person, params.scope, params.genre) : podcastDirectoryRows(person, params.query ?? "", params.scope ?? "search", params.shelf, params.kind, params.genre);
+    }
     case "episodes": {
+      if (params.scope === "history") {
+        const found = new Set<string>();
+        const items: MediaItem[] = [];
+        for (const progress of getProgressMany(person.id, queryItems(person, APP, { all: true, limit: 500 }).map((item) => item.id))) {
+          const item = readableIn(person, APP, progress.media_id);
+          if (!item || found.has(item.id) || (!progress.completed && !("seconds" in progress.position && progress.position.seconds > 0))) continue;
+          found.add(item.id);
+          items.push(item);
+          if (items.length >= limit) break;
+        }
+        return episodeRows(person, items);
+      }
       const items = episodesOf(person, params, limit);
       const rows = withEpisodeFields(person, items, episodeRows(person, items));
       const q = params.query?.trim();
@@ -140,7 +158,10 @@ registerMediaAppData(APP, (person, dataId, params) => {
       const starts = new Map(searchPodcastTranscripts(person, q).map((hit) => [hit.episode_id, hit.start_s]));
       return rows.map((row) => ({ ...row, start_s: starts.get(String((row as { id?: string }).id)) ?? 0 }));
     }
-    case "saved": return params.scope === "snips" ? podcastSnipRowsForRoute(person, limit).map(({ start_s, snip_id, ...row }) => ({ ...row, id: snip_id, media_id: row.id, start_s })) : episodeRows(person, episodesOf(person, params, limit, true));
+    case "saved": {
+      const items = episodesOf(person, params, limit, true);
+      return params.scope === "downloads" ? episodeRows(person, items.filter((item) => !(item.location as { url?: string }).url)) : params.scope === "snips" ? podcastSnipRowsForRoute(person, limit).map(({ start_s, snip_id, ...row }) => ({ ...row, id: snip_id, media_id: row.id, start_s })) : episodeRows(person, items);
+    }
     case "bookmarks": return bookmarkRows(person, limit);
     // PODCAST-PORT-03: the person's own saved filters, and the episodes one of them shows now.
     case "filters": return personFilters(person).map((collection) => { const view = viewOf(person, collection); return { id: view.id, title: view.title, summary: view.summary }; });

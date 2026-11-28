@@ -4,6 +4,24 @@
   "title": "Search podcasts",
   "body": [
     {
+      "type": "media_shelf",
+      "heading": "Category shows",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "genre", "genre": "$state.genre" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{author}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "size_control": true,
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "layout": "grid",
+      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
+      "row_actions": [{ "icon": "plus", "label": "Follow", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } } }],
+      "empty_state": { "type": "empty_state", "icon": "headphones", "text": "No shows are available in this category right now. Try another category or search.", "action": { "navigate": { "to": "/apps/podcasts/categories" } }, "action_label": "Browse categories" }
+    },
+    {
       "type": "search",
       "state": "q",
       "label": "Search podcasts",
@@ -37,6 +55,7 @@
     },
     {
       "type": "section",
+      "condition": "!genre",
       "condition": "!kind == 'episodes'",
       "children": [
         {
@@ -46,7 +65,7 @@
             "source": "package",
             "path": "directory",
             "params": {
-              "q": "$state.q",
+              "query": "$state.q",
               "scope": "search",
               "shelf": "shows",
               "kind": "$state.kind"
@@ -57,6 +76,7 @@
           "item_subtitle_field": "{author}",
           "item_media_field": "thumbnail",
           "aspect": "square",
+          "size_control": true,
           "variant": "plain",
           "orientation": "vertical",
           "density": "compact",
@@ -87,7 +107,7 @@
           "empty_state": {
             "type": "empty_state",
             "icon": "search",
-            "text": "No shows match. Check the spelling, or add a show by its feed address with New show.",
+            "text": "No shows match. If online search is off, an admin can enable it in Settings → Podcasts → Find podcasts online. Otherwise check the spelling or add a feed address with New show.",
             "action": {
               "navigate": {
                 "to": "/apps/podcasts/new-show"
@@ -109,7 +129,7 @@
             "source": "package",
             "path": "directory",
             "params": {
-              "q": "$state.q",
+              "query": "$state.q",
               "scope": "search",
               "shelf": "episodes",
               "kind": "$state.kind"

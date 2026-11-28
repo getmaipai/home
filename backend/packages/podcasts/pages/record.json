@@ -6,7 +6,7 @@
     {
       "type": "empty_state",
       "icon": "audio-waveform",
-      "text": "Record an episode with your own voice here. This page is coming soon.",
+      "text": "Recording is not available in this version. You can still make a show from an idea in Podcasts → New show.",
       "action": {
         "navigate": {
           "to": "/apps/podcasts/shows"

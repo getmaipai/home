@@ -369,6 +369,7 @@ export interface DataParams {
   /** PARITY-01, Audio `songs` scope `library` and Videos `library`: the sort (recents, a-z, creator) and the kind chip (all, songs, albums, artists, playlists). */
   sort?: string;
   kind?: string;
+  shelf?: string;
   /** MEDIA-PARITY-02, Audio: which browser or device is asking (set by the route from its session, never from the body); a Library row says whether this device keeps it for offline play. */
   device?: string;
   /** VIDEO-UI-06, Videos `recipes` scope `feed`: the Type filter (all, video, still). */

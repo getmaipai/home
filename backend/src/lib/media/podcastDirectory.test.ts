@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { directoryAllowed, searchDirectory, topShows, __resetDirectoryForTests, type DirectoryDeps } from "@/lib/media/podcastDirectory";
+import { directoryAllowed, searchDirectory, topShows, topShowsForGenre, PODCAST_GENRES, podcastDirectoryStatus, __resetDirectoryForTests, type DirectoryDeps } from "@/lib/media/podcastDirectory";
 
 const SEARCH = { results: [
-  { collectionId: 1, collectionName: "Cabin Radio", artistName: "Sage", feedUrl: "https://feeds.example.com/cabin.xml", artworkUrl600: "https://img.example.com/c.jpg", primaryGenreName: "Comedy", collectionExplicitness: "notExplicit" },
+  { collectionId: 1, collectionName: "Cabin Radio", artistName: "Sage", feedUrl: "https://feeds.example.com/cabin.xml", artworkUrl600: "https://img.example.com/c.jpg", primaryGenreName: "Comedy", primaryGenreId: 1303, collectionExplicitness: "notExplicit" },
   { collectionId: 2, collectionName: "No Feed", artistName: "X" },
   { collectionId: 3, collectionName: "Loud", artistName: "Y", feedUrl: "http://feeds.example.com/loud.xml", collectionExplicitness: "explicit" },
 ] };
@@ -28,6 +28,10 @@ describe("who may use the directory", () => {
     expect(directoryAllowed(person("teen"), { enabled: true, teens: true })).toBe(true);
   });
   test("a child never, whatever the switches say", () => expect(directoryAllowed(person("child"), { enabled: true, teens: true })).toBe(false));
+  test("an adult gets an actionable off message; a child does not learn the switch", () => {
+    expect(podcastDirectoryStatus(person("adult"), { enabled: false, teens: false }).note).toContain("Settings → Podcasts");
+    expect(podcastDirectoryStatus(person("child"), { enabled: false, teens: false })).toEqual({ allowed: false });
+  });
 });
 
 describe("search", () => {
@@ -36,7 +40,7 @@ describe("search", () => {
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.shows).toEqual([
-      { id: "1", title: "Cabin Radio", author: "Sage", feed_url: "https://feeds.example.com/cabin.xml", art: "https://img.example.com/c.jpg", genre: "Comedy", explicit: false },
+      { id: "1", title: "Cabin Radio", author: "Sage", feed_url: "https://feeds.example.com/cabin.xml", art: "https://img.example.com/c.jpg", genre: "Comedy", genre_id: "1303", explicit: false },
       { id: "3", title: "Loud", author: "Y", feed_url: "https://feeds.example.com/loud.xml", art: null, genre: null, explicit: true },
     ]);
     expect(new URL(urls[0]!).host).toBe("itunes.apple.com");
@@ -77,6 +81,19 @@ describe("charts", () => {
     expect(out.shows.map((s) => [s.title, s.feed_url])).toEqual([["Top One", "https://feeds.example.com/one.xml"], ["Top Two", "https://feeds.example.com/two.xml"]]);
     expect(urls.length).toBe(2);
     expect(new URL(urls[1]!).searchParams.get("id")).toBe("10,11");
+  });
+  test("a fixed genre id reads that Apple chart and rejects unknown ids at the row boundary", async () => {
+    const out = await topShowsForGenre("1303", deps((url) => (url.includes("rss.marketingtools.apple.com") ? CHARTS : LOOKUP)));
+    expect(out.ok).toBe(true);
+    expect(new URL(urls[0]!).pathname).toContain("/podcast-genres/1303/");
+    expect(PODCAST_GENRES.find((genre) => genre.id === "1303")?.name).toBe("Comedy");
+  });
+  test("genre charts are cached separately", async () => {
+    const fake = deps((url) => (url.includes("rss.marketingtools.apple.com") ? CHARTS : LOOKUP));
+    await topShowsForGenre("1303", fake);
+    const prior = urls.length;
+    await topShowsForGenre("1303");
+    expect(urls).toHaveLength(prior);
   });
 });
 

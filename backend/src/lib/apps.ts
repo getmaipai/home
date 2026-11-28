@@ -627,8 +627,15 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   if (!entry || !appRouteAllowed(person, packageId, "data", dataId, app)) return { ok: false, status: 404, error: "no such data" };
   if (packageId === "podcasts" && dataId === "directory") {
     const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
-    const { podcastDirectoryRows } = await import("@/routes/podcastApp");
-    return { ok: true, status: 200, value: await podcastDirectoryRows(person, typeof input.q === "string" ? input.q : "", typeof input.scope === "string" ? input.scope : "search") as never };
+    const { podcastDirectoryRows, podcastDiscoveryRows } = await import("@/routes/podcastApp");
+    if (input.scope === "status") {
+      const { podcastDirectoryStatus } = await import("@/lib/media/podcastDirectory");
+      const { mediaBandOf } = await import("@/lib/media/band");
+      const { getHouseholdSettingValue } = await import("@/lib/settings");
+      return { ok: true, status: 200, value: { ...podcastDirectoryStatus({ band: mediaBandOf(person) }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true }), available: true } as never };
+    }
+    if (["categories", "trending", "recommended", "genre"].includes(String(input.scope))) return { ok: true, status: 200, value: await podcastDiscoveryRows(person, String(input.scope), typeof input.genre === "string" ? input.genre : undefined) as never };
+    return { ok: true, status: 200, value: await podcastDirectoryRows(person, typeof input.q === "string" ? input.q : "", typeof input.scope === "string" ? input.scope : "search", typeof input.shelf === "string" ? input.shelf : undefined, typeof input.kind === "string" ? input.kind : undefined, typeof input.genre === "string" ? input.genre : undefined) as never };
   }
   const asOf = new Date().toISOString();
   if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
