@@ -1,0 +1,12 @@
+{
+  "type": "page",
+  "id": "skip",
+  "title": "Skip settings",
+  "body": [
+    {
+      "type": "empty_state",
+      "icon": "skip-forward",
+      "text": "Choose what each kind of break does."
+    }
+  ]
+}

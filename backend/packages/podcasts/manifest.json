@@ -252,6 +252,20 @@
         "kind": "schema",
         "module": "cover-art",
         "min_role": "adult"
+      },
+      {
+        "id": "skip",
+        "label": "Skip settings",
+        "icon": "skip-forward",
+        "nav": false,
+        "kind": "schema",
+        "module": "skip",
+        "keywords": [
+          "ads",
+          "skip",
+          "segments",
+          "bumper"
+        ]
       }
     ],
     "sidebar": {
@@ -455,7 +469,11 @@
           "icon": "skip-forward",
           "kind": "link",
           "href": "/apps/podcasts",
-          "keywords": ["ads", "segments", "skip"]
+          "keywords": [
+            "ads",
+            "segments",
+            "skip"
+          ]
         },
         {
           "id": "storage",

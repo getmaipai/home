@@ -106,6 +106,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/podcasts/pages/search.json` | podcasts | Search podcasts |
 | `backend/packages/podcasts/pages/show.json` | podcasts | Podcast show |
 | `backend/packages/podcasts/pages/shows.json` | podcasts | Shows |
+| `backend/packages/podcasts/pages/skip.json` | podcasts | Skip settings |
 | `backend/packages/podcasts/pages/stats.json` | podcasts | Stats |
 | `backend/packages/podcasts/pages/transcripts.json` | podcasts | Transcripts |
 | `backend/packages/podcasts/pages/trending.json` | podcasts | Trending |

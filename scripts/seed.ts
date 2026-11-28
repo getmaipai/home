@@ -211,7 +211,10 @@ async function seedDemoMusic(baseUrl: string, dataDir: string, cookie: string): 
     }), `recording a play of ${title} failed`);
   }
   for (const station of DEMO_STATIONS) {
-    await requireOk(await request(baseUrl, "/api/plugins/audio/radio/stations", { method: "POST", cookie, body: JSON.stringify(station) }), `saving station ${station.name} failed`);
+    const saved = await request(baseUrl, "/api/plugins/audio/radio/stations", { method: "POST", cookie, body: JSON.stringify(station) });
+    // The audio package is switched off when its startup test cannot run (for example no cached deno modules); the rest of the demo household still seeds.
+    if (saved.status === 404) { console.error(`Skipped the demo station ${station.name}: the audio package is not running here.`); continue; }
+    await requireOk(saved, `saving station ${station.name} failed`);
   }
 }
 

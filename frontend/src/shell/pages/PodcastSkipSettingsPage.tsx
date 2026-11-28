@@ -1,3 +1,5 @@
+import { formatTimeSaved } from "@/shell/skip/skipPlan";
+import { useNavigate } from "react-router-dom";
 import { i18n } from "@lingui/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -5,8 +7,6 @@ import { api, type Roster } from "@/lib/api";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
-import { getIcon } from "@maipai/ui/src/icons";
 import { formatRelative } from "@/lib/format";
 
 type Choice = "skip" | "mark" | "off" | "inherit";
@@ -70,7 +70,7 @@ export function PodcastSkipSettingsPage({ person, showId }: { person: Roster; sh
       </fieldset>;
     })}
     {!showId && isAdmin ? <Button type="button" variant="outline" aria-pressed={homeValues.find((entry) => entry.key === "podcasts.skip.bumpers_with_ads")?.value !== false} onClick={() => void save("household", "podcasts.skip.bumpers_with_ads", homeValues.find((entry) => entry.key === "podcasts.skip.bumpers_with_ads")?.value === false)}>{i18n._({ id: "Skip bumpers with ads", message: "Skip bumpers with ads" })}: {homeValues.find((entry) => entry.key === "podcasts.skip.bumpers_with_ads")?.value === false ? i18n._({ id: "Off", message: "Off" }) : i18n._({ id: "On", message: "On" })}</Button> : null}
-    {!showId ? <Button type="button" variant="outline" onClick={() => setExplainer(true)}>{i18n._({ id: "How skip settings work", message: "How skip settings work" })}</Button> : <div className="rounded-lg border p-3"><h3 className="font-medium">{i18n._({ id: "This show", message: "This show" })}</h3>{summary.isError ? <><p>{i18n._({ id: "Stack is offline. Retry to reload this show summary.", message: "Stack is offline. Retry to reload this show summary." })}</p><Button type="button" variant="outline" onClick={() => void summary.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : showStats ? <><p className="text-body">{i18n._({ id: "{count} ads skipped · {minutes} minutes saved", message: "{count} ads skipped · {minutes} minutes saved", values: { count: showStats.ads_skipped, minutes: Math.round(showStats.seconds_saved / 60) } })}</p>{lastProcessed ? <p className="text-body text-muted-foreground">{i18n._({ id: "Last processed {when}", message: "Last processed {when}", values: { when: formatRelative(lastProcessed) } })}</p> : null}</> : <p className="text-body text-muted-foreground">{i18n._({ id: "Nothing skipped yet.", message: "Nothing skipped yet." })}</p>}</div>}
+    {!showId ? <Button type="button" variant="outline" onClick={() => setExplainer(true)}>{i18n._({ id: "How skip settings work", message: "How skip settings work" })}</Button> : <div className="rounded-lg border p-3"><h3 className="font-medium">{i18n._({ id: "This show", message: "This show" })}</h3>{summary.isError ? <><p>{i18n._({ id: "Stack is offline. Retry to reload this show summary.", message: "Stack is offline. Retry to reload this show summary." })}</p><Button type="button" variant="outline" onClick={() => void summary.refetch()}>{i18n._({ id: "Retry", message: "Retry" })}</Button></> : showStats ? <><p className="text-body">{i18n._({ id: "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}", message: "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}", values: { count: showStats.ads_skipped, saved: formatTimeSaved(showStats.seconds_saved) } })}</p>{lastProcessed ? <p className="text-body text-muted-foreground">{i18n._({ id: "Last processed {when}", message: "Last processed {when}", values: { when: formatRelative(lastProcessed) } })}</p> : null}</> : <p className="text-body text-muted-foreground">{i18n._({ id: "Nothing skipped yet.", message: "Nothing skipped yet." })}</p>}</div>}
     <Dialog open={explainer} onOpenChange={(open) => { setExplainer(open); if (!open) { void save(scope, "podcasts.skip.explainer.dismissed", true); setChoiceToSave(null); } }}><DialogContent><DialogHeader><DialogTitle>{i18n._({ id: "Choose how podcast breaks work", message: "Choose how podcast breaks work" })}</DialogTitle><DialogDescription>{i18n._({ id: "Skip ads jumps over detected breaks. Mark only shows them in the timeline without skipping. Off leaves playback unchanged. A bumper is a short sound or spoken tag around an ad break; by default a bumper beside a skipped ad goes with it.", message: "Skip ads jumps over detected breaks. Mark only shows them in the timeline without skipping. Off leaves playback unchanged. A bumper is a short sound or spoken tag around an ad break; by default a bumper beside a skipped ad goes with it." })}</DialogDescription></DialogHeader><div className="flex flex-wrap gap-2">{(["skip", "mark", "off"] as const).map((choice) => <Button key={choice} type="button" onClick={() => { if (choiceToSave) { void save(scope, choiceToSave.key, choice); void save(scope, "podcasts.skip.explainer.dismissed", true); setChoiceToSave(null); } setExplainer(false); }}>{choice === "skip" ? i18n._({ id: "Skip ads", message: "Skip ads" }) : choice === "mark" ? i18n._({ id: "Mark only", message: "Mark only" }) : i18n._({ id: "Off", message: "Off" })}</Button>)}</div></DialogContent></Dialog>
   </section>;
 }
@@ -80,8 +80,7 @@ function peopleValue(rows: Array<{ key: string; value: unknown }> | undefined, k
 }
 
 export function PodcastShowSkipSettingsAction({ person, showId }: { person: Roster; showId: string }) {
-  const [open, setOpen] = useState(false);
-  if (person.age_band !== "adult" || (person.role !== "owner" && person.role !== "admin")) return null;
-  const MoreIcon = getIcon("more-horizontal");
-  return <><DropdownMenu><DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-lg" aria-label={i18n._({ id: "More show actions", message: "More show actions" })} />}><MoreIcon aria-hidden="true" /></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => setOpen(true)}>{i18n._({ id: "Skip settings for this show", message: "Skip settings for this show" })}</DropdownMenuItem></DropdownMenuContent></DropdownMenu><Dialog open={open} onOpenChange={setOpen}><DialogContent><PodcastSkipSettingsPage person={person} showId={showId} /></DialogContent></Dialog></>;
+  const navigate = useNavigate();
+  if (person.age_band !== "adult" || (person.role !== "owner" && person.role !== "admin") || !showId) return null;
+  return <div className="px-4 pb-6"><Button type="button" variant="outline" onClick={() => navigate(`/apps/podcasts/skip?show=${encodeURIComponent(showId)}`)}>{i18n._({ id: "Skip settings for this show", message: "Skip settings for this show" })}</Button></div>;
 }

@@ -35,17 +35,22 @@ export function mapTime(positionSec: number, ranges: readonly Pick<SkipRange, "s
   return Math.max(0, skipped);
 }
 
-/** The time a skip saved, in the active language through the one formatter: "45 sec", "2 min 53 sec", "42 min", "1 hr 4 min", plus "saved". */
-export function formatTimeSaved(seconds: number): string {
+/** A length of time in the active language through the one formatter: "45 sec", "2 min 53 sec", "42 min", "1 hr 4 min". Empty for under a second. */
+export function formatSkipDuration(seconds: number): string {
   const total = Math.round(seconds);
   if (!Number.isFinite(total) || total < 1) return "";
   const u = (value: number, unit: "second" | "minute" | "hour") => formatUnit(value, unit, { maximumFractionDigits: 0 });
-  let amount: string;
-  if (total < 60) amount = u(total, "second");
-  else if (total < 600) { const m = Math.floor(total / 60), r = total % 60; amount = r ? `${u(m, "minute")} ${u(r, "second")}` : u(m, "minute"); }
-  else if (total < 3600) amount = u(Math.round(total / 60), "minute");
-  else { const h = Math.floor(total / 3600), m = Math.round((total % 3600) / 60); amount = m ? `${u(h, "hour")} ${u(m, "minute")}` : u(h, "hour"); }
-  return i18n._({ id: "{amount} saved", message: "{amount} saved", values: { amount } });
+  if (total < 60) return u(total, "second");
+  if (total < 600) { const m = Math.floor(total / 60), r = total % 60; return r ? `${u(m, "minute")} ${u(r, "second")}` : u(m, "minute"); }
+  if (total < 3600) return u(Math.round(total / 60), "minute");
+  const h = Math.floor(total / 3600), m = Math.round((total % 3600) / 60);
+  return m ? `${u(h, "hour")} ${u(m, "minute")}` : u(h, "hour");
+}
+
+/** The time a skip saved, with the word "saved". */
+export function formatTimeSaved(seconds: number): string {
+  const amount = formatSkipDuration(seconds);
+  return amount ? i18n._({ id: "{amount} saved", message: "{amount} saved", values: { amount } }) : "";
 }
 
 /** The polite screen-reader line for a skipped break (translated by the caller): whole minutes, at least one. */

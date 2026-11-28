@@ -148,7 +148,7 @@ msgid "{activeLabel}, {displayTime} remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/skip/skipPlan.ts:48
+#: src/shell/skip/skipPlan.ts:53
 msgid "{amount} saved"
 msgstr ""
 
@@ -160,6 +160,16 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/setup/SetupWizard.tsx:148
 msgid "{checksErrorMessage} Refresh this page and try again."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastTimeSaved.tsx:16
+msgid "{count, plural, one {# ad skipped} other {# ads skipped}}"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
+msgid "{count, plural, one {# ad skipped} other {# ads skipped}} · {saved}"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -366,16 +376,6 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/apps/people/FaceEnrollmentPage.tsx:762
 msgid "{count, plural, one {Saving # face sample…} other {Saving # face samples…}}"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:15
-msgid "{count} ads skipped"
-msgstr ""
-
-#. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:73
-msgid "{count} ads skipped · {minutes} minutes saved"
 msgstr ""
 
 #. js-lingui-explicit-id
@@ -1138,17 +1138,17 @@ msgid "{pictures} and {videos}"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:314
+#: src/shell/pages/PackageAppPage.tsx:315
 msgid "{place} is already in your list."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:325
+#: src/shell/pages/PackageAppPage.tsx:326
 msgid "{place} is your home place. Change it in Settings, Weather."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:332
+#: src/shell/pages/PackageAppPage.tsx:333
 msgid "{place} removed from your list."
 msgstr ""
 
@@ -7476,7 +7476,7 @@ msgid "Could not remove that person. Check your connection and try again."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:333
+#: src/shell/pages/PackageAppPage.tsx:334
 msgid "Could not remove this place."
 msgstr ""
 
@@ -12499,7 +12499,7 @@ msgid "Household synth"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:15
+#: src/shell/pages/PodcastTimeSaved.tsx:16
 #: src/shell/pages/StoragePage.tsx:85
 #: src/shell/pages/StoragePage.tsx:155
 msgid "Household total"
@@ -14225,7 +14225,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:73
-#: src/shell/pages/PodcastTimeSaved.tsx:15
+#: src/shell/pages/PodcastTimeSaved.tsx:16
 msgid "Last processed {when}"
 msgstr ""
 
@@ -15297,7 +15297,7 @@ msgid "Loading the styles"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:10
+#: src/shell/pages/PodcastTimeSaved.tsx:11
 msgid "Loading time saved"
 msgstr ""
 
@@ -15332,7 +15332,7 @@ msgid "Loading voices"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:307
+#: src/shell/pages/PackageAppPage.tsx:308
 msgid "Loading weather"
 msgstr ""
 
@@ -16939,11 +16939,6 @@ msgid "setting.ease.spacing.option.roomy"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:86
-msgid "More show actions"
-msgstr ""
-
-#. js-lingui-explicit-id
 #: src/shell/AlarmRinger.tsx:64
 msgid "More snooze options"
 msgstr ""
@@ -17973,7 +17968,7 @@ msgid "No items match your search."
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:14
+#: src/shell/pages/PodcastTimeSaved.tsx:15
 msgid "No listening time saved yet."
 msgstr ""
 
@@ -20756,7 +20751,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/shell/library/useSaveAsCharacter.tsx:49
 #: src/shell/MediaPickerDialog.tsx:76
-#: src/shell/pages/PackageAppPage.tsx:332
+#: src/shell/pages/PackageAppPage.tsx:333
 msgid "Place"
 msgstr ""
 
@@ -23756,9 +23751,9 @@ msgid "seconds"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:373
-#: src/shell/pages/PackageAppPage.tsx:391
-#: src/shell/pages/PackageAppPage.tsx:406
+#: src/shell/pages/PackageAppPage.tsx:374
+#: src/shell/pages/PackageAppPage.tsx:392
+#: src/shell/pages/PackageAppPage.tsx:407
 msgid "Sections"
 msgstr ""
 
@@ -25089,7 +25084,7 @@ msgstr ""
 
 #. js-lingui-explicit-id
 #: src/shell/pages/PodcastSkipSettingsPage.tsx:55
-#: src/shell/pages/PodcastSkipSettingsPage.tsx:86
+#: src/shell/pages/PodcastSkipSettingsPage.tsx:85
 msgid "Skip settings for this show"
 msgstr ""
 
@@ -27117,7 +27112,7 @@ msgstr ""
 #: src/shell/pages/MusicStudioView.tsx:155
 #: src/shell/pages/MusicStudioView.tsx:156
 #: src/shell/pages/MusicStudioView.tsx:159
-#: src/shell/pages/PackageAppPage.tsx:306
+#: src/shell/pages/PackageAppPage.tsx:307
 #: src/shell/pages/ProjectsPage.tsx:137
 #: src/shell/pages/RepairsPage.tsx:124
 #: src/shell/pages/settings/SettingsAreaPage.tsx:271
@@ -28937,7 +28932,7 @@ msgid "This makes a new voice based on the recording. It is not a copy of the vo
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:15
+#: src/shell/pages/PodcastTimeSaved.tsx:16
 msgid "This month"
 msgstr ""
 
@@ -28982,7 +28977,7 @@ msgid "This picture becomes the element. Use the name with @ in chat or on Creat
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PackageAppPage.tsx:325
+#: src/shell/pages/PackageAppPage.tsx:326
 msgid "This place"
 msgstr ""
 
@@ -29163,7 +29158,7 @@ msgid "This was wrong"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:15
+#: src/shell/pages/PodcastTimeSaved.tsx:16
 msgid "This week"
 msgstr ""
 
@@ -29229,13 +29224,13 @@ msgid "Time remaining"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:14
 #: src/shell/pages/PodcastTimeSaved.tsx:15
+#: src/shell/pages/PodcastTimeSaved.tsx:16
 msgid "Time saved"
 msgstr ""
 
 #. js-lingui-explicit-id
-#: src/shell/pages/PodcastTimeSaved.tsx:11
+#: src/shell/pages/PodcastTimeSaved.tsx:12
 msgid "Time saved could not be loaded. Check Stack and reload to try again."
 msgstr ""
 
