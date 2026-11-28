@@ -6,7 +6,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { resetDb } from "../../../tests/reset-db";
 import { newMediaItemId } from "@/lib/id";
 import { BUILTIN_SEGMENT_POLICY, PODCAST_SEGMENT_KINDS, resolveSegmentPolicy } from "./podcastSegmentPolicy";
-import { acceptPodcastSegments, correctPodcastSegment, podcastPlayerSkipBindings, pollPodcastSegments, processPodcastCopy, skipPlanFor } from "./podcastSegments";
+import { acceptPodcastSegments, correctPodcastSegment, podcastPlayerSkipBindings, podcastSkipAction, pollPodcastSegments, processPodcastCopy, skipPlanFor } from "./podcastSegments";
 import type { PersonRow } from "@/types";
 import type { MediaSegmentsRecord } from "@maipai/spec/media/ts/segments.js";
 
@@ -106,6 +106,19 @@ describe("saved podcast segment lifecycle", () => {
     correctionCalls.length = 0;
     await correctPodcastSegment(itemId, "record-1", "seg-1", true);
     expect(correctionCalls).toEqual([["seg-1", "rejected"]]);
+  });
+  test("skip actions answer with player instructions the page renderer applies; a child cannot review", async () => {
+    await processPodcastCopy(itemId);
+    acceptPodcastSegments(itemId, sha, "record-1", record(sha));
+    const child = db.select().from(people).where(eq(people.id, "person-podseg-child")).get()! as PersonRow;
+    const undo = await podcastSkipAction(child, { mediaId: itemId, actionId: "undo", id: "seg-1" }) as { player: Record<string, unknown> };
+    expect(undo.player).toMatchObject({ seek_to_sec: 10, play_once_until_sec: 20, resume_after: true });
+    const press = await podcastSkipAction(child, { mediaId: itemId, actionId: "skip_button", id: "seg-1" }) as { player: Record<string, unknown> };
+    expect(press.player).toMatchObject({ seek_to_sec: 20, refresh: true });
+    const hear = await podcastSkipAction(child, { mediaId: itemId, actionId: "hear_anyway", id: "seg-1" }) as { player: Record<string, unknown> };
+    expect(hear.player).toMatchObject({ refresh: true });
+    await expect(Promise.resolve().then(() => podcastSkipAction(child, { mediaId: itemId, actionId: "wrong", id: "seg-1" }))).rejects.toThrow();
+    await expect(Promise.resolve().then(() => podcastSkipAction(child, { mediaId: itemId, actionId: "missed", startSec: 5 }))).rejects.toThrow();
   });
   test("a completed plan follows matching saved-copy SHA, never the publisher stream", async () => {
     await processPodcastCopy(itemId);

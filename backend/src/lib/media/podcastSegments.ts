@@ -62,7 +62,7 @@ export function podcastSkipAction(person: PersonRow, input: { mediaId: string; a
   if (input.actionId === "hear_anyway") {
     if (!range) throw new Error("That range is no longer available.");
     heardThisPlay.add(`${key}:${range.id}`);
-    return { ok: true, suppress_id: range.id };
+    return { ok: true, suppress_id: range.id, player: { refresh: true, announce: "This break will play." } };
   }
   if (input.actionId === "missed") {
     if (mediaBandOf(person) === "child") throw new Error("This action is not available.");
@@ -82,8 +82,12 @@ export function podcastSkipAction(person: PersonRow, input: { mediaId: string; a
     if (!range || !plan.recordId) throw new Error("That range is no longer available.");
     return correctPodcastSegment(input.mediaId, plan.recordId, range.id, true).then(() => ({ ok: true }));
   }
-  if (input.actionId === "range_select" || input.actionId === "undo") return { seek_to: range?.startSec ?? input.startSec ?? 0, play_once: true };
-  if (input.actionId === "skip_button") return { seek_to: range?.endSec ?? input.endSec ?? 0 };
+  // The page renderer applies `player` to the Player that sent the action (spec action result, spec-v0.1.491).
+  if (input.actionId === "range_select" || input.actionId === "undo") {
+    const startSec = range?.startSec ?? input.startSec ?? 0, endSec = range?.endSec ?? input.endSec;
+    return { ok: true, player: { seek_to_sec: startSec, ...(endSec !== undefined && endSec > startSec ? { play_once_until_sec: endSec, resume_after: true } : {}), announce: "Playing the skipped break once." } };
+  }
+  if (input.actionId === "skip_button") return { ok: true, player: { seek_to_sec: range?.endSec ?? input.endSec ?? 0, announce: "Skipped the break.", refresh: true } };
   return { ok: false };
 }
 
