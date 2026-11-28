@@ -247,7 +247,7 @@
       "item_subtitle_field": "{date} · {description} · {skip_help}",
       "item_media_field": "thumbnail",
       "item_meta_field": "duration_s",
-      "item_badge_field": "skip_badge",
+      "item_badge_field": "unplayed",
       "aspect": "wide",
       "variant": "plain",
       "orientation": "vertical",
@@ -310,7 +310,8 @@
             }
           }
         }
-      ]
+      ],
+      "item_badge_presentation": "dot"
     }
   ]
 }
